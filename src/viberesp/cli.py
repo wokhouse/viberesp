@@ -245,8 +245,9 @@ def import_cmd(input_path, overwrite):
 @click.argument('driver_name')
 @click.argument('enclosure_type', type=click.Choice(['sealed', 'ported']))
 @click.option('--volume', '-v', type=float, required=True, help='Box volume (L)')
+@click.option('--depth', '-d', type=float, help='Enclosure internal depth (cm)')
 @click.option('--tuning', '-f', type=float, help='Port tuning frequency (Hz) [for ported]')
-@click.option('--port-diameter', '-d', type=float, help='Port diameter (cm) [for ported]')
+@click.option('--port-diameter', '-D', type=float, help='Port diameter (cm) [for ported]')
 @click.option('--num-ports', '-n', type=int, default=1, help='Number of ports')
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.option('--plot', '-p', is_flag=True, help='Show frequency response plot')
@@ -269,6 +270,11 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
         'enclosure_type': enclosure_type,
         'vb': volume,
     }
+
+    # Add depth if provided
+    depth = kwargs.get('depth')
+    if depth is not None:
+        params_dict['depth_cm'] = depth
 
     if enclosure_type == 'ported':
         tuning = kwargs.get('tuning')
@@ -301,6 +307,14 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
     click.echo(f"\n{enclosure_type.title()} Enclosure Simulation")
     click.echo(f"Driver: {driver_name}")
     click.echo(f"Volume: {volume:.1f} L")
+    if depth is not None:
+        click.echo(f"Depth: {depth:.1f} cm")
+        # Calculate approximate front panel area
+        # Area (cm²) = Volume (L) × 1000 / depth (cm)
+        front_area_cm2 = (volume * 1000) / depth
+        side_length_cm = np.sqrt(front_area_cm2)
+        click.echo(f"  → Front panel area: ~{front_area_cm2:.0f} cm²")
+        click.echo(f"  → If square: ~{side_length_cm:.1f} × {side_length_cm:.1f} cm")
 
     if enclosure_type == 'ported' and tuning:
         click.echo(f"Tuning: {tuning:.1f} Hz")

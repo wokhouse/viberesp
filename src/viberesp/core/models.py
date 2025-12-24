@@ -271,6 +271,11 @@ class EnclosureParameters(BaseModel):
         gt=0,
         description="Net internal box volume (L)"
     )
+    depth_cm: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Enclosure internal depth (cm)"
+    )
 
     # Ported enclosure parameters
     fb: Optional[float] = Field(
