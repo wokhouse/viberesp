@@ -353,6 +353,79 @@ Viberesp is designed to complement Hornresp, not replace it:
 - Multi-segment horns and folded horns
 - Room interaction and array modeling
 
+## Testing
+
+Viberesp includes automated tests to validate simulation accuracy against Hornresp reference data.
+
+### Running Tests
+
+```bash
+# Run all validation tests
+pytest tests/validation/ -v
+
+# Check for regressions (strict - fails if metrics degrade)
+pytest tests/validation/test_regression.py::test_regression_no_degradation -v
+
+# Track improvements
+pytest tests/validation/test_regression.py::test_regression_improvement_tracking -v -s
+```
+
+### Test Infrastructure
+
+The test suite includes:
+
+- **Synthetic Test Cases**: 4 progressively complex horn designs
+  - Case 1: Straight exponential horn (no chambers)
+  - Case 2: Horn + rear chamber
+  - Case 3: Horn + front chamber
+  - Case 4: Complete F118-style system
+
+- **Regression Testing**: Ensures simulation quality doesn't degrade
+  - Strict: Tests fail if RMSE increases or correlation decreases
+  - Tracks improvements over time
+  - Baseline history for trend analysis
+
+- **Validation Metrics**: RMSE, F3 error, correlation, MAE
+
+Current baseline metrics (starting point for tracking improvements):
+```
+Case                          RMSE (dB)    Correlation
+case1_straight_horn            13.56        -0.21
+case2_horn_rear_chamber         9.22         0.00
+case3_horn_front_chamber        34.39         0.33
+case4_complete_system           35.83         0.22
+```
+
+Note: The current physics model has poor agreement with Hornresp. This establishes the baseline for tracking future physics model improvements.
+
+### Updating Baselines
+
+After improving the physics model with literature backing:
+
+```bash
+# 1. Generate new baselines
+PYTHONPATH=src python3 tools/generate_baselines.py
+
+# 2. Review the improvements (metrics should get better)
+git diff tests/fixtures/baselines/
+
+# 3. Commit with explanation
+git commit -m "Improve front chamber Helmholtz model
+
+Added standing wave modes 1-3 to front chamber impedance
+calculation based on Beranek (1954) pipe theory.
+
+Improvements:
+- case3 RMSE: 34.39 → 12.5 dB
+- case4 RMSE: 35.83 → 15.2 dB
+
+References:
+- Beranek, L.L. 'Acoustics', §5.15"
+"
+```
+
+See `tests/fixtures/hornresp/synthetic/README.md` for detailed test case documentation.
+
 ## Physics Model Status
 
 The horn physics model is under active development:
@@ -364,12 +437,10 @@ The horn physics model is under active development:
 - Multi-mode front chamber Helmholtz resonance
 - Rear chamber compliance modeling
 
-**In Development:**
-- SPL magnitude calibration
-- Horn high-pass characteristic refinement
-- Validation against Hornresp reference designs
-
-**Current Status:** Use empirical model or export to Hornresp for validated designs.
+**Current Status:**
+- RMSE: 9-35 dB vs Hornresp (baseline established 2024-12-24)
+- Target: RMSE < 5 dB vs Hornresp
+- Use empirical model or export to Hornresp for validated designs
 
 ## License
 

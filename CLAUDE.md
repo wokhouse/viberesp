@@ -520,13 +520,205 @@ export_hornresp_params(
 )
 ```
 
-## Testing Status
+## Testing
 
-Tests directory exists but is currently empty. When adding tests:
-- Place in `tests/` directory
-- Name files `test_*.py`
-- Use pytest fixtures for common setup (driver parameters, enclosures)
-- Target coverage configured in pytest.ini_options
+Viberesp has automated test infrastructure for validating simulation accuracy against Hornresp reference data.
+
+### Test Structure
+
+```
+tests/
+├── validation/                        # Hornresp validation tests
+│   ├── conftest.py                   # Shared pytest fixtures
+│   ├── test_synthetic_cases.py       # Test synthetic cases
+│   └── test_regression.py            # Regression tests
+├── fixtures/
+│   ├── drivers/                      # Driver JSON files
+│   ├── hornresp/
+│   │   └── synthetic/                 # Synthetic test cases
+│   │       ├── case1_straight_horn/
+│   │       │   ├── parameters.txt     # Hornresp input
+│   │       │   ├── simulation.txt     # Hornresp output
+│   │       │   ├── metadata.json      # Case description
+│   │       │   └── baseline.json      # Expected metrics
+│   │       ├── case2_horn_rear_chamber/
+│   │       ├── case3_horn_front_chamber/
+│   │       └── case4_complete_system/
+│   └── baselines/                    # Global baseline tracking
+│       ├── current.json               # Current accepted metrics
+│       └── history/                  # Historical metrics
+└── reports/                          # Generated reports (gitignored)
+```
+
+### Running Tests
+
+```bash
+# Run all validation tests
+pytest tests/validation/ -v
+
+# Run specific test file
+pytest tests/validation/test_synthetic_cases.py -v
+
+# Run regression test (fails on metric degradation)
+pytest tests/validation/test_regression.py::test_regression_no_degradation -v
+
+# Track improvements (informational, always passes)
+pytest tests/validation/test_regression.py::test_regression_improvement_tracking -v -s
+```
+
+### Adding New Tests
+
+When adding validation tests for new enclosure types or test cases:
+
+1. **Create test fixture files** in `tests/fixtures/hornresp/synthetic/caseX_*/`:
+   - `parameters.txt`: Hornresp input file
+   - `simulation.txt`: Hornresp output reference
+   - `metadata.json`: Test case description and validation targets
+   - `baseline.json`: Expected metrics (run `tools/generate_baselines.py` to generate)
+
+2. **Add driver** to `tests/fixtures/drivers/*.json` if using new driver
+
+3. **Add test case** to `SYNTHETIC_CASES` list in `tests/validation/test_synthetic_cases.py`
+
+4. **Run tests** to verify they work
+
+### Regression Testing
+
+The regression system enforces **strict quality control**:
+
+- **Tests FAIL if** metrics degrade (RMSE increases, correlation decreases)
+- **Tolerance**: 0% - any degradation fails CI
+- **Baseline updates** require literature backing and manual approval
+
+To update baselines after physics model improvements:
+
+```bash
+# 1. Improve physics model with literature backing
+# 2. Generate new baselines
+PYTHONPATH=src python3 tools/generate_baselines.py
+
+# 3. Review improvements (metrics should get better)
+git diff tests/fixtures/
+
+# 4. Commit with detailed explanation
+git add tests/fixtures/baselines/
+git commit -m "Improve horn throat impedance model
+
+Implemented Kolbrek's finite exponential horn equations
+with proper throat reactance correction.
+
+References:
+- Kolbrek, B. 'Horn Theory: An Introduction', Eq. 3.21
+
+Baseline improvements:
+- case1 RMSE: 13.56 → 8.2 dB
+- case2 RMSE: 9.22 → 6.5 dB
+"
+```
+
+### CI/CD
+
+GitHub Actions workflow (`.github/workflows/validation.yml`) runs on every push/PR:
+- Runs all synthetic case tests
+- Checks for regressions
+- Reports improvements
+- Uploads validation results as artifacts
+
+### Current Baseline Metrics
+
+Established 2024-12-24 as starting point for tracking improvements:
+
+| Case | RMSE (dB) | Correlation |
+|------|-----------|-------------|
+| case1_straight_horn | 13.56 | -0.21 |
+| case2_horn_rear_chamber | 9.22 | 0.00 |
+| case3_horn_front_chamber | 34.39 | 0.33 |
+| case4_complete_system | 35.83 | 0.22 |
+
+The physics model is under active development. These baselines establish the starting point for measuring future improvements.
+
+### Test Fixtures Format
+
+#### Driver JSON (`tests/fixtures/drivers/*.json`)
+
+```json
+{
+  "manufacturer": "B&C",
+  "model_number": "18DS115",
+  "fs": 32.0,
+  "qes": 0.38,
+  "qms": 6.52,
+  "sd": 0.121,
+  "re": 5.0,
+  "bl": 39.0,
+  "mms": 330.0,
+  "cms": 8.24e-05,
+  "rms": 14.72,
+  "le": 3.85,
+  "xmax": 16.5,
+  "pe": 500.0,
+  "vas": 158.0,
+  "driver_type": "woofer"
+}
+```
+
+#### Test Case Metadata (`tests/fixtures/hornresp/synthetic/caseX/metadata.json`)
+
+```json
+{
+  "id": "case1_straight_horn",
+  "name": "Straight Exponential Horn",
+  "description": "Pure exponential horn with no chambers",
+  "category": "synthetic",
+  "tags": ["exponential", "no_chambers"],
+  "driver": "idealized_18inch",
+  "enclosure_type": "exponential_horn",
+  "parameters": {
+    "throat_area_cm2": 600,
+    "mouth_area_cm2": 4800,
+    "horn_length_cm": 200,
+    "cutoff_frequency": 35
+  },
+  "expected_behavior": {
+    "f3_range": [35, 40],
+    "horn_gain_db": 9
+  },
+  "validation_targets": {
+    "rmse_max": 3.0,
+    "f3_error_max": 5.0,
+    "correlation_min": 0.98
+  }
+}
+```
+
+#### Baseline (`tests/fixtures/hornresp/synthetic/caseX/baseline.json`)
+
+```json
+{
+  "test_case": "case1_straight_horn",
+  "commit": "abc123...",
+  "date": "2024-12-24",
+  "viberesp_version": "0.1.0",
+  "metrics": {
+    "rmse": 13.557,
+    "mae": 8.234,
+    "max_error": 25.3,
+    "max_error_freq": 45.2,
+    "passband_rmse": 12.1,
+    "bass_rmse": 14.8,
+    "f3_viberesp": null,
+    "f3_hornresp": null,
+    "f3_error": null,
+    "correlation": -0.2073,
+    "agreement_score": 0.0
+  },
+  "model_settings": {
+    "use_physics_model": true,
+    "radiation_model": "beranek",
+    "front_chamber_modes": 3
+  }
+}
+```
 
 ## Dependencies
 
