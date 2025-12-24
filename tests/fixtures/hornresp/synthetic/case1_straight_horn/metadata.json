@@ -1,0 +1,29 @@
+{
+  "id": "case1_straight_horn",
+  "name": "Straight Exponential Horn",
+  "description": "Pure exponential horn with no chambers - baseline test case",
+  "category": "synthetic",
+  "tags": ["exponential", "no_chambers", "baseline"],
+  "driver": "idealized_18inch",
+  "enclosure_type": "exponential_horn",
+  "parameters": {
+    "throat_area_cm2": 600,
+    "mouth_area_cm2": 4800,
+    "horn_length_cm": 200,
+    "cutoff_frequency": 35,
+    "rear_chamber_volume": 0,
+    "front_chamber_volume": 0
+  },
+  "expected_behavior": {
+    "f3_range": [35, 40],
+    "horn_gain_db": 9,
+    "roll_off": "12 dB/octave below cutoff"
+  },
+  "validation_targets": {
+    "rmse_max": 3.0,
+    "f3_error_max": 5.0,
+    "correlation_min": 0.98
+  },
+  "created": "2024-12-24",
+  "notes": "Simplest horn configuration - validates basic exponential horn equations"
+}

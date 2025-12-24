@@ -1,0 +1,24 @@
+{
+  "test_case": "case3_horn_front_chamber",
+  "commit": "5bad42f607af3a7a1cadb242ddb163f795cb94d5",
+  "date": "2025-12-24T15:36:36.939362",
+  "viberesp_version": "0.1.0",
+  "metrics": {
+    "rmse": 34.38785075739988,
+    "mae": 30.269068217670384,
+    "max_error": 61.50645272627305,
+    "max_error_freq": 53.045455142347386,
+    "passband_rmse": 18.615098235313056,
+    "bass_rmse": 39.12618831376749,
+    "f3_viberesp": 371.33609178683395,
+    "f3_hornresp": 48.08361641328223,
+    "f3_error": 323.2524753735517,
+    "correlation": 0.3289600402461035,
+    "agreement_score": 0.0
+  },
+  "model_settings": {
+    "use_physics_model": true,
+    "radiation_model": "beranek",
+    "front_chamber_modes": 3
+  }
+}

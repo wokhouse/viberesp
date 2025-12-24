@@ -1,0 +1,24 @@
+{
+  "test_case": "case4_complete_system",
+  "commit": "5bad42f607af3a7a1cadb242ddb163f795cb94d5",
+  "date": "2025-12-24T15:36:36.948511",
+  "viberesp_version": "0.1.0",
+  "metrics": {
+    "rmse": 35.82834512923407,
+    "mae": 30.94251853420407,
+    "max_error": 63.28387481404193,
+    "max_error_freq": 48.115650505228636,
+    "passband_rmse": 15.462393882651728,
+    "bass_rmse": 41.45978696980601,
+    "f3_viberesp": 371.04620493874415,
+    "f3_hornresp": 44.12158403383724,
+    "f3_error": 326.92462090490693,
+    "correlation": 0.22050816064252102,
+    "agreement_score": 0.0
+  },
+  "model_settings": {
+    "use_physics_model": true,
+    "radiation_model": "beranek",
+    "front_chamber_modes": 3
+  }
+}

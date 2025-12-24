@@ -1,0 +1,19 @@
+{
+  "manufacturer": "B&C",
+  "model_number": "18DS115",
+  "fs": 32.0,
+  "qes": 0.38,
+  "qms": 6.52,
+  "sd": 0.121,
+  "re": 5.0,
+  "bl": 39.0,
+  "mms": 330.0,
+  "cms": 8.24e-05,
+  "rms": 14.72,
+  "le": 3.85,
+  "xmax": 16.5,
+  "pe": 500.0,
+  "vas": 158.0,
+  "driver_type": "woofer",
+  "notes": "B&C 18DS115 - real datasheet parameters for case 4 (F118-style design)"
+}

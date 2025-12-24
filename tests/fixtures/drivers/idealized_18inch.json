@@ -1,0 +1,19 @@
+{
+  "manufacturer": "Idealized",
+  "model_number": "18inch_Test",
+  "fs": 30.0,
+  "qes": 0.25,
+  "qms": 5.0,
+  "sd": 0.121,
+  "re": 6.0,
+  "bl": 35.0,
+  "mms": 300.0,
+  "cms": 8.24e-05,
+  "rms": 15.0,
+  "le": 3.5,
+  "xmax": 15.0,
+  "pe": 100.0,
+  "vas": 200.0,
+  "driver_type": "woofer",
+  "notes": "Idealized driver for synthetic test cases (cases 1-3)"
+}

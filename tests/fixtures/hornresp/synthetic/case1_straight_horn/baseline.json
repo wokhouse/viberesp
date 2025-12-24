@@ -1,0 +1,24 @@
+{
+  "test_case": "case1_straight_horn",
+  "commit": "5bad42f607af3a7a1cadb242ddb163f795cb94d5",
+  "date": "2025-12-24T15:36:36.920090",
+  "viberesp_version": "0.1.0",
+  "metrics": {
+    "rmse": 13.556665864315756,
+    "mae": 8.022054655477188,
+    "max_error": 39.14573820073704,
+    "max_error_freq": 20.000000000000004,
+    "passband_rmse": 4.587908801910735,
+    "bass_rmse": 15.861561722160062,
+    "f3_viberesp": null,
+    "f3_hornresp": 48.08449892776651,
+    "f3_error": null,
+    "correlation": -0.2073453177811351,
+    "agreement_score": 0.0
+  },
+  "model_settings": {
+    "use_physics_model": true,
+    "radiation_model": "beranek",
+    "front_chamber_modes": 3
+  }
+}

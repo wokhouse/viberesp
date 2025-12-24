@@ -163,3 +163,8 @@ data/
 
 # Claude Code
 .claude/
+
+# Validation test reports (generated)
+tests/reports/*.html
+tests/reports/*.json
+tests/reports/*.png
