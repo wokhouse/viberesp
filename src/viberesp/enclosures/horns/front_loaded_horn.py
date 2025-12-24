@@ -269,13 +269,17 @@ class FrontLoadedHorn(BaseHorn):
         frequencies: np.ndarray
     ) -> np.ndarray:
         """
-        Calculate front chamber compliance effect.
+        Calculate front chamber effect on frequency response.
 
-        The front chamber (if present) acts as a high-pass filter in series
-        with the horn. The cutoff frequency depends on the throat area
-        and chamber volume.
+        The front chamber (if present) affects the system response through:
+        - Helmholtz resonance with the horn throat (calculated but not directly applied)
+        - Modified coupling between driver and horn
 
-        fc_front ≈ c / (2π) × √(St / (Vfc × L_eff))
+        The current implementation uses a simplified first-order high-pass model
+        that approximates the effect without creating artificial resonant peaks.
+
+        For accurate Helmholtz resonance frequency calculation, use:
+            calculate_loaded_parameters()['f_helmholtz']
 
         Args:
             frequencies: Array of frequencies (Hz)
@@ -286,28 +290,36 @@ class FrontLoadedHorn(BaseHorn):
         if not self.params.front_chamber_volume:
             return np.ones_like(frequencies, dtype=complex)
 
-        # Front chamber volume (convert L to m³)
-        Vfc = self.params.front_chamber_volume * 0.001
-        St = self.throat_area
+        # Simplified first-order high-pass filter
+        # This approximates the front chamber effect without creating resonant peaks
+        C_fc = self._calculate_acoustic_compliance(self.params.front_chamber_volume)
 
-        # Use actual acoustic path length if provided (from Hornresp Lrc parameter)
-        # This represents the physical path length through the chamber
-        # Otherwise fall back to horn-based approximation
-        if self.params.rear_chamber_length_cm:
-            # Hornresp uses Lrc for acoustic path length in cm
-            L_acoustic = self.params.rear_chamber_length_cm * 0.01  # Convert cm to m
+        # Use Hornresp-compatible acoustic parameters
+        if self.params.front_chamber_area_cm2:
+            area_cm2 = self.params.front_chamber_area_cm2
         else:
-            # Crude fallback approximation based on horn length
-            L_acoustic = self.horn_length * 0.1
+            area_cm2 = self.params.throat_area_cm2 if self.params.throat_area_cm2 else 50.0
 
-        # Calculate front chamber cutoff frequency
-        # fc = c / (2π) × √(St / (Vfc × L_acoustic))
-        fc_front = (C / (2 * np.pi)) * np.sqrt(St / (Vfc * L_acoustic + 1e-10))
+        if self.params.rear_chamber_length_cm:
+            length_m = self.params.rear_chamber_length_cm * 0.01
+        else:
+            length_m = self.calculate_effective_length() if self.horn_length else 0.0
 
-        # First-order high-pass filter response
+        M_horn = self._calculate_acoustic_mass(area_cm2, length_m)
+
+        # Calculate Helmholtz resonance frequency for reference
+        f_helmholtz = self._calculate_helmholtz_resonance(C_fc, M_horn)
+
+        # First-order high-pass filter at Helmholtz frequency
+        # This provides a gentle roll-off below resonance without creating peaks
         w = 2 * np.pi * frequencies
-        wc = 2 * np.pi * fc_front
+        wc = 2 * np.pi * f_helmholtz
         H = (1j * w / wc) / (1 + 1j * w / wc)
+
+        # Attenuate the effect for large chambers
+        if self.params.front_chamber_volume > 100:
+            attenuation = 0.5 + 0.5 * (100 / self.params.front_chamber_volume)
+            H = H * attenuation + (1 - attenuation)
 
         return H
 
@@ -375,6 +387,102 @@ class FrontLoadedHorn(BaseHorn):
         mass_loading_factor = M_horn / (Mms_kg + 1e-10)
 
         return mass_loading_factor
+
+    def _calculate_acoustic_compliance(self, volume_liters: float) -> float:
+        """
+        Calculate acoustic compliance of a chamber.
+
+        C_acoustic = V / (ρ₀ × c²)
+
+        Args:
+            volume_liters: Chamber volume in liters
+
+        Returns:
+            Acoustic compliance in m⁵/N
+        """
+        from viberesp.core.constants import RHO, C
+
+        volume_m3 = volume_liters * 0.001
+        return volume_m3 / (RHO * C**2)
+
+    def _calculate_acoustic_mass(self, area_cm2: float, length_m: float) -> float:
+        """
+        Calculate acoustic mass of a tube/horn section.
+
+        M_acoustic = ρ₀ × L / S
+
+        Args:
+            area_cm2: Cross-sectional area in cm²
+            length_m: Effective length in meters
+
+        Returns:
+            Acoustic mass in kg/m⁴
+        """
+        from viberesp.core.constants import RHO, CM2_TO_M2
+
+        area_m2 = area_cm2 * CM2_TO_M2
+        return RHO * length_m / area_m2
+
+    def _calculate_helmholtz_resonance(
+        self,
+        compliance_m5_n: float,
+        mass_kg_m4: float
+    ) -> float:
+        """
+        Calculate Helmholtz resonance frequency.
+
+        f_h = 1 / (2π × √(M × C))
+
+        Args:
+            compliance_m5_n: Acoustic compliance (m⁵/N)
+            mass_kg_m4: Acoustic mass (kg/m⁴)
+
+        Returns:
+            Resonance frequency in Hz
+        """
+        return 1.0 / (2 * np.pi * np.sqrt(mass_kg_m4 * compliance_m5_n))
+
+    def _calculate_helmholtz_q(
+        self,
+        resonance_freq: float,
+        compliance_m5_n: float,
+        mass_kg_m4: float,
+        resistance: float = None
+    ) -> float:
+        """
+        Calculate Q factor of Helmholtz resonator.
+
+        Q = (1/R) × √(M/C) for parallel RLC
+        Q = R × √(C/M) for series RLC
+
+        Uses horn radiation resistance as damping.
+
+        Args:
+            resonance_freq: Resonance frequency (Hz)
+            compliance_m5_n: Acoustic compliance (m⁵/N)
+            mass_kg_m4: Acoustic mass (kg/m⁴)
+            resistance: Acoustic resistance (optional, auto-calculated if None)
+
+        Returns:
+            Q factor (unitless)
+        """
+        from viberesp.core.constants import RHO, C
+
+        if resistance is None:
+            # Use horn characteristic impedance as reference
+            # Z0 = (ρ₀ × c) / S_throat
+            Z0 = (RHO * C) / self.throat_area if self.throat_area else (RHO * C) / 0.01
+            resistance = Z0
+
+        # Acoustic impedance at resonance
+        # Z_acoustic = √(M/C) = 1/(2π × fc × C)
+        z_acoustic = 1.0 / (2 * np.pi * resonance_freq * compliance_m5_n)
+
+        # Q depends on coupling configuration
+        # For driver-loaded system, Q is typically high (under-damped)
+        q_factor = z_acoustic / resistance
+
+        return q_factor
 
     def calculate_frequency_response(
         self,
@@ -497,15 +605,23 @@ class FrontLoadedHorn(BaseHorn):
                 f_norm = np.log10(f / 200)
                 response_db[i] = spl_peak - 3 - 2 * f_norm
 
-        # Apply front chamber filtering if present
-        # This now uses the proper acoustic path length from Hornresp parameters
-        H_front = self._calculate_front_chamber_response(frequencies)
-        front_chamber_attenuation = 20 * np.log10(np.abs(H_front) + 1e-10)
-        response_db = response_db + front_chamber_attenuation
+        # Apply Helmholtz resonance if front chamber present
+        if self.params.front_chamber_volume:
+            # Get Helmholtz transfer function
+            H_helmholtz = self._calculate_front_chamber_response(frequencies)
 
-        # Calculate phase (approximate based on group delay)
-        # Use effective length with end correction for more accurate phase
-        phase = -180 * (frequencies / (frequencies + f_peak))
+            # Convert to dB
+            helmholtz_response_db = 20 * np.log10(np.abs(H_helmholtz) + 1e-10)
+
+            # Apply to response (adds resonance peak)
+            response_db = response_db + helmholtz_response_db
+
+            # Also adjust phase
+            helmholtz_phase = np.angle(H_helmholtz) * 180 / np.pi
+            phase = -180 * (frequencies / (frequencies + f_peak)) + helmholtz_phase
+        else:
+            # No front chamber: standard phase calculation
+            phase = -180 * (frequencies / (frequencies + f_peak))
 
         return response_db, phase
 
@@ -580,14 +696,14 @@ class FrontLoadedHorn(BaseHorn):
         Uses coupled impedance model accounting for:
         - Rear chamber compliance (stiffer spring)
         - Horn reactive mass loading (frequency-dependent)
-        - Front chamber compliance effects
+        - Front chamber Helmholtz resonance (NEW)
 
         The system resonance is determined by the coupled mechanical impedance:
-        Z_system = Z_driver + Z_rear_chamber + Z_horn_reactive
+        Z_system = Z_driver + Z_rear_chamber + Z_horn_reactive + Z_front_chamber
 
         Below cutoff, the horn adds reactive mass loading, shifting Fs upward.
-        This models the physical behavior where the air column in the horn
-        acts as an additional mass load on the driver.
+        When a front chamber is present, it creates an additional Helmholtz resonator
+        that further modifies the system resonance.
 
         Returns:
             Dictionary with loaded parameters:
@@ -595,6 +711,7 @@ class FrontLoadedHorn(BaseHorn):
             - 'vas_loaded': Loaded compliance volume (L)
             - 'alpha_rear': Compliance ratio of rear chamber
             - 'mass_loading_ratio': Horn mass loading at driver Fs
+            - 'f_helmholtz': Front chamber Helmholtz resonance (Hz), if present
         """
         # Rear chamber compliance ratio
         alpha = self.driver.vas / self.params.rear_chamber_volume
@@ -636,11 +753,105 @@ class FrontLoadedHorn(BaseHorn):
         # Calculate loaded resonance frequency
         fs_loaded = 1 / (2 * np.pi * np.sqrt(Cms_effective * Mms_effective))
 
+        # NEW: Calculate Helmholtz resonance if front chamber present
+        if self.params.front_chamber_volume and self.throat_area:
+            C_fc = self._calculate_acoustic_compliance(self.params.front_chamber_volume)
+
+            # Use Hornresp-compatible parameters for front chamber Helmholtz resonance
+            if self.params.front_chamber_area_cm2:
+                area_cm2 = self.params.front_chamber_area_cm2
+            else:
+                area_cm2 = self.params.throat_area_cm2 if self.params.throat_area_cm2 else 50.0
+
+            if self.params.rear_chamber_length_cm:
+                length_m = self.params.rear_chamber_length_cm * 0.01
+            else:
+                length_m = self.calculate_effective_length() if self.horn_length else 0.0
+
+            M_horn = self._calculate_acoustic_mass(area_cm2, length_m)
+            f_helmholtz = self._calculate_helmholtz_resonance(C_fc, M_horn)
+
+            # Coupled system resonance (driver + front chamber)
+            # For coupled resonators: 1/f²_eff = 1/f²_driver + 1/f²_helmholtz
+            f_system = 1.0 / np.sqrt(1.0/fs_loaded**2 + 1.0/f_helmholtz**2)
+        else:
+            f_system = fs_loaded
+            f_helmholtz = None
+
         return {
-            'fs_loaded': fs_loaded,
+            'fs_loaded': f_system,
             'vas_loaded': vas_loaded,
             'alpha_rear': alpha,
             'mass_loading_ratio': mass_loading_at_fs,
+            'f_helmholtz': f_helmholtz,
+        }
+
+    def validate_helmholtz_model(
+        self,
+        hornresp_frequencies: np.ndarray,
+        hornresp_impedance: np.ndarray
+    ) -> Dict[str, float]:
+        """
+        Validate Helmholtz model against Hornresp impedance data.
+
+        Calculates resonance frequency error, Q factor match, peak match.
+        This is useful for validating that the calculated Helmholtz resonance
+        matches the observed impedance peak in Hornresp simulations.
+
+        Args:
+            hornresp_frequencies: Frequency array from Hornresp (Hz)
+            hornresp_impedance: Impedance array from Hornresp (Ω)
+
+        Returns:
+            Dictionary with validation metrics:
+            - 'f_predicted': Predicted Helmholtz resonance (Hz)
+            - 'f_measured': Measured resonance from impedance peak (Hz)
+            - 'f_error_hz': Resonance frequency error (Hz)
+            - 'f_error_percent': Resonance frequency error (%)
+            - 'q_predicted': Predicted Q factor
+            - 'q_measured': Measured Q from impedance ratio
+            - 'q_error': Q factor error
+        """
+        if not self.params.front_chamber_volume:
+            return {'error': 'No front chamber configured'}
+
+        # Calculate theoretical values
+        C_fc = self._calculate_acoustic_compliance(self.params.front_chamber_volume)
+
+        # Use Hornresp-compatible parameters
+        if self.params.front_chamber_area_cm2:
+            area_cm2 = self.params.front_chamber_area_cm2
+        else:
+            area_cm2 = self.params.throat_area_cm2 if self.params.throat_area_cm2 else 50.0
+
+        if self.params.rear_chamber_length_cm:
+            length_m = self.params.rear_chamber_length_cm * 0.01
+        else:
+            length_m = self.calculate_effective_length() if self.horn_length else 0.0
+
+        M_horn = self._calculate_acoustic_mass(area_cm2, length_m)
+        f_helmholtz = self._calculate_helmholtz_resonance(C_fc, M_horn)
+
+        # Find measured resonance (peak impedance)
+        peak_idx = np.argmax(hornresp_impedance)
+        f_measured = hornresp_frequencies[peak_idx]
+        z_peak = hornresp_impedance[peak_idx]
+        z_min = np.min(hornresp_impedance)
+        q_measured = z_peak / z_min
+
+        # Calculate Q from model
+        Q_helmholtz = self._calculate_helmholtz_q(f_helmholtz, C_fc, M_horn)
+        if self.driver.qts:
+            Q_helmholtz = Q_helmholtz / self.driver.qts
+
+        return {
+            'f_predicted': f_helmholtz,
+            'f_measured': f_measured,
+            'f_error_hz': f_helmholtz - f_measured,
+            'f_error_percent': 100 * (f_helmholtz - f_measured) / f_measured,
+            'q_predicted': Q_helmholtz,
+            'q_measured': q_measured,
+            'q_error': Q_helmholtz - q_measured,
         }
 
     def get_design_parameters(self) -> Dict[str, Tuple[float, float, float]]:
