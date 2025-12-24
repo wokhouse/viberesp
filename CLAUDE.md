@@ -55,6 +55,7 @@ src/viberesp/
 │   └── frequency_response.py # FrequencyResponseSimulator - unified response calculator
 ├── validation/
 │   ├── hornresp_parser.py   # Parse Hornresp output and parameter files
+│   ├── hornresp_exporter.py # Export Viberesp parameters to Hornresp format
 │   ├── comparison.py        # Compare Viberesp and Hornresp responses
 │   ├── metrics.py           # Calculate validation metrics (RMSE, MAE, F3, etc.)
 │   └── plotting.py          # Generate validation plots (comprehensive and Hornresp-style)
@@ -292,7 +293,103 @@ The Click-based CLI has these main command groups:
 - `viberesp simulate` - Run single enclosure simulation with optional plotting
 - `viberesp scan` - Parameter sweep across volume/tuning ranges
 - `viberesp validate` - Validate simulation output against reference tools (Hornresp)
+- `viberesp export` - Export design parameters to external tools (Hornresp)
 - `viberesp optimize` - Multi-objective optimization (planned)
+
+### Export to Hornresp
+
+The `export hornresp` command generates Hornresp-compatible parameter files from Viberesp driver and enclosure parameters. Auto-calculates Cms (mechanical compliance) from Vas and Sd if missing.
+
+**CLI Usage:**
+
+```bash
+# Export sealed enclosure
+viberesp export hornresp <driver_name> -e sealed \
+    --volume 40 \
+    --output sealed_horn.txt
+
+# Export exponential horn
+viberesp export hornresp <driver_name> -e exponential_horn \
+    --throat-area 500 \
+    --mouth-area 4800 \
+    --horn-length 200 \
+    --cutoff 36 \
+    --rear-chamber 100 \
+    --output exponential_horn.txt
+
+# Export front-loaded horn with comment
+viberesp export hornresp 18DS115 -e front_loaded_horn \
+    --throat-area 500 \
+    --mouth-area 4800 \
+    --horn-length 200 \
+    --cutoff 36 \
+    --rear-chamber 100 \
+    --front-chamber 6 \
+    --output f118_style_horn.txt \
+    --comment "B&C 18DS115 F118-style front-loaded horn"
+```
+
+**Parameters:**
+- `--enclosure-type` / `-e`: Enclosure type (sealed, ported, exponential_horn, front_loaded_horn)
+- `--volume` / `-v`: Box volume in liters [required for sealed/ported]
+- `--throat-area`: Throat area in cm² [required for horns]
+- `--mouth-area`: Mouth area in cm² [required for horns]
+- `--horn-length`: Horn length in cm [required for horns]
+- `--cutoff` / `-fc`: Horn cutoff frequency in Hz [for horns]
+- `--rear-chamber`: Rear chamber volume in liters [for horns]
+- `--front-chamber`: Front chamber volume in liters [for front_loaded_horn]
+- `--output` / `-o`: Output file path [required]
+- `--comment` / `-c`: Optional description for the design
+
+**Auto-Calculation:**
+- Cms is auto-calculated from Vas and Sd using: `Cms = Vas / (ρ₀ × c² × Sd²)`
+- Rms is auto-calculated from Qms, Mmd, and Cms if missing: `Rms = (1/Qms) × sqrt(Mmd/Cms)`
+
+**Integrated Validate-Export:**
+
+The `validate hornresp` command supports `--export-viberesp-params` to export Viberesp parameters during validation:
+
+```bash
+# Validate and export Viberesp parameters in one step
+viberesp validate hornresp <driver_name> <hornresp_output.txt> \
+    -e front_loaded_horn \
+    --params-file hornresp_params.txt \
+    --export-viberesp-params viberesp_params.txt \
+    --hornresp-style \
+    --export-plot validation.png
+```
+
+This workflow allows direct comparison between Viberesp and Hornresp parameter files.
+
+**Python API Usage:**
+
+```python
+from viberesp.validation.hornresp_exporter import export_hornresp_params
+from viberesp.io.driver_db import DriverDatabase
+
+# Load driver
+db = DriverDatabase()
+driver = db.get_driver('18DS115')
+
+# Define enclosure parameters
+params = {
+    'throat_area_cm2': 500,
+    'mouth_area_cm2': 4800,
+    'horn_length_cm': 200,
+    'cutoff_frequency': 36,
+    'rear_chamber_volume': 100,
+    'front_chamber_volume': 6,
+}
+
+# Export to Hornresp format
+export_hornresp_params(
+    driver=driver,
+    params=params,
+    enclosure_type='front_loaded_horn',
+    output_path='18DS115_horn.txt',
+    comment='F118-style front-loaded horn'
+)
+```
 
 ## Testing Status
 

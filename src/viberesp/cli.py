@@ -32,6 +32,7 @@ from viberesp.validation import (
     calculate_validation_metrics,
     plot_validation,
     plot_hornresp_style,
+    export_hornresp_params,
 )
 
 # Check matplotlib availability
@@ -74,6 +75,8 @@ def driver():
 @click.option('--xmax', type=float, help='Max excursion (mm)')
 @click.option('--le', type=float, help='Voice coil inductance (mH)')
 @click.option('--mms', type=float, help='Moving mass (g)')
+@click.option('--cms', type=float, help='Mechanical compliance (m/N) - required for Hornresp export')
+@click.option('--rms', type=float, help='Mechanical resistance (N*s/m)')
 @click.option('--pe', type=float, help='Thermal power rating (W)')
 @click.option('--type', 'driver_type', type=click.Choice(['woofer', 'midrange', 'tweeter', 'full_range', 'subwoofer']),
               help='Driver type')
@@ -268,6 +271,7 @@ def import_cmd(input_path, overwrite):
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.option('--plot', '-p', is_flag=True, help='Show frequency response plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
+@click.option('--export-hornresp', type=click.Path(), help='Export Hornresp parameter file')
 def simulate(driver_name, enclosure_type, volume, **kwargs):
     """Simulate enclosure frequency response."""
     # Load driver
@@ -461,6 +465,45 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
 
         click.echo(f"\n✓ Results saved to {output}")
 
+    # Export Hornresp parameters
+    export_hornresp = kwargs.get('export_hornresp')
+    if export_hornresp:
+        from viberesp.validation import export_hornresp_params
+
+        # Validate that driver has required Cms and Mmd fields
+        if driver.cms is None:
+            click.echo(
+                "\n✗ Cannot export Hornresp file: driver missing Cms (mechanical compliance).\n"
+                "   Add Cms to driver using: viberesp driver add <name> --cms <value>",
+                err=True
+            )
+            raise click.Abort()
+
+        if driver.mms is None:
+            click.echo(
+                "\n✗ Cannot export Hornresp file: driver missing Mmd (moving mass).\n"
+                "   Add Mmd to driver using: viberesp driver add <name> --mms <value>",
+                err=True
+            )
+            raise click.Abort()
+
+        # Build comment from driver info
+        driver_info = f"{driver.manufacturer or 'Unknown'} {driver.model_number or 'Unknown'}".strip()
+        comment = f"{driver_info} - {enclosure_type}"
+
+        try:
+            export_hornresp_params(
+                driver=driver,
+                params=params_dict,
+                enclosure_type=enclosure_type,
+                output_path=export_hornresp,
+                comment=comment
+            )
+            click.echo(f"\n✓ Exported Hornresp parameters to {export_hornresp}")
+        except Exception as e:
+            click.echo(f"\n✗ Failed to export Hornresp file: {e}", err=True)
+            raise click.Abort()
+
     # Plot
     if kwargs.get('plot') or kwargs.get('export_plot'):
         if not MATPLOTLIB_AVAILABLE:
@@ -554,6 +597,169 @@ def stats():
 
 
 # ========================================
+# Export Commands
+# ========================================
+
+@cli.group()
+def export():
+    """Export design parameters to external tools."""
+    pass
+
+
+@export.command('hornresp')
+@click.argument('driver_name')
+@click.option('--enclosure-type', '-e', type=click.Choice(['sealed', 'ported', 'exponential_horn', 'front_loaded_horn']),
+              default='sealed', help='Enclosure type')
+@click.option('--volume', '-v', type=float, help='Box volume (L) [required for sealed/ported]')
+@click.option('--depth', '-d', type=float, help='Enclosure internal depth (cm)')
+@click.option('--tuning', '-f', type=float, help='Port tuning frequency (Hz) [for ported]')
+@click.option('--port-diameter', '-D', type=float, help='Port diameter (cm) [for ported]')
+@click.option('--num-ports', '-n', type=int, default=1, help='Number of ports')
+@click.option('--throat-area', type=float, help='Throat area (cm²) [for horns]')
+@click.option('--mouth-area', type=float, help='Mouth area (cm²) [for horns]')
+@click.option('--horn-length', type=float, help='Horn length (cm) [for horns]')
+@click.option('--flare-rate', type=float, help='Exponential flare rate m (1/m) [for horns]')
+@click.option('--cutoff', '-fc', type=float, help='Horn cutoff frequency (Hz) [for horns]')
+@click.option('--rear-chamber', type=float, help='Rear chamber volume (L) [for horns]')
+@click.option('--front-chamber', type=float, help='Front chamber volume (L) [for front_loaded_horn]')
+@click.option('--output', '-o', type=click.Path(), required=True, help='Output file path')
+@click.option('--comment', '-c', type=str, help='Optional comment for the design')
+def export_hornresp_cmd(driver_name, enclosure_type, volume, output, comment, **kwargs):
+    """Export enclosure parameters to Hornresp format.
+
+    Generates a Hornresp-compatible parameter file for the specified driver and enclosure.
+
+    Examples:
+        viberesp export hornresp 18DS115 -e sealed --volume 50 -o design.txt
+
+        viberesp export hornresp 18DS115 -e front_loaded_horn \\
+            --throat-area 500 --mouth-area 4800 --horn-length 200 \\
+            --rear-chamber 100 --front-chamber 6 -o horn_design.txt
+    """
+    # Load driver
+    db = DriverDatabase()
+    driver = db.get_driver(driver_name)
+
+    if driver is None:
+        click.echo(f"✗ Driver '{driver_name}' not found", err=True)
+        click.echo("Available drivers:")
+        for name in db.list_drivers():
+            click.echo(f"  - {name}")
+        raise click.Abort()
+
+    # Validate required parameters based on enclosure type
+    if enclosure_type in ['sealed', 'ported'] and volume is None:
+        click.echo(f"✗ --volume required for {enclosure_type} enclosures", err=True)
+        raise click.Abort()
+
+    if enclosure_type == 'ported' and kwargs.get('tuning') is None:
+        click.echo("✗ --tuning required for ported enclosures", err=True)
+        raise click.Abort()
+
+    if enclosure_type in ['exponential_horn', 'front_loaded_horn']:
+        for param in ['throat_area', 'mouth_area', 'horn_length']:
+            if kwargs.get(param) is None:
+                click.echo(f"✗ --{param.replace('_', '-')} required for horn enclosures", err=True)
+                raise click.Abort()
+
+    if enclosure_type == 'front_loaded_horn' and kwargs.get('rear_chamber') is None:
+        click.echo("✗ --rear-chamber required for front-loaded horn enclosures", err=True)
+        raise click.Abort()
+
+    # Build enclosure parameters dict
+    params_dict = {
+        'enclosure_type': enclosure_type,
+        'vb': volume if volume is not None else 0.0,
+    }
+
+    # Add optional parameters
+    if kwargs.get('depth'):
+        params_dict['depth_cm'] = kwargs.get('depth')
+
+    if enclosure_type == 'ported':
+        params_dict['fb'] = kwargs.get('tuning')
+        params_dict['port_diameter'] = kwargs.get('port_diameter')
+        params_dict['number_of_ports'] = kwargs.get('num_ports', 1)
+
+    if enclosure_type == 'exponential_horn':
+        params_dict['throat_area_cm2'] = kwargs.get('throat_area')
+        params_dict['mouth_area_cm2'] = kwargs.get('mouth_area')
+        params_dict['horn_length_cm'] = kwargs.get('horn_length')
+        params_dict['flare_rate'] = kwargs.get('flare_rate')
+        params_dict['cutoff_frequency'] = kwargs.get('cutoff')
+        params_dict['rear_chamber_volume'] = kwargs.get('rear_chamber')
+
+    if enclosure_type == 'front_loaded_horn':
+        params_dict['throat_area_cm2'] = kwargs.get('throat_area')
+        params_dict['mouth_area_cm2'] = kwargs.get('mouth_area')
+        params_dict['horn_length_cm'] = kwargs.get('horn_length')
+        params_dict['flare_rate'] = kwargs.get('flare_rate')
+        params_dict['cutoff_frequency'] = kwargs.get('cutoff')
+        params_dict['rear_chamber_volume'] = kwargs.get('rear_chamber')
+        params_dict['front_chamber_volume'] = kwargs.get('front_chamber')
+
+    # Build default comment if not provided
+    if comment is None:
+        driver_info = f"{driver.manufacturer or 'Unknown'} {driver.model_number or driver_name}".strip()
+        comment = f"{driver_info} - {enclosure_type}"
+
+    # Auto-calculate Cms if needed
+    if driver.cms is None:
+        if driver.vas is not None and driver.sd is not None:
+            click.echo(f"ℹ Auto-calculating Cms from Vas and Sd...")
+        else:
+            click.echo(
+                f"\n✗ Driver missing Cms (mechanical compliance) and cannot auto-calculate.\n"
+                f"   Add Cms using: viberesp driver add {driver_name} --cms <value>",
+                err=True
+            )
+            raise click.Abort()
+
+    # Validate Mmd
+    if driver.mms is None:
+        click.echo(
+            f"\n✗ Driver missing Mmd (moving mass).\n"
+            f"   Add Mmd using: viberesp driver add {driver_name} --mms <value>",
+            err=True
+        )
+        raise click.Abort()
+
+    try:
+        export_hornresp_params(
+            driver=driver,
+            params=params_dict,
+            enclosure_type=enclosure_type,
+            output_path=str(output),
+            comment=comment
+        )
+        click.echo(f"✓ Exported Hornresp parameters to {output}")
+
+        # Show summary
+        click.echo(f"\nExport Summary:")
+        click.echo(f"  Driver: {driver_name}")
+        click.echo(f"  Type: {enclosure_type}")
+        if enclosure_type == 'sealed':
+            click.echo(f"  Volume: {volume} L")
+        elif enclosure_type == 'ported':
+            click.echo(f"  Volume: {volume} L")
+            click.echo(f"  Tuning: {kwargs.get('tuning')} Hz")
+        elif enclosure_type in ['exponential_horn', 'front_loaded_horn']:
+            click.echo(f"  Throat: {kwargs.get('throat_area')} cm²")
+            click.echo(f"  Mouth: {kwargs.get('mouth_area')} cm²")
+            click.echo(f"  Length: {kwargs.get('horn_length')} cm")
+            if kwargs.get('cutoff'):
+                click.echo(f"  Cutoff: {kwargs.get('cutoff')} Hz")
+            if enclosure_type == 'front_loaded_horn':
+                click.echo(f"  Rear Chamber: {kwargs.get('rear_chamber')} L")
+                if kwargs.get('front_chamber'):
+                    click.echo(f"  Front Chamber: {kwargs.get('front_chamber')} L")
+
+    except Exception as e:
+        click.echo(f"✗ Export failed: {e}", err=True)
+        raise click.Abort()
+
+
+# ========================================
 # Validation Commands
 # ========================================
 
@@ -576,9 +782,10 @@ def validate():
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
 @click.option('--hornresp-style', is_flag=True, help='Use Hornresp-style clean plot (single curve, no metrics overlay)')
 @click.option('--output', '-o', type=click.Path(), help='Save metrics to JSON file')
+@click.option('--export-viberesp-params', type=click.Path(), help='Export Viberesp parameters to file for comparison')
 @click.option('--verbose', is_flag=True, help='Show detailed output')
 def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_min, freq_max,
-                      params_file, show_plot, export_plot, hornresp_style, output, verbose):
+                      params_file, show_plot, export_plot, hornresp_style, output, export_viberesp_params, verbose):
     """Validate Viberesp simulation against Hornresp output.
 
     Compares Viberesp simulation results with Hornresp reference data
@@ -786,6 +993,54 @@ def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_m
             click.echo("\n⚠ Validation acceptable - Good agreement")
         else:
             click.echo("\n✗ Validation warning - Poor agreement")
+
+        # Export Viberesp parameters if requested
+        if export_viberesp_params:
+            click.echo(f"\nExporting Viberesp parameters to {export_viberesp_params}...")
+
+            # Build comment from driver info and enclosure type
+            driver_info = f"{driver.manufacturer or 'Unknown'} {driver.model_number or 'Unknown'}".strip()
+            comment = f"{driver_info} - {enclosure_type} (Viberesp)"
+
+            try:
+                # Get the enclosure params that were used
+                if enclosure_type == 'front_loaded_horn':
+                    viberesp_params_dict = {
+                        'enclosure_type': enclosure_type,
+                        'vb': enclosure_params.vb,
+                        'throat_area_cm2': enclosure_params.throat_area_cm2,
+                        'mouth_area_cm2': enclosure_params.mouth_area_cm2,
+                        'horn_length_cm': enclosure_params.horn_length_cm,
+                        'cutoff_frequency': enclosure_params.cutoff_frequency,
+                        'rear_chamber_volume': enclosure_params.rear_chamber_volume,
+                        'front_chamber_volume': enclosure_params.front_chamber_volume,
+                    }
+                elif enclosure_type == 'exponential_horn':
+                    viberesp_params_dict = {
+                        'enclosure_type': enclosure_type,
+                        'vb': enclosure_params.vb,
+                        'throat_area_cm2': enclosure_params.throat_area_cm2,
+                        'mouth_area_cm2': enclosure_params.mouth_area_cm2,
+                        'horn_length_cm': enclosure_params.horn_length_cm,
+                        'cutoff_frequency': enclosure_params.cutoff_frequency,
+                        'rear_chamber_volume': enclosure_params.rear_chamber_volume,
+                    }
+                else:  # sealed
+                    viberesp_params_dict = {
+                        'enclosure_type': enclosure_type,
+                        'vb': enclosure_params.vb,
+                    }
+
+                export_hornresp_params(
+                    driver=driver,
+                    params=viberesp_params_dict,
+                    enclosure_type=enclosure_type,
+                    output_path=str(export_viberesp_params),
+                    comment=comment
+                )
+                click.echo(f"✓ Exported Viberesp parameters to {export_viberesp_params}")
+            except Exception as e:
+                click.echo(f"\n✗ Failed to export Viberesp parameters: {e}", err=True)
 
     except FileNotFoundError as e:
         click.echo(f"✗ File not found: {e}", err=True)

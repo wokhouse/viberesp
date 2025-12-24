@@ -12,6 +12,7 @@ from .hornresp_parser import (
     parse_hornresp_output,
     parse_hornresp_params,
 )
+from .hornresp_exporter import export_hornresp_params
 from .comparison import ComparisonResult, compare_responses
 from .metrics import ValidationMetrics, calculate_validation_metrics
 from .plotting import plot_validation, plot_spl_only, plot_hornresp_style
@@ -23,6 +24,8 @@ __all__ = [
     'parse_hornresp_output',
     'parse_hornresp_params',
     'hornresp_params_to_ts',
+    # Export
+    'export_hornresp_params',
     # Comparison
     'ComparisonResult',
     'compare_responses',
