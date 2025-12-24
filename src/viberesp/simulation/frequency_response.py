@@ -180,6 +180,9 @@ class FrequencyResponseSimulator:
 
         Uses linear interpolation for accuracy.
 
+        For high-pass filters (response rises with frequency), finds the
+        upward crossing where SPL transitions from below to above threshold.
+
         Args:
             frequencies: Frequency array (Hz)
             spl: SPL array (dB, normalized to passband)
@@ -195,21 +198,23 @@ class FrequencyResponseSimulator:
             # Never drops to this level
             return frequencies[-1]
 
-        idx = np.argmax(below_threshold)
+        # For high-pass filters, find the LAST transition from below to above
+        # Search from low to high frequency for upward crossing
+        for i in range(len(spl) - 1):
+            if spl[i] <= level_db < spl[i + 1]:
+                # Linear interpolation for accuracy
+                f1, f2 = frequencies[i], frequencies[i + 1]
+                spl1, spl2 = spl[i], spl[i + 1]
+                fraction = (level_db - spl1) / (spl2 - spl1)
+                return f1 + fraction * (f2 - f1)
 
-        if idx == 0:
-            # Already below threshold at lowest frequency
+        # If no upward crossing found, check first/last points
+        if spl[0] > level_db:
+            # Already above threshold at lowest frequency
             return frequencies[0]
-
-        # Linear interpolation for accuracy
-        f1, f2 = frequencies[idx - 1], frequencies[idx]
-        spl1, spl2 = spl[idx - 1], spl[idx]
-
-        # Interpolate
-        fraction = (level_db - spl1) / (spl2 - spl1)
-        f_crossing = f1 + fraction * (f2 - f1)
-
-        return f_crossing
+        else:
+            # Never reaches threshold
+            return frequencies[-1]
 
     def to_dict(
         self,
