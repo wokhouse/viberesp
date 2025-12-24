@@ -22,6 +22,7 @@ class EnclosureType(str, Enum):
     TRANSMISSION_LINE = "transmission_line"
     BANDPASS = "bandpass"
     TAPPED_HORN = "tapped_horn"
+    EXPONENTIAL_HORN = "exponential_horn"
 
 
 class ThieleSmallParameters(BaseModel):
@@ -268,7 +269,7 @@ class EnclosureParameters(BaseModel):
     # Common to all enclosures
     vb: float = Field(
         ...,
-        gt=0,
+        gte=0,
         description="Net internal box volume (L)"
     )
     depth_cm: Optional[float] = Field(
@@ -353,6 +354,59 @@ class EnclosureParameters(BaseModel):
         None,
         gt=0,
         description="Front port tuning (Hz)"
+    )
+
+    # Horn parameters
+    throat_area_cm2: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Throat cross-sectional area (cm²)"
+    )
+    mouth_area_cm2: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Mouth cross-sectional area (cm²)"
+    )
+    horn_length_cm: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Horn axial length (cm)"
+    )
+    flare_rate: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Exponential flare rate m (1/m)"
+    )
+    cutoff_frequency: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Horn cutoff frequency fc (Hz)"
+    )
+    horn_type: Optional[str] = Field(
+        None,
+        description="Horn flare type: exponential, hyperbolic, conical, tractrix"
+    )
+    t_value: Optional[float] = Field(
+        None,
+        gte=0,
+        description="Hyperbolic horn T parameter (0=infinite flare, 1=exponential)"
+    )
+
+    # Tapped horn specific parameters
+    tap_position_cm: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Driver tap position from throat (cm)"
+    )
+    rear_chamber_volume: Optional[float] = Field(
+        None,
+        gte=0,
+        description="Rear chamber volume (L)"
+    )
+    front_chamber_volume: Optional[float] = Field(
+        None,
+        gte=0,
+        description="Front chamber volume (L)"
     )
 
 

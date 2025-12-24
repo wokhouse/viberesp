@@ -13,6 +13,7 @@ from viberesp.core.models import (
     DriverType
 )
 from viberesp.enclosures.sealed import SealedEnclosure
+from viberesp.enclosures.horns import ExponentialHorn
 from viberesp.simulation.frequency_response import (
     FrequencyResponseSimulator,
     compare_enclosures
@@ -250,12 +251,18 @@ def import_cmd(input_path, overwrite):
 
 @cli.command()
 @click.argument('driver_name')
-@click.argument('enclosure_type', type=click.Choice(['sealed', 'ported']))
-@click.option('--volume', '-v', type=float, required=True, help='Box volume (L)')
+@click.argument('enclosure_type', type=click.Choice(['sealed', 'ported', 'exponential_horn']))
+@click.option('--volume', '-v', type=float, required=False, help='Box volume (L) [required for sealed/ported]')
 @click.option('--depth', '-d', type=float, help='Enclosure internal depth (cm)')
 @click.option('--tuning', '-f', type=float, help='Port tuning frequency (Hz) [for ported]')
 @click.option('--port-diameter', '-D', type=float, help='Port diameter (cm) [for ported]')
 @click.option('--num-ports', '-n', type=int, default=1, help='Number of ports')
+@click.option('--throat-area', type=float, help='Throat area (cm²) [for horns]')
+@click.option('--mouth-area', type=float, help='Mouth area (cm²) [for horns]')
+@click.option('--horn-length', type=float, help='Horn length (cm) [for horns]')
+@click.option('--flare-rate', type=float, help='Exponential flare rate m (1/m) [for horns]')
+@click.option('--cutoff', '-fc', type=float, help='Horn cutoff frequency (Hz) [for horns]')
+@click.option('--rear-chamber', type=float, help='Rear chamber volume (L) [for horns]')
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.option('--plot', '-p', is_flag=True, help='Show frequency response plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
@@ -272,10 +279,37 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
             click.echo(f"  - {name}")
         raise click.Abort()
 
+    # Validate required parameters based on enclosure type
+    if enclosure_type in ['sealed', 'ported'] and volume is None:
+        click.echo(f"✗ --volume required for {enclosure_type} enclosures", err=True)
+        raise click.Abort()
+
+    if enclosure_type == 'ported':
+        tuning = kwargs.get('tuning')
+        if tuning is None:
+            click.echo("✗ --tuning required for ported enclosures", err=True)
+            raise click.Abort()
+
+    if enclosure_type == 'exponential_horn':
+        # Check required horn parameters
+        throat_area = kwargs.get('throat_area')
+        mouth_area = kwargs.get('mouth_area')
+        horn_length = kwargs.get('horn_length')
+
+        if throat_area is None:
+            click.echo("✗ --throat-area required for horn enclosures", err=True)
+            raise click.Abort()
+        if mouth_area is None:
+            click.echo("✗ --mouth-area required for horn enclosures", err=True)
+            raise click.Abort()
+        if horn_length is None:
+            click.echo("✗ --horn-length required for horn enclosures", err=True)
+            raise click.Abort()
+
     # Create enclosure parameters
     params_dict = {
         'enclosure_type': enclosure_type,
-        'vb': volume,
+        'vb': volume if volume is not None else 0.0,
     }
 
     # Add depth if provided
@@ -283,14 +317,20 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
     if depth is not None:
         params_dict['depth_cm'] = depth
 
+    # Ported enclosure parameters
     if enclosure_type == 'ported':
-        tuning = kwargs.get('tuning')
-        if tuning is None:
-            click.echo("✗ --tuning required for ported enclosures", err=True)
-            raise click.Abort()
-        params_dict['fb'] = tuning
+        params_dict['fb'] = kwargs.get('tuning')
         params_dict['port_diameter'] = kwargs.get('port_diameter')
         params_dict['number_of_ports'] = kwargs.get('num_ports', 1)
+
+    # Horn enclosure parameters
+    if enclosure_type == 'exponential_horn':
+        params_dict['throat_area_cm2'] = kwargs.get('throat_area')
+        params_dict['mouth_area_cm2'] = kwargs.get('mouth_area')
+        params_dict['horn_length_cm'] = kwargs.get('horn_length')
+        params_dict['flare_rate'] = kwargs.get('flare_rate')
+        params_dict['cutoff_frequency'] = kwargs.get('cutoff')
+        params_dict['rear_chamber_volume'] = kwargs.get('rear_chamber')
 
     try:
         enclosure_params = EnclosureParameters(**params_dict)
@@ -301,6 +341,8 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
     # Create enclosure instance
     if enclosure_type == 'sealed':
         enclosure = SealedEnclosure(driver, enclosure_params)
+    elif enclosure_type == 'exponential_horn':
+        enclosure = ExponentialHorn(driver, enclosure_params)
     else:
         click.echo(f"✗ Enclosure type '{enclosure_type}' not yet implemented", err=True)
         raise click.Abort()
@@ -311,20 +353,40 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
     metrics = simulator.calculate_metrics(response)
 
     # Display results
-    click.echo(f"\n{enclosure_type.title()} Enclosure Simulation")
+    click.echo(f"\n{enclosure_type.replace('_', ' ').title()} Enclosure Simulation")
     click.echo(f"Driver: {driver_name}")
-    click.echo(f"Volume: {volume:.1f} L")
-    if depth is not None:
-        click.echo(f"Depth: {depth:.1f} cm")
-        # Calculate approximate front panel area
-        # Area (cm²) = Volume (L) × 1000 / depth (cm)
-        front_area_cm2 = (volume * 1000) / depth
-        side_length_cm = np.sqrt(front_area_cm2)
-        click.echo(f"  → Front panel area: ~{front_area_cm2:.0f} cm²")
-        click.echo(f"  → If square: ~{side_length_cm:.1f} × {side_length_cm:.1f} cm")
 
-    if enclosure_type == 'ported' and tuning:
-        click.echo(f"Tuning: {tuning:.1f} Hz")
+    # Show enclosure-specific parameters
+    if enclosure_type == 'exponential_horn':
+        throat_area = kwargs.get('throat_area')
+        mouth_area = kwargs.get('mouth_area')
+        horn_length = kwargs.get('horn_length')
+        flare_rate = kwargs.get('flare_rate')
+        cutoff = kwargs.get('cutoff')
+        rear_chamber = kwargs.get('rear_chamber')
+
+        click.echo(f"Throat Area: {throat_area:.1f} cm²")
+        click.echo(f"Mouth Area: {mouth_area:.1f} cm²")
+        click.echo(f"Horn Length: {horn_length:.1f} cm")
+        if flare_rate:
+            click.echo(f"Flare Rate: {flare_rate:.2f} m⁻¹")
+        if cutoff:
+            click.echo(f"Cutoff Frequency: {cutoff:.1f} Hz")
+        if rear_chamber:
+            click.echo(f"Rear Chamber: {rear_chamber:.1f} L")
+    else:
+        click.echo(f"Volume: {volume:.1f} L")
+        if depth is not None:
+            click.echo(f"Depth: {depth:.1f} cm")
+            # Calculate approximate front panel area
+            # Area (cm²) = Volume (L) × 1000 / depth (cm)
+            front_area_cm2 = (volume * 1000) / depth
+            side_length_cm = np.sqrt(front_area_cm2)
+            click.echo(f"  → Front panel area: ~{front_area_cm2:.0f} cm²")
+            click.echo(f"  → If square: ~{side_length_cm:.1f} × {side_length_cm:.1f} cm")
+
+    if enclosure_type == 'ported' and kwargs.get('tuning'):
+        click.echo(f"Tuning: {kwargs.get('tuning'):.1f} Hz")
 
     click.echo(f"\nPerformance Metrics:")
     click.echo(f"  F3 (-3dB):      {metrics['f3']:.1f} Hz")

@@ -46,6 +46,9 @@ src/viberesp/
 ├── enclosures/
 │   ├── base.py              # Abstract BaseEnclosure class
 │   ├── sealed.py            # SealedEnclosure implementation
+│   ├── horns/
+│   │   ├── base_horn.py     # BaseHorn abstract class with shared horn logic
+│   │   └── exponential_horn.py # ExponentialHorn implementation
 │   └── [ported, passive radiator, etc.]
 ├── simulation/
 │   └── frequency_response.py # FrequencyResponseSimulator - unified response calculator
@@ -93,6 +96,114 @@ When adding a new enclosure type:
 3. Add type to `EnclosureType` enum in `core/models.py`
 4. Register in CLI factory in `cli.py`
 5. Add unit tests in `tests/`
+
+## Horn Enclosures
+
+Horn enclosures provide acoustic impedance transformation between the driver and listening space, resulting in improved efficiency and controlled directivity.
+
+### Horn Architecture
+
+The horn implementation follows a hierarchical structure:
+
+```
+BaseEnclosure (abstract)
+    └── BaseHorn (abstract)
+        └── ExponentialHorn (concrete)
+        └── TappedHorn (planned)
+        └── FrontLoadedHorn (planned)
+```
+
+### Horn Parameters (in EnclosureParameters)
+
+- **throat_area_cm2**: Throat cross-sectional area (cm²) - Required
+- **mouth_area_cm2**: Mouth cross-sectional area (cm²) - Required
+- **horn_length_cm**: Horn axial length (cm) - Required
+- **flare_rate**: Exponential flare rate m (1/m) - Optional
+- **cutoff_frequency**: Horn cutoff frequency fc (Hz) - Optional
+- **horn_type**: Flare type (exponential, hyperbolic, conical, tractrix) - Optional
+- **t_value**: Hyperbolic horn T parameter - Optional
+- **tap_position_cm**: Driver tap position from throat (tapped horns) - Optional
+- **rear_chamber_volume**: Rear chamber volume (L) - Optional
+- **front_chamber_volume**: Front chamber volume (L) - Optional
+
+### BaseHorn Class
+
+The `BaseHorn` abstract class extends `BaseEnclosure` with shared horn functionality:
+
+- **calculate_throat_impedance()**: Calculate acoustic impedance at horn throat (abstract)
+- **calculate_cutoff_frequency()**: Calculate horn cutoff from flare rate or explicit parameter
+- **validate_mouth_size()**: Check mouth size vs cutoff (k_rm >= 0.7 requirement)
+- **calculate_horn_gain()**: Calculate theoretical gain from area ratio: `10*log10(mouth/throat)` dB
+- **calculate_loaded_parameters()**: Calculate driver parameters with horn loading effect
+
+### ExponentialHorn Class
+
+The `ExponentialHorn` implements a simplified model:
+
+1. **Driver Validation**: Checks Qts < 0.4, Fs < 80 Hz, throat sizing
+2. **Throat Impedance**: Infinite exponential horn model (Kolbrek formula)
+3. **Horn Loading**: Increases effective Fs, reduces Vas with rear chamber
+4. **Frequency Response**: 2nd-order high-pass with loaded parameters + horn gain
+5. **Performance Metrics**: F3, F10, system Q, sensitivity with horn gain
+
+### Horn Design Guidelines
+
+**Driver Selection:**
+- **Qts**: < 0.4 for tight control (warns if higher)
+- **Fs**: < 80 Hz for bass applications
+- **Throat size**: 0.5-1.5× driver Sd to avoid mismatch
+
+**Mouth Sizing:**
+- Minimum: k_rm >= 0.7 at cutoff for smooth response
+- Recommended: k_rm >= 1.0 for optimal performance
+- Where k_rm = (2π×fc/c) × mouth_radius
+
+**CLI Usage:**
+
+```bash
+# Simulate exponential horn
+viberesp simulate <driver_name> exponential_horn \
+    --throat-area 50 \
+    --mouth-area 1000 \
+    --horn-length 120 \
+    --flare-rate 4.0 \
+    --cutoff 75 \
+    --rear-chamber 20 \
+    --plot
+```
+
+### Acoustic Equations
+
+**Infinite Exponential Horn Throat Impedance:**
+```
+Z_A = (ρ₀c/S_t) × (√(1 - m²/(4k²)) + j×m/(2k))
+```
+
+**Horn Loading Effect:**
+```
+fs_loaded = fs × √(1 + (c / (2π×fc×S_throat))²)
+Q_horn ≈ Qts × (fs / fs_loaded)
+```
+
+**Horn Gain:**
+```
+horn_gain_db = 10 × log10(mouth_area / throat_area)
+```
+
+### Validation Against Hornresp
+
+Horn implementations are validated against Hornresp reference designs:
+- Success criteria: Within 3-5 dB in passband
+- Cutoff frequency prediction: < 2 Hz error
+- Mouth reflection ripple analysis
+- Reference designs in `tests/fixtures/hornresp_*.txt`
+
+### Future Horn Types
+
+- **Tapped Horn**: Driver tapped at specific point, interference patterns
+- **Front-Loaded Horn**: Horn loading + sealed box combination
+- **Multi-Segment**: Folded horns, tractrix profiles
+- **Enhanced Physics**: Full Webster equation, mouth reflections
 
 ## CLI Structure
 
