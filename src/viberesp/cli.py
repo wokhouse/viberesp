@@ -272,6 +272,7 @@ def import_cmd(input_path, overwrite):
 @click.option('--plot', '-p', is_flag=True, help='Show frequency response plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
 @click.option('--export-hornresp', type=click.Path(), help='Export Hornresp parameter file')
+@click.option('--suppress-visualization', is_flag=True, help='Suppress interactive plot display (useful for automated runs)')
 def simulate(driver_name, enclosure_type, volume, **kwargs):
     """Simulate enclosure frequency response."""
     # Load driver
@@ -510,13 +511,16 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
             click.echo("✗ Matplotlib not available for plotting", err=True)
             return
 
+        # Determine if plot should be shown interactively
+        show_plot = kwargs.get('plot', False) and not kwargs.get('suppress_visualization', False)
+
         plot_frequency_response(
             response['frequency'],
             response['spl_db'],
             f3=metrics['f3'],
             f10=metrics['f10'],
             title=f"{enclosure_type.title()} Enclosure - {driver_name}",
-            show=kwargs.get('plot', False),
+            show=show_plot,
             save_path=kwargs.get('export_plot')
         )
 

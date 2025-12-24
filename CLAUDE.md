@@ -296,6 +296,39 @@ The Click-based CLI has these main command groups:
 - `viberesp export` - Export design parameters to external tools (Hornresp)
 - `viberesp optimize` - Multi-objective optimization (planned)
 
+### Simulate Command
+
+The `viberesp simulate` command runs enclosure simulations and displays performance metrics.
+
+**Visualization Options:**
+- `--plot` / `-p`: Show frequency response plot interactively
+- `--export-plot`: Save plot to file instead of displaying
+- `--suppress-visualization`: Suppress interactive plot display (useful for automated runs, agent exploration, or CI/CD)
+
+When `--suppress-visualization` is set, the plot will not be displayed interactively even if `--plot` is specified. This is particularly useful for:
+- Automated testing where user interaction is not possible
+- Agent/programmatic exploration where blocking on plot windows hinders workflow
+- Batch simulations where you only want to save plots to files
+
+**Examples:**
+
+```bash
+# Simulate with interactive plot (blocks until window closed)
+viberesp simulate 12BG100 sealed --volume 40 --plot
+
+# Simulate and save plot without interactive display
+viberesp simulate 12BG100 sealed --volume 40 --export-plot response.png
+
+# Simulate with --plot flag but suppress visualization (non-blocking)
+viberesp simulate 12BG100 sealed --volume 40 --plot --suppress-visualization
+
+# Simulate with both export and suppressed visualization
+viberesp simulate 12BG100 sealed --volume 40 \
+    --plot \
+    --export-plot response.png \
+    --suppress-visualization
+```
+
 ### Export to Hornresp
 
 The `export hornresp` command generates Hornresp-compatible parameter files from Viberesp driver and enclosure parameters. Auto-calculates Cms (mechanical compliance) from Vas and Sd if missing.
