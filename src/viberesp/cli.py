@@ -513,23 +513,27 @@ def validate():
 @validate.command('hornresp')
 @click.argument('driver_name')
 @click.argument('hornresp_file', type=click.Path(exists=True))
-@click.option('--volume', '-v', type=float, required=True, help='Enclosure volume in liters')
+@click.option('--enclosure-type', '-e', type=click.Choice(['sealed', 'exponential_horn']), default='sealed',
+              help='Enclosure type to validate (default: sealed)')
+@click.option('--volume', '-v', type=float, help='Enclosure volume in liters [required for sealed]')
 @click.option('--freq-min', type=float, default=20, help='Minimum frequency for comparison (Hz)')
 @click.option('--freq-max', type=float, default=500, help='Maximum frequency for comparison (Hz)')
-@click.option('--params-file', type=click.Path(exists=True), help='Hornresp parameter file')
+@click.option('--params-file', type=click.Path(exists=True), help='Hornresp parameter file [required for horns]')
 @click.option('--show-plot', is_flag=True, help='Display validation plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
 @click.option('--output', '-o', type=click.Path(), help='Save metrics to JSON file')
 @click.option('--verbose', is_flag=True, help='Show detailed output')
-def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
+def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_min, freq_max,
                       params_file, show_plot, export_plot, output, verbose):
     """Validate Viberesp simulation against Hornresp output.
 
     Compares Viberesp simulation results with Hornresp reference data
     for the same driver and enclosure configuration.
 
-    Example:
+    Examples:
         viberesp validate hornresp 12BG100 hornresp_output.txt --volume 40
+
+        viberesp validate hornresp 12BG100 horn_sim.txt -e exponential_horn --params-file horn_params.txt
     """
     try:
         # Load driver
@@ -546,6 +550,7 @@ def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
         click.echo(f"  Loaded {len(hornresp_data)} frequency points")
 
         # Parse Hornresp parameters if provided
+        hornresp_params = None
         if params_file:
             click.echo(f"Parsing Hornresp parameters: {params_file}")
             hornresp_params = parse_hornresp_params(params_file)
@@ -555,12 +560,40 @@ def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
                 click.echo(f"  Mmd: {hornresp_params.mmd} g")
                 click.echo(f"  Vrc: {hornresp_params.vrc} L")
 
-        # Create Viberesp enclosure
-        enclosure_params = EnclosureParameters(
-            enclosure_type='sealed',
-            vb=volume,
-        )
-        enclosure = SealedEnclosure(driver, enclosure_params)
+        # Validate required parameters based on enclosure type
+        if enclosure_type == 'exponential_horn':
+            if params_file is None:
+                click.echo("✗ --params-file required for exponential_horn validation", err=True)
+                raise click.Abort()
+            if hornresp_params.s1 is None or hornresp_params.s2 is None or hornresp_params.exp is None:
+                click.echo("✗ Horn parameters (S1, S2, Exp) not found in params file", err=True)
+                raise click.Abort()
+        elif enclosure_type == 'sealed':
+            if volume is None:
+                click.echo("✗ --volume required for sealed enclosure validation", err=True)
+                raise click.Abort()
+
+        # Create Viberesp enclosure based on type
+        if enclosure_type == 'exponential_horn':
+            # Build horn parameters from Hornresp params
+            enclosure_params = EnclosureParameters(
+                enclosure_type='exponential_horn',
+                vb=0.0,  # Not used for horns
+                throat_area_cm2=hornresp_params.s1,
+                mouth_area_cm2=hornresp_params.s2,
+                horn_length_cm=hornresp_params.exp,
+                cutoff_frequency=hornresp_params.f12,
+                rear_chamber_volume=hornresp_params.vrc if hornresp_params.vrc and hornresp_params.vrc > 0 else None,
+            )
+            enclosure = ExponentialHorn(driver, enclosure_params)
+            enclosure_desc = f"Exponential Horn ({hornresp_params.s1:.0f}→{hornresp_params.s2:.0f} cm², {hornresp_params.exp:.0f} cm)"
+        else:  # sealed
+            enclosure_params = EnclosureParameters(
+                enclosure_type='sealed',
+                vb=volume,
+            )
+            enclosure = SealedEnclosure(driver, enclosure_params)
+            enclosure_desc = f"Sealed ({volume:.1f} L)"
 
         # Calculate Viberesp response
         simulator = FrequencyResponseSimulator(enclosure)
@@ -594,7 +627,7 @@ def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
         click.echo("Hornresp Validation Results")
         click.echo("=" * 60)
         click.echo(f"Driver: {driver_name}")
-        click.echo(f"Volume: {volume:.1f} L")
+        click.echo(f"Enclosure: {enclosure_desc}")
         click.echo(f"Frequency Range: {freq_min}-{freq_max} Hz\n")
 
         click.echo(f"Overall Agreement: {metrics.agreement_score:.1f}%\n")
@@ -627,7 +660,9 @@ def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
         if output:
             result = {
                 'driver': driver_name,
-                'volume': volume,
+                'enclosure_type': enclosure_type,
+                'enclosure_desc': enclosure_desc,
+                'volume': volume if enclosure_type == 'sealed' else None,
                 'frequency_range': {'min': freq_min, 'max': freq_max},
                 'metrics': {
                     'agreement_score': metrics.agreement_score,

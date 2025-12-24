@@ -48,6 +48,10 @@ class HornrespParams:
         vrc: Rear chamber volume in liters
         lrc: Rear chamber length in cm
         eg: Input voltage in volts
+        s1: Throat area in cm² (for horns)
+        s2: Mouth area in cm² (for horns)
+        exp: Horn length in cm (exponential horn)
+        f12: Cutoff frequency in Hz (for horns)
     """
 
     sd: float
@@ -61,6 +65,10 @@ class HornrespParams:
     vrc: float
     lrc: float
     eg: float
+    s1: Optional[float] = None
+    s2: Optional[float] = None
+    exp: Optional[float] = None
+    f12: Optional[float] = None
 
 
 def parse_hornresp_output(file_path: str | Path) -> HornrespData:
@@ -142,6 +150,10 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
     Bl = 23.69
     Cms = 1.06E-04
     ...
+    S1 = 400.00
+    S2 = 20000.00
+    Exp = 220.00
+    F12 = 48.68
     ```
 
     Args:
@@ -175,6 +187,14 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
         'eg': r'Eg\s*=\s*([\d.E+-]+)',
     }
 
+    # Horn parameters (optional)
+    horn_patterns = {
+        's1': r'S1\s*=\s*([\d.E+-]+)',
+        's2': r'S2\s*=\s*([\d.E+-]+)',
+        'exp': r'Exp\s*=\s*([\d.E+-]+)',
+        'f12': r'F12\s*=\s*([\d.E+-]+)',
+    }
+
     parsed = {}
     for key, pattern in patterns.items():
         match = re.search(pattern, content)
@@ -182,6 +202,13 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
             parsed[key] = float(match.group(1))
         else:
             raise ValueError(f"Required parameter '{key}' not found in {file_path}")
+
+    # Parse optional horn parameters
+    horn_parsed = {}
+    for key, pattern in horn_patterns.items():
+        match = re.search(pattern, content)
+        if match:
+            horn_parsed[key] = float(match.group(1))
 
     return HornrespParams(
         sd=parsed['sd'],
@@ -195,6 +222,10 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
         vrc=parsed['vrc'],
         lrc=parsed['lrc'],
         eg=parsed['eg'],
+        s1=horn_parsed.get('s1'),
+        s2=horn_parsed.get('s2'),
+        exp=horn_parsed.get('exp'),
+        f12=horn_parsed.get('f12'),
     )
 
 
