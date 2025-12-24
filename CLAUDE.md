@@ -134,6 +134,93 @@ BaseEnclosure (abstract)
 - **tap_position_cm**: Driver tap position from throat (tapped horns) - Optional
 - **rear_chamber_volume**: Rear chamber volume (L) - Optional
 - **front_chamber_volume**: Front chamber volume (L) - Optional
+- **front_chamber_area_cm2**: Front chamber area (cm²) - For front_loaded_horn
+- **rear_chamber_length_cm**: Rear chamber length (cm) - For front_loaded_horn
+- **front_chamber_modes**: Number of front chamber pipe modes (0=Helmholtz only, 3=with standing waves) - Default: 0
+- **radiation_model**: Radiation impedance model ('simple' or 'beranek') - Default: 'simple'
+- **use_physics_model**: Use physics-based impedance model (True) or empirical model (False) - Default: True
+
+### Physics-Based vs Empirical Models
+
+Horn enclosures support two frequency response calculation methods:
+
+#### Physics Model (Default)
+
+The physics model uses an **acoustic impedance chain** method:
+
+```
+Driver Force → Volume Velocity → Throat Impedance → Horn Transfer → Mouth Pressure → SPL
+```
+
+**Key equations:**
+1. **Driver Mechanical Impedance:**
+   ```
+   Z_m = R_ms + jωM_ms + 1/(jωC_ms) + S_d² × Z_acoustic
+   ```
+
+2. **Electrical Impedance with Motional Branch:**
+   ```
+   Z_e = R_e + jωL_e + (B*l)² / Z_m
+   ```
+
+3. **Volume Velocity at Throat:**
+   ```
+   U_throat = (B*l × V_in) / (Z_e × Z_m) × S_d
+   ```
+
+4. **Mouth Pressure:**
+   ```
+   P_mouth = U_throat × Z_throat × sqrt(area_ratio) × (Z_mouth / |Z_mouth|)
+   ```
+
+5. **SPL Calculation:**
+   ```
+   SPL = 20 × log10(|P_mouth| / P_ref)
+   ```
+
+**Features:**
+- Beranek circular piston radiation impedance model
+- Finite horn transmission line with mouth reflections
+- Multi-mode front chamber Helmholtz resonance
+- Rear chamber compliance in parallel with throat load
+
+#### Empirical Model (Fallback)
+
+The empirical model uses a **parameterized 2nd-order high-pass** approach:
+
+- Loaded driver parameters (Fs shifted by horn loading)
+- Horn gain from area ratio
+- Empirical peak frequency and sharpness coefficients
+- Helmholtz resonance for front chambers
+
+**Usage:**
+
+```python
+# Use physics model (default, more accurate in theory)
+params = EnclosureParameters(
+    enclosure_type='exponential_horn',
+    throat_area_cm2=600,
+    mouth_area_cm2=4800,
+    horn_length_cm=200,
+    cutoff_frequency=35,
+    use_physics_model=True,  # Physics-based model
+    radiation_model='beranek',
+    ...
+)
+
+# Use empirical model (tested, fallback)
+params = EnclosureParameters(
+    enclosure_type='exponential_horn',
+    throat_area_cm2=600,
+    mouth_area_cm2=4800,
+    horn_length_cm=200,
+    cutoff_frequency=35,
+    use_physics_model=False,  # Empirical model
+    ...
+)
+```
+
+**Note:** The physics model is currently under active development. The empirical model provides more reliable results for validation against Hornresp at this time.
 
 ### BaseHorn Class
 
@@ -147,9 +234,18 @@ The `BaseHorn` abstract class extends `BaseEnclosure` with shared horn functiona
 
 ### ExponentialHorn Class
 
-The `ExponentialHorn` implements a simplified model:
+The `ExponentialHorn` implements two calculation methods (selected via `use_physics_model`):
 
+**Physics Model** (use_physics_model=True):
 1. **Driver Validation**: Checks Qts < 0.4, Fs < 80 Hz, throat sizing
+2. **Throat Impedance**: Finite exponential horn with auto-calculated flare rate
+3. **Mechanical/Electrical Impedance**: Full driver model with acoustic loading
+4. **Volume Velocity**: Calculated from force balance: `U = (B*l × V) / (Z_e × Z_m) × S_d`
+5. **Acoustic Pressure**: Mouth pressure from throat impedance transformation
+6. **Fallback**: Automatically switches to empirical model on calculation error
+
+**Empirical Model** (use_physics_model=False):
+1. **Driver Validation**: Same as physics model
 2. **Throat Impedance**: Infinite exponential horn model (Kolbrek formula)
 3. **Horn Loading**: Increases effective Fs, reduces Vas with rear chamber
 4. **Frequency Response**: 2nd-order high-pass with loaded parameters + horn gain

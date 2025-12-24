@@ -152,14 +152,24 @@ class FrontLoadedHorn(BaseHorn):
 
     def calculate_throat_impedance(self, frequencies: np.ndarray) -> np.ndarray:
         """
-        Calculate throat impedance for front-loaded horn.
+        Calculate throat impedance for front-loaded horn using finite horn model.
 
-        Uses the same infinite exponential horn model as ExponentialHorn,
-        as the throat physics are identical. The front chamber (if present)
-        slightly modifies this, but the effect is small for typical designs.
+        Phase 1 Enhancement: Now uses proper finite horn transmission line model
+        with mouth radiation impedance boundary condition.
 
-        Uses Kolbrek infinite horn approximation:
-        Z_A = (ρ₀c/S_t) * (√(1 - m²/(4k²)) + j*m/(2k))
+        The throat impedance accounts for:
+        - Finite horn length effects (transmission line)
+        - Mouth radiation impedance (Beranek circular piston model)
+        - Proper impedance transformation from mouth to throat
+
+        Uses transmission line impedance transformation:
+        Z_throat = Z_char × coth(γ×L) + Z_mouth / sinh²(γ×L)
+
+        Where:
+        - Z_char is characteristic impedance at throat
+        - γ is complex propagation constant
+        - Z_mouth is mouth radiation impedance
+        - L is effective horn length
 
         Args:
             frequencies: Array of frequencies (Hz)
@@ -170,29 +180,44 @@ class FrontLoadedHorn(BaseHorn):
         Raises:
             ValueError: If flare_rate is not specified
         """
-        # Get or calculate flare rate
-        m = self._get_or_calculate_flare_rate()  # flare rate (1/m)
-        k = 2 * np.pi * frequencies / C  # wavenumber
-        St = self.throat_area  # throat area (m²)
+        # Get mouth radiation impedance (Beranek model if enabled)
+        Z_mouth = self.calculate_mouth_radiation_impedance(frequencies)
 
-        # Characteristic impedance of air
-        Z0 = (RHO * C) / St
+        # Calculate characteristic impedance at throat
+        Z_char = self._calculate_characteristic_impedance()
 
-        # Calculate impedance
-        # Handle cutoff region (below fc, term becomes imaginary)
-        k_term = 4 * k**2 - m**2
+        # Calculate propagation constant
+        gamma = self._calculate_propagation_constant(frequencies)
 
-        # Above cutoff: real resistance
-        # Below cutoff: purely reactive
-        resistance = np.zeros_like(frequencies)
-        above_cutoff = k_term > 0
+        # Get effective horn length (with end correction if enabled)
+        L_eff = self.calculate_effective_length()
 
-        if np.any(above_cutoff):
-            resistance[above_cutoff] = Z0 * np.sqrt(k_term[above_cutoff]) / (2 * k[above_cutoff])
+        # Calculate hyperbolic functions for transmission line
+        # Z_throat = Z_char × coth(γ×L) + Z_mouth / sinh²(γ×L)
+        gamma_L = gamma * L_eff
 
-        reactance = Z0 * m / (2 * k)
+        # Avoid overflow in hyperbolic functions
+        # Use identities: coth(z) = cosh(z)/sinh(z), 1/sinh²(z) = cosh(z)/sinh(z) × 1/sinh(z)
 
-        return resistance + 1j * reactance
+        sinh_gamma_L = np.sinh(gamma_L)
+        cosh_gamma_L = np.cosh(gamma_L)
+
+        # Avoid division by zero
+        sinh_gamma_L = np.where(np.abs(sinh_gamma_L) < 1e-10, 1e-10, sinh_gamma_L)
+
+        # coth(γ×L) = cosh(γ×L) / sinh(γ×L)
+        coth_gamma_L = cosh_gamma_L / sinh_gamma_L
+
+        # Calculate throat impedance with mouth loading
+        # First term: characteristic impedance times coth(γL)
+        term1 = Z_char * coth_gamma_L
+
+        # Second term: mouth impedance divided by sinh²(γL)
+        term2 = Z_mouth / (sinh_gamma_L ** 2)
+
+        Z_throat = term1 + term2
+
+        return Z_throat
 
     def _calculate_high_pass_response(
         self,
@@ -264,6 +289,197 @@ class FrontLoadedHorn(BaseHorn):
 
         return H.astype(complex)
 
+    def _calculate_modal_response(
+        self,
+        frequencies: np.ndarray,
+        f_n: float,
+        Q_n: float
+    ) -> np.ndarray:
+        """
+        Calculate single modal response for a resonant mode.
+
+        Uses 2nd-order resonator transfer function:
+        H_n(f) = (f/f_n)² / [(1 - (f/f_n)²) + j(f/f_n)/Q_n]
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+            f_n: Modal resonance frequency (Hz)
+            Q_n: Modal quality factor
+
+        Returns:
+            Complex modal response array
+        """
+        # Frequency ratio
+        f_ratio = frequencies / f_n
+
+        # Avoid division by zero
+        f_ratio = np.where(f_ratio < 1e-10, 1e-10, f_ratio)
+
+        # 2nd-order resonator transfer function
+        # H(s) = s² / (s² + s×(ω₀/Q) + ω₀²)
+        # In frequency domain with s = jω:
+        # H(jω) = -(ω/ω₀)² / [-(ω/ω₀)² + j(ω/ω₀)/Q + 1]
+
+        numer = -f_ratio**2
+        denom = -f_ratio**2 + 1j * f_ratio / Q_n + 1
+
+        H_n = numer / denom
+
+        return H_n
+
+    def _calculate_effective_chamber_length(self) -> float:
+        """
+        Calculate effective acoustic length of front chamber.
+
+        Converts chamber volume to equivalent cylindrical pipe length
+        for standing wave calculations.
+
+        For a volume V and throat area S_throat:
+        L_eff = V / S_throat
+
+        This represents the length of a constant-area pipe with the
+        same volume as the front chamber.
+
+        Returns:
+            Effective chamber length (m)
+        """
+        if not self.params.front_chamber_volume:
+            return 0.0
+
+        # Get throat area (m²)
+        if self.params.front_chamber_area_cm2:
+            throat_area_m2 = self.params.front_chamber_area_cm2 * 1e-4
+        elif self.throat_area:
+            throat_area_m2 = self.throat_area
+        else:
+            return 0.0
+
+        # Convert volume to m³
+        volume_m3 = self.params.front_chamber_volume * 0.001
+
+        # Effective length = Volume / Area
+        L_eff = volume_m3 / throat_area_m2
+
+        return L_eff
+
+    def _calculate_standing_wave_q(self, mode_number: int) -> float:
+        """
+        Calculate Q factor for standing wave mode in front chamber.
+
+        Higher modes have lower Q due to increased radiation losses
+        and wall damping. Q scales approximately as 1/(2n+1).
+
+        Args:
+            mode_number: Standing wave mode number (1 or 2)
+
+        Returns:
+            Q factor for the mode
+        """
+        # Base Q for fundamental Helmholtz mode
+        # This depends on horn throat loading
+        if self.throat_area:
+            Z0 = (RHO * C) / self.throat_area
+        else:
+            Z0 = RHO * C / 0.01
+
+        # Q decreases with mode number due to increased losses
+        # Empirical scaling: Q_n ≈ Q_base / (2n + 1)
+        q_base = 5.0  # Typical Q for front chamber modes
+        q_mode = q_base / (2 * mode_number + 1)
+
+        return q_mode
+
+    def _calculate_rear_chamber_impedance(
+        self,
+        frequencies: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate rear chamber acoustic impedance.
+
+        Models rear chamber as sealed box compliance:
+        Z_rc = 1 / (jω × C_rc)
+
+        Where C_rc = V_rc / (ρ₀ × c²)
+
+        The rear chamber acts as a compliance in parallel with the horn throat load,
+        affecting the driver's mechanical impedance and system response.
+
+        Args:
+            frequencies: Frequency array (Hz)
+
+        Returns:
+            Complex rear chamber impedance (Pa·s/m³)
+        """
+        if self.params.rear_chamber_volume <= 0:
+            return np.inf * np.ones_like(frequencies, dtype=complex)
+
+        # Rear chamber compliance (m³/Pa)
+        # C = V / (ρ₀ × c²)
+        V_rc = self.params.rear_chamber_volume / 1000  # L → m³
+        C_rc = V_rc / (RHO * C**2)
+
+        # Angular frequency
+        omega = 2 * np.pi * frequencies
+
+        # Rear chamber impedance (purely compliant)
+        # Z = 1 / (jωC)
+        Z_rc = 1 / (1j * omega * C_rc)
+
+        return Z_rc
+
+    def _calculate_driver_mechanical_impedance(
+        self,
+        frequencies: np.ndarray,
+        Z_acoustic_load: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate driver mechanical impedance with acoustic loading.
+
+        Phase 1 Enhancement: Includes rear chamber compliance in parallel with throat load.
+
+        Z_m = R_ms + jωM_ms + 1/(jωC_ms) + S_d² × Z_acoustic_combined
+
+        Where Z_acoustic_combined combines throat and rear chamber impedances in parallel:
+        1/Z_acoustic_combined = 1/Z_throat + 1/Z_rc
+
+        Args:
+            frequencies: Frequency array (Hz)
+            Z_acoustic_load: Acoustic impedance at throat (Pa·s/m³)
+
+        Returns:
+            Complex mechanical impedance (N·s/m)
+        """
+        omega = 2 * np.pi * frequencies
+
+        # Mechanical resistance
+        R_ms = self.driver.rms
+
+        # Moving mass
+        M_ms = self.driver.mms / 1000  # g → kg
+
+        # Mechanical compliance
+        C_ms = self.driver.cms
+
+        # Diaphragm area (m²)
+        S_d = self.driver.sd
+
+        # Add rear chamber compliance in parallel with throat load
+        if self.params.rear_chamber_volume > 0:
+            Z_rc = self._calculate_rear_chamber_impedance(frequencies)
+
+            # Parallel combination: 1/Z_total = 1/Z_throat + 1/Z_rc
+            Z_acoustic_combined = (Z_acoustic_load * Z_rc) / (Z_acoustic_load + Z_rc)
+
+            # Radiation loading from combined acoustic impedance
+            Z_rad_load = (S_d ** 2) * Z_acoustic_combined
+        else:
+            Z_rad_load = (S_d ** 2) * Z_acoustic_load
+
+        # Mechanical impedance
+        Z_m = R_ms + 1j * omega * M_ms + 1 / (1j * omega * C_ms) + Z_rad_load
+
+        return Z_m
+
     def _calculate_front_chamber_response(
         self,
         frequencies: np.ndarray
@@ -271,15 +487,18 @@ class FrontLoadedHorn(BaseHorn):
         """
         Calculate front chamber effect on frequency response.
 
-        The front chamber (if present) affects the system response through:
-        - Helmholtz resonance with the horn throat (calculated but not directly applied)
-        - Modified coupling between driver and horn
+        Phase 1 Enhancement: Multi-mode pipe resonator model.
 
-        The current implementation uses a simplified first-order high-pass model
-        that approximates the effect without creating artificial resonant peaks.
+        Models front chamber as closed-open pipe with standing wave modes.
+        Each mode contributes with Q-dependent damping.
 
-        For accurate Helmholtz resonance frequency calculation, use:
-            calculate_loaded_parameters()['f_helmholtz']
+        Modes:
+        - n=0: Fundamental Helmholtz resonance (mass-spring system)
+        - n=1,2: Standing wave modes at f_n = (2n+1)×c/(4×L_eff)
+
+        The number of modes is controlled by `front_chamber_modes` parameter:
+        - 0 (default): Helmholtz only (backward compatible)
+        - 3: Full multi-mode model with standing waves
 
         Args:
             frequencies: Array of frequencies (Hz)
@@ -290,8 +509,10 @@ class FrontLoadedHorn(BaseHorn):
         if not self.params.front_chamber_volume:
             return np.ones_like(frequencies, dtype=complex)
 
-        # Simplified first-order high-pass filter
-        # This approximates the front chamber effect without creating resonant peaks
+        # Check how many modes to calculate
+        num_modes = getattr(self.params, 'front_chamber_modes', 0)
+
+        # Calculate acoustic compliance and mass for Helmholtz mode
         C_fc = self._calculate_acoustic_compliance(self.params.front_chamber_volume)
 
         # Use Hornresp-compatible acoustic parameters
@@ -307,21 +528,48 @@ class FrontLoadedHorn(BaseHorn):
 
         M_horn = self._calculate_acoustic_mass(area_cm2, length_m)
 
-        # Calculate Helmholtz resonance frequency for reference
+        # Calculate fundamental Helmholtz frequency (n=0)
         f_helmholtz = self._calculate_helmholtz_resonance(C_fc, M_horn)
 
-        # First-order high-pass filter at Helmholtz frequency
-        # This provides a gentle roll-off below resonance without creating peaks
+        # Calculate Q for Helmholtz mode
+        Q_helmholtz = self._calculate_helmholtz_q(f_helmholtz, C_fc, M_horn)
+
+        # Start with Helmholtz mode (n=0)
+        modes = [self._calculate_modal_response(frequencies, f_helmholtz, Q_helmholtz)]
+
+        # If multi-mode enabled, add standing wave modes
+        if num_modes >= 3:
+            # Get effective chamber length for standing waves
+            L_eff_chamber = self._calculate_effective_chamber_length()
+
+            # Calculate standing wave modes n=1, n=2
+            for n in [1, 2]:
+                # Closed-open pipe resonator: f_n = (2n+1)×c/(4×L_eff)
+                f_n = (2 * n + 1) * C / (4 * L_eff_chamber)
+
+                # Get Q for this mode
+                Q_n = self._calculate_standing_wave_q(n)
+
+                # Calculate modal response
+                H_n = self._calculate_modal_response(frequencies, f_n, Q_n)
+                modes.append(H_n)
+
+        # Sum all modal responses (coherent summation)
+        H_total = np.sum(modes, axis=0)
+
+        # Normalize to preserve energy (modes should sum to unity at high frequency)
+        # At high frequencies well above all resonances, response → 1
+        H_norm = H_total / (len(modes) + 1e-10)
+
+        # Apply gentle low-frequency roll-off to avoid artificial boost
+        # This preserves physical behavior while preventing numerical artifacts
         w = 2 * np.pi * frequencies
         wc = 2 * np.pi * f_helmholtz
-        H = (1j * w / wc) / (1 + 1j * w / wc)
+        lf_rolloff = (1j * w / wc) / (1 + 1j * w / wc)
 
-        # Attenuate the effect for large chambers
-        if self.params.front_chamber_volume > 100:
-            attenuation = 0.5 + 0.5 * (100 / self.params.front_chamber_volume)
-            H = H * attenuation + (1 - attenuation)
+        H_final = H_norm * lf_rolloff
 
-        return H
+        return H_final
 
     def _calculate_horn_mass_loading(self, frequencies: np.ndarray) -> np.ndarray:
         """
@@ -490,7 +738,70 @@ class FrontLoadedHorn(BaseHorn):
         voltage: float = VOLTAGE_1W_8OHM
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Calculate frequency response for front-loaded horn.
+        Calculate frequency response for front-loaded horn using physics-based model.
+
+        Phase 1 Enhancement: Uses acoustic impedance chain method with front chamber effects.
+
+        Physics model:
+        1. Calculate driver mechanical impedance with horn loading
+        2. Include rear chamber compliance in parallel with throat load
+        3. Calculate electrical impedance with motional branch
+        4. Calculate volume velocity at throat
+        5. Apply front chamber transfer function
+        6. Calculate acoustic pressure at listening position
+        7. Convert to SPL
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+            voltage: Input voltage (default: 2.83V for 1W into 8Ω)
+
+        Returns:
+            (spl_magnitude_db, phase_degrees)
+        """
+        P_ref = 20e-6
+
+        # Check if physics model should be used
+        use_physics = getattr(self.params, 'use_physics_model', True)
+
+        if not use_physics:
+            return self._calculate_empirical_response(frequencies, voltage)
+
+        # Physics-based calculation
+        try:
+            # Calculate volume velocity at throat
+            U_throat = self._calculate_volume_velocity(frequencies, voltage)
+
+            # Apply front chamber transfer function
+            H_fc = self._calculate_front_chamber_response(frequencies)
+
+            # Volume velocity at horn throat (after front chamber)
+            U_horn = U_throat * H_fc
+
+            # Calculate acoustic pressure at listening position
+            P_r = self._calculate_acoustic_pressure(frequencies, U_horn, distance=1.0)
+
+            # Convert to SPL
+            spl_db = 20 * np.log10(np.abs(P_r) / P_ref)
+
+            # Calculate phase
+            phase_degrees = np.angle(P_r, deg=True)
+
+            return spl_db, phase_degrees
+
+        except Exception as e:
+            warnings.warn(
+                f"Physics model failed: {e}. Falling back to empirical model.",
+                UserWarning
+            )
+            return self._calculate_empirical_response(frequencies, voltage)
+
+    def _calculate_empirical_response(
+        self,
+        frequencies: np.ndarray,
+        voltage: float = VOLTAGE_1W_8OHM
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Original empirical model (kept for backward compatibility).
 
         Uses parameterized empirical model with physics-informed corrections:
         - Peak frequency depends on horn cutoff, driver Qts, and rear chamber size
@@ -624,6 +935,7 @@ class FrontLoadedHorn(BaseHorn):
             phase = -180 * (frequencies / (frequencies + f_peak))
 
         return response_db, phase
+
 
     def calculate_system_q(self) -> float:
         """

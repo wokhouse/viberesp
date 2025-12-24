@@ -424,6 +424,22 @@ class EnclosureParameters(BaseModel):
         description="Apply mouth end correction for finite horn length"
     )
 
+    # Phase 1: Enhanced horn modeling parameters
+    front_chamber_modes: int = Field(
+        default=0,
+        ge=0,
+        le=3,
+        description="Number of front chamber pipe modes (0=Helmholtz only, 3=with standing waves)"
+    )
+    radiation_model: str = Field(
+        default="simple",
+        description="Radiation impedance model: 'simple' (end correction) or 'beranek' (piston impedance)"
+    )
+    use_physics_model: bool = Field(
+        default=True,
+        description="Use physics-based impedance model (True) or empirical model (False)"
+    )
+
 
 class OptimizationObjectives(BaseModel):
     """Multi-objective optimization weights and targets."""

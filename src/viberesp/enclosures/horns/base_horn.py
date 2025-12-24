@@ -4,6 +4,7 @@ from abc import abstractmethod
 from typing import Dict, Tuple, List, Optional
 import numpy as np
 import warnings
+from scipy import special
 
 from viberesp.enclosures.base import BaseEnclosure
 from viberesp.core.models import ThieleSmallParameters, EnclosureParameters
@@ -351,3 +352,324 @@ class BaseHorn(BaseEnclosure):
         Z_throat = Z0 / tanh_gamma_L
 
         return Z_throat
+
+    def calculate_mouth_radiation_impedance(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Calculate mouth radiation impedance using Beranek circular piston model.
+
+        This models the mouth as a circular piston in an infinite baffle,
+        which provides a more accurate boundary condition than simple end correction.
+
+        The radiation impedance is:
+        Z_rad = (ρ₀c/S_m) × [R₁(ka) + j×X₁(ka)]
+
+        Where:
+        - R₁ is the radiation resistance function
+        - X₁ is the radiation reactance function (Struve function)
+        - k is the wavenumber = 2πf/c
+        - a is the mouth radius
+
+        Reference: Beranek, "Acoustics", Section 5.5
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+
+        Returns:
+            Complex radiation impedance at mouth (Pa·s/m³)
+        """
+        # Check which radiation model to use
+        # Using getattr for backward compatibility in case older params don't have this field
+        radiation_model = getattr(self.params, 'radiation_model', 'simple')
+
+        # Simple model: return characteristic impedance
+        if radiation_model == 'simple':
+            Z0 = (RHO * C) / self.mouth_area
+            return np.full_like(frequencies, Z0, dtype=complex)
+
+        # Beranek model: circular piston in infinite baffle
+        # Calculate equivalent mouth radius
+        mouth_radius = np.sqrt(self.mouth_area / np.pi)
+
+        # Wavenumber
+        k = 2 * np.pi * frequencies / C
+
+        # Product k×a
+        ka = k * mouth_radius
+
+        # Radiation resistance function: R₁(x) = 1 - 2×J₁(x)/x
+        # J₁ is Bessel function of first kind, order 1
+        j1_ka = special.spherical_jn(1, ka)  # Spherical Bessel function
+        R1 = 1 - 2 * j1_ka / ka
+
+        # Radiation reactance function: X₁(x) = 2×H₁(x)/x
+        # H₁ is Struve function of order 1
+        # Note: scipy.special.struve requires order as second argument
+        H1_ka = special.struve(1, ka)
+        X1 = 2 * H1_ka / ka
+
+        # Characteristic impedance of air
+        Z0 = (RHO * C) / self.mouth_area
+
+        # Radiation impedance
+        Z_rad = Z0 * (R1 + 1j * X1)
+
+        return Z_rad
+
+    def _calculate_characteristic_impedance(self) -> complex:
+        """
+        Calculate characteristic impedance of exponential horn at throat.
+
+        For an exponential horn, the characteristic impedance is:
+        Z_char = (ρ₀c/S_throat) / sqrt(1 - (fc/f)²)
+
+        This accounts for the flare rate and frequency-dependent behavior.
+
+        Returns:
+            Complex characteristic impedance (Pa·s/m³)
+        """
+        # Throat area
+        St = self.throat_area
+
+        # Characteristic impedance of air at throat
+        Z0 = (RHO * C) / St
+
+        # Note: The frequency-dependent factor 1/sqrt(1 - (fc/f)²)
+        # is handled in the propagation constant calculation.
+        # This method returns the base characteristic impedance.
+        return Z0
+
+    def _calculate_propagation_constant(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Calculate complex propagation constant for exponential horn.
+
+        For exponential horns, the propagation constant is:
+        γ = sqrt(m²/4 - k²)
+
+        Where:
+        - m is the flare rate (1/m)
+        - k is the wavenumber = 2πf/c
+
+        Above cutoff (k > m/2): γ is imaginary (propagating wave)
+        Below cutoff (k < m/2): γ is real (evanescent wave)
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+
+        Returns:
+            Complex propagation constant (1/m)
+        """
+        # Get flare rate
+        m = self._get_or_calculate_flare_rate()
+
+        # Wavenumber
+        k = 2 * np.pi * frequencies / C
+
+        # Complex propagation constant
+        # gamma = sqrt(m²/4 - k²)
+        gamma_term = m**2 / 4 - k**2
+
+        gamma = np.zeros_like(frequencies, dtype=complex)
+
+        above_cutoff = gamma_term < 0
+        below_cutoff = gamma_term >= 0
+
+        # Above cutoff: propagating mode (imaginary)
+        if np.any(above_cutoff):
+            gamma[above_cutoff] = 1j * np.sqrt(-gamma_term[above_cutoff])
+
+        # Below cutoff: evanescent mode (real)
+        if np.any(below_cutoff):
+            gamma[below_cutoff] = np.sqrt(gamma_term[below_cutoff])
+
+        return gamma
+
+    def _calculate_driver_mechanical_impedance(
+        self,
+        frequencies: np.ndarray,
+        Z_acoustic_load: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate driver mechanical impedance with acoustic loading.
+
+        Z_m = R_ms + jωM_ms + 1/(jωC_ms) + S_d² × Z_acoustic
+
+        Args:
+            frequencies: Frequency array (Hz)
+            Z_acoustic_load: Acoustic impedance at diaphragm (Pa·s/m³)
+
+        Returns:
+            Complex mechanical impedance (N·s/m)
+        """
+        omega = 2 * np.pi * frequencies
+
+        # Mechanical resistance
+        R_ms = self.driver.rms
+
+        # Moving mass
+        M_ms = self.driver.mms / 1000  # g → kg
+
+        # Mechanical compliance
+        C_ms = self.driver.cms
+
+        # Diaphragm area (m²)
+        S_d = self.driver.sd
+
+        # Radiation loading from acoustic impedance
+        Z_rad_load = (S_d ** 2) * Z_acoustic_load
+
+        # Mechanical impedance
+        Z_m = R_ms + 1j * omega * M_ms + 1 / (1j * omega * C_ms) + Z_rad_load
+
+        return Z_m
+
+    def _calculate_electrical_impedance(
+        self,
+        frequencies: np.ndarray,
+        Z_m: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate electrical impedance with motional branch.
+
+        Z_e = R_e + jωL_e + (B*l)² / Z_m
+
+        Args:
+            frequencies: Frequency array (Hz)
+            Z_m: Mechanical impedance (N·s/m)
+
+        Returns:
+            Complex electrical impedance (Ω)
+        """
+        omega = 2 * np.pi * frequencies
+
+        # Voice coil resistance
+        R_e = self.driver.re
+
+        # Voice coil inductance
+        L_e = self.driver.le / 1000  # mH → H
+
+        # Force factor
+        B_l = self.driver.bl
+
+        # Motional impedance
+        Z_mot = (B_l ** 2) / Z_m
+
+        # Total electrical impedance
+        Z_e = R_e + 1j * omega * L_e + Z_mot
+
+        return Z_e
+
+    def _calculate_volume_velocity(
+        self,
+        frequencies: np.ndarray,
+        voltage: float
+    ) -> np.ndarray:
+        """
+        Calculate diaphragm volume velocity.
+
+        U = (B*l × V_in) / (Z_e × Z_m)
+
+        Args:
+            frequencies: Frequency array (Hz)
+            voltage: Input voltage (V)
+
+        Returns:
+            Complex volume velocity (m³/s)
+        """
+        # Get acoustic load at throat
+        Z_throat = self.calculate_throat_impedance(frequencies)
+
+        # Mechanical impedance with acoustic loading
+        Z_m = self._calculate_driver_mechanical_impedance(frequencies, Z_throat)
+
+        # Electrical impedance
+        Z_e = self._calculate_electrical_impedance(frequencies, Z_m)
+
+        # Force factor
+        B_l = self.driver.bl
+
+        # Volume velocity from force balance
+        # F = B*l*I = Z_m × v = Z_m × U/S_d
+        # I = V_in / Z_e
+        # U = (B*l × V_in) / (Z_e × Z_m) × S_d
+        U = (B_l * voltage) / (Z_e * Z_m) * self.driver.sd
+
+        return U
+
+    def _calculate_horn_transfer_function(
+        self,
+        frequencies: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate horn transfer function (mouth pressure / throat pressure).
+
+        For exponential horn with finite length:
+        H_horn = 1 / cosh(γ×L) × (1 + Z_mouth / Z_char × tanh(γ×L))
+
+        Simplified: Use throat impedance directly
+        P_mouth = U_throat × Z_throat × area_correction
+
+        Args:
+            frequencies: Frequency array (Hz)
+
+        Returns:
+            Complex transfer function
+        """
+        # Get throat impedance
+        Z_throat = self.calculate_throat_impedance(frequencies)
+
+        # Get mouth radiation impedance
+        Z_mouth = self.calculate_mouth_radiation_impedance(frequencies)
+
+        # Area ratio correction (mouth/throat)
+        area_ratio = self.mouth_area / self.throat_area
+
+        # Simplified transfer function
+        # P_mouth ≈ P_throat × sqrt(area_ratio) for lossless horn
+        H_horn = np.sqrt(area_ratio) * (Z_mouth / Z_throat)
+
+        return H_horn
+
+    def _calculate_acoustic_pressure(
+        self,
+        frequencies: np.ndarray,
+        volume_velocity: np.ndarray,
+        distance: float = 1.0
+    ) -> np.ndarray:
+        """
+        Calculate acoustic pressure at listening position.
+
+        For a horn, we can calculate mouth pressure directly from volume velocity:
+        P_mouth = U_throat × |H_horn| × sqrt(Z_throat × Z_mouth)
+
+        Then convert to SPL at reference distance.
+
+        Args:
+            frequencies: Frequency array (Hz)
+            volume_velocity: Complex volume velocity at throat (m³/s)
+            distance: Listening distance (m) - currently unused, assumes 1m
+
+        Returns:
+            Complex pressure (Pa)
+        """
+        # Get mouth radiation impedance
+        Z_mouth = self.calculate_mouth_radiation_impedance(frequencies)
+
+        # Get throat impedance
+        Z_throat = self.calculate_throat_impedance(frequencies)
+
+        # Calculate pressure amplitude at throat from volume velocity
+        # P_throat = U_throat × Z_throat
+        P_throat = volume_velocity * Z_throat
+
+        # Horn area ratio (impedance transformation)
+        area_ratio = self.mouth_area / self.throat_area
+
+        # Pressure at mouth (conservation of acoustic power)
+        # P_mouth = P_throat × sqrt(area_ratio) for lossless horn
+        P_mouth = P_throat * np.sqrt(area_ratio)
+
+        # Add mouth loading effect using radiation impedance
+        # This accounts for the actual load presented by the radiation
+        P_mouth = P_mouth * (Z_mouth / np.abs(Z_mouth))
+
+        return P_mouth

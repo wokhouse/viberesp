@@ -114,10 +114,8 @@ class ExponentialHorn(BaseHorn):
         Returns:
             Complex acoustic impedance at throat (Pa·s/m³)
         """
-        if not self.params.flare_rate:
-            raise ValueError("flare_rate required for throat impedance calculation")
-
-        m = self.params.flare_rate  # flare rate (1/m)
+        # Get or calculate flare rate from cutoff frequency
+        m = self._get_or_calculate_flare_rate()  # flare rate (1/m)
         k = 2 * np.pi * frequencies / C  # wavenumber
         St = self.throat_area  # throat area (m²)
 
@@ -147,7 +145,66 @@ class ExponentialHorn(BaseHorn):
         voltage: float = VOLTAGE_1W_8OHM
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Calculate frequency response for exponential horn.
+        Calculate frequency response using physics-based model.
+
+        Phase 1 Enhancement: Uses acoustic impedance chain method instead
+        of empirical 2nd-order high-pass approximation.
+
+        Physics model:
+        1. Calculate driver mechanical impedance with horn loading
+        2. Calculate electrical impedance with motional branch
+        3. Calculate volume velocity at throat
+        4. Calculate acoustic pressure at listening position
+        5. Convert to SPL
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+            voltage: Input voltage (default: 2.83V for 1W into 8Ω)
+
+        Returns:
+            (spl_magnitude_db, phase_degrees)
+        """
+        # Reference pressure (20 μPa)
+        P_ref = 20e-6
+
+        # Check if physics model should be used
+        use_physics = getattr(self.params, 'use_physics_model', True)
+
+        if not use_physics:
+            # Fall back to empirical model (for backward compatibility)
+            return self._calculate_empirical_response(frequencies, voltage)
+
+        # Physics-based calculation
+        try:
+            # Calculate volume velocity at throat
+            U_throat = self._calculate_volume_velocity(frequencies, voltage)
+
+            # Calculate acoustic pressure at listening position
+            P_r = self._calculate_acoustic_pressure(frequencies, U_throat, distance=1.0)
+
+            # Convert to SPL
+            spl_db = 20 * np.log10(np.abs(P_r) / P_ref)
+
+            # Calculate phase
+            phase_degrees = np.angle(P_r, deg=True)
+
+            return spl_db, phase_degrees
+
+        except Exception as e:
+            # Fallback to empirical model on error
+            warnings.warn(
+                f"Physics model failed: {e}. Falling back to empirical model.",
+                UserWarning
+            )
+            return self._calculate_empirical_response(frequencies, voltage)
+
+    def _calculate_empirical_response(
+        self,
+        frequencies: np.ndarray,
+        voltage: float = VOLTAGE_1W_8OHM
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Original empirical model (kept for backward compatibility).
 
         Simplified model:
         1. Calculate loaded driver parameters (Fs shifts up due to horn loading)
@@ -203,6 +260,7 @@ class ExponentialHorn(BaseHorn):
         spl_db = spl_db + spl_ref
 
         return spl_db, phase
+
 
     def calculate_system_q(self) -> float:
         """
