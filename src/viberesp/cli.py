@@ -24,6 +24,13 @@ from viberesp.utils.plotting import (
     plot_frequency_response,
     plot_multiple_responses
 )
+from viberesp.validation import (
+    parse_hornresp_output,
+    parse_hornresp_params,
+    compare_responses,
+    calculate_validation_metrics,
+    plot_validation,
+)
 
 # Check matplotlib availability
 MATPLOTLIB_AVAILABLE = check_matplotlib()
@@ -429,6 +436,191 @@ def stats():
     click.echo(f"    Fs: {stats['fs_range'][0]:.1f} - {stats['fs_range'][1]:.1f} Hz")
     click.echo(f"    Qts: {stats['qts_range'][0]:.3f} - {stats['qts_range'][1]:.3f}")
     click.echo(f"    Vas: {stats['vas_range'][0]:.1f} - {stats['vas_range'][1]:.1f} L")
+
+
+# ========================================
+# Validation Commands
+# ========================================
+
+@cli.group()
+def validate():
+    """Validate simulation output against reference tools."""
+    pass
+
+
+@validate.command('hornresp')
+@click.argument('driver_name')
+@click.argument('hornresp_file', type=click.Path(exists=True))
+@click.option('--volume', '-v', type=float, required=True, help='Enclosure volume in liters')
+@click.option('--freq-min', type=float, default=20, help='Minimum frequency for comparison (Hz)')
+@click.option('--freq-max', type=float, default=500, help='Maximum frequency for comparison (Hz)')
+@click.option('--params-file', type=click.Path(exists=True), help='Hornresp parameter file')
+@click.option('--show-plot', is_flag=True, help='Display validation plot')
+@click.option('--export-plot', type=click.Path(), help='Save plot to file')
+@click.option('--output', '-o', type=click.Path(), help='Save metrics to JSON file')
+@click.option('--verbose', is_flag=True, help='Show detailed output')
+def validate_hornresp(driver_name, hornresp_file, volume, freq_min, freq_max,
+                      params_file, show_plot, export_plot, output, verbose):
+    """Validate Viberesp simulation against Hornresp output.
+
+    Compares Viberesp simulation results with Hornresp reference data
+    for the same driver and enclosure configuration.
+
+    Example:
+        viberesp validate hornresp 12BG100 hornresp_output.txt --volume 40
+    """
+    try:
+        # Load driver
+        db = DriverDatabase()
+        driver = db.get_driver(driver_name)
+
+        if driver is None:
+            click.echo(f"✗ Driver '{driver_name}' not found", err=True)
+            raise click.Abort()
+
+        # Parse Hornresp output
+        click.echo(f"Parsing Hornresp output: {hornresp_file}")
+        hornresp_data = parse_hornresp_output(hornresp_file)
+        click.echo(f"  Loaded {len(hornresp_data)} frequency points")
+
+        # Parse Hornresp parameters if provided
+        if params_file:
+            click.echo(f"Parsing Hornresp parameters: {params_file}")
+            hornresp_params = parse_hornresp_params(params_file)
+            if verbose:
+                click.echo(f"  Sd: {hornresp_params.sd} cm²")
+                click.echo(f"  Bl: {hornresp_params.bl}")
+                click.echo(f"  Mmd: {hornresp_params.mmd} g")
+                click.echo(f"  Vrc: {hornresp_params.vrc} L")
+
+        # Create Viberesp enclosure
+        enclosure_params = EnclosureParameters(
+            enclosure_type='sealed',
+            vb=volume,
+        )
+        enclosure = SealedEnclosure(driver, enclosure_params)
+
+        # Calculate Viberesp response
+        simulator = FrequencyResponseSimulator(enclosure)
+        viberesp_response = simulator.calculate_response()
+
+        # Convert to numpy arrays for comparison
+        viberesp_freq = np.array(viberesp_response['frequency'])
+        viberesp_spl = np.array(viberesp_response['spl_db'])
+
+        # Get phase if available
+        viberesp_phase = np.array(viberesp_response['phase_degrees']) if 'phase_degrees' in viberesp_response else None
+
+        # Run comparison
+        click.echo("Running comparison...")
+        comparison = compare_responses(
+            viberesp_freq=viberesp_freq,
+            viberesp_spl=viberesp_spl,
+            viberesp_phase=viberesp_phase,
+            hornresp_freq=hornresp_data.frequencies,
+            hornresp_spl=hornresp_data.spl,
+            hornresp_phase=hornresp_data.phase,
+            freq_min=freq_min,
+            freq_max=freq_max,
+        )
+
+        # Calculate metrics
+        metrics = calculate_validation_metrics(comparison)
+
+        # Display results
+        click.echo("\n" + "=" * 60)
+        click.echo("Hornresp Validation Results")
+        click.echo("=" * 60)
+        click.echo(f"Driver: {driver_name}")
+        click.echo(f"Volume: {volume:.1f} L")
+        click.echo(f"Frequency Range: {freq_min}-{freq_max} Hz\n")
+
+        click.echo(f"Overall Agreement: {metrics.agreement_score:.1f}%\n")
+
+        click.echo("SPL Magnitude Errors:")
+        click.echo(f"  RMSE: {metrics.rmse:.3f} dB")
+        click.echo(f"  MAE:  {metrics.mae:.3f} dB")
+        click.echo(f"  Max:  {metrics.max_error:.3f} dB @ {metrics.max_error_freq:.1f} Hz\n")
+
+        click.echo("Band-Specific RMSE:")
+        click.echo(f"  Passband (200-500Hz): {metrics.passband_rmse:.3f} dB")
+        click.echo(f"  Bass (20-200Hz):      {metrics.bass_rmse:.3f} dB\n")
+
+        if metrics.f3_viberesp and metrics.f3_hornresp:
+            click.echo(f"F3 Frequency:")
+            click.echo(f"  Viberesp:  {metrics.f3_viberesp:.2f} Hz")
+            click.echo(f"  Hornresp:  {metrics.f3_hornresp:.2f} Hz")
+            click.echo(f"  Error:     {metrics.f3_error:.2f} Hz\n")
+
+        click.echo(f"Correlation: {metrics.correlation:.4f}")
+        click.echo(f"Passband Offset Applied: {comparison.passband_offset:.3f} dB")
+
+        if verbose:
+            click.echo("\nDetailed Statistics:")
+            click.echo(f"  Min difference: {np.nanmin(comparison.spl_difference):.3f} dB")
+            click.echo(f"  Max difference: {np.nanmax(comparison.spl_difference):.3f} dB")
+            click.echo(f"  Std deviation: {np.nanstd(comparison.spl_difference):.3f} dB")
+
+        # Save metrics to JSON
+        if output:
+            result = {
+                'driver': driver_name,
+                'volume': volume,
+                'frequency_range': {'min': freq_min, 'max': freq_max},
+                'metrics': {
+                    'agreement_score': metrics.agreement_score,
+                    'rmse': metrics.rmse,
+                    'mae': metrics.mae,
+                    'max_error': {
+                        'value': metrics.max_error,
+                        'frequency': metrics.max_error_freq,
+                    },
+                    'passband_rmse': metrics.passband_rmse,
+                    'bass_rmse': metrics.bass_rmse,
+                    'f3_viberesp': metrics.f3_viberesp,
+                    'f3_hornresp': metrics.f3_hornresp,
+                    'f3_error': metrics.f3_error,
+                    'correlation': metrics.correlation,
+                },
+                'passband_offset': comparison.passband_offset,
+            }
+
+            with open(output, 'w') as f:
+                json.dump(result, f, indent=2)
+
+            click.echo(f"\n✓ Metrics saved to {output}")
+
+        # Generate plot
+        if export_plot or show_plot:
+            if not MATPLOTLIB_AVAILABLE:
+                click.echo("✗ Matplotlib not available for plotting", err=True)
+            else:
+                plot_validation(
+                    comparison=comparison,
+                    metrics=metrics,
+                    driver_name=driver_name,
+                    volume=volume,
+                    output_path=export_plot,
+                    show=show_plot,
+                )
+
+        # Success indicator
+        if metrics.rmse < 1.0 and metrics.correlation > 0.99:
+            click.echo("\n✓ Validation passed - Excellent agreement!")
+        elif metrics.rmse < 2.0 and metrics.correlation > 0.95:
+            click.echo("\n⚠ Validation acceptable - Good agreement")
+        else:
+            click.echo("\n✗ Validation warning - Poor agreement")
+
+    except FileNotFoundError as e:
+        click.echo(f"✗ File not found: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"✗ Validation error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise click.Abort()
 
 
 if __name__ == '__main__':

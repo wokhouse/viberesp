@@ -22,3 +22,8 @@ src/viberesp/simulation/__init__.py
 src/viberesp/simulation/frequency_response.py
 src/viberesp/utils/__init__.py
 src/viberesp/utils/plotting.py
+src/viberesp/validation/__init__.py
+src/viberesp/validation/comparison.py
+src/viberesp/validation/hornresp_parser.py
+src/viberesp/validation/metrics.py
+src/viberesp/validation/plotting.py
