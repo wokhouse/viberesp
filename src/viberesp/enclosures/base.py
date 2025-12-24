@@ -203,9 +203,16 @@ class BaseEnclosure(ABC):
 
     def _get_f3_from_qtc(self, qtc: float) -> float:
         """
-        Calculate F3 frequency from Qtc using empirical relationships.
+        Calculate F3 frequency from Qtc using the correct formula.
 
-        Based on Thiele's alignment tables for sealed boxes.
+        Based on the established formula for sealed box systems:
+        F3 = Fc × sqrt(X + sqrt(X² + 1))
+        where X = 1/(2×Qtc²) - 1
+
+        This formula is derived from the transfer function of a 2nd-order
+        high-pass filter and is the theoretically correct method.
+
+        Reference: https://www.diyaudio.com/community/threads/relationship-between-fcb-f-3-and-qtc-in-a-closed-box-sub.1792/
 
         Args:
             qtc: System Q factor
@@ -215,22 +222,54 @@ class BaseEnclosure(ABC):
         """
         fc = self.calculate_box_frequency()
 
-        # Empirical relationship between Qtc and F3/Fc ratio
-        # From Thiele's alignment tables
-        if qtc <= 0.5:
-            # Very low Q: F3 is significantly above Fc
-            f3_ratio = 1.55 - 0.5 * qtc
-        elif qtc <= QTC_BUTTERWORTH:  # 0.707
-            # approaching Butterworth
-            f3_ratio = 1.0 + 0.3 * (QTC_BUTTERWORTH - qtc) / (QTC_BUTTERWORTH - 0.5)
-        elif qtc <= 1.0:
-            # Above Butterworth but reasonable
-            f3_ratio = 1.0 + 0.15 * (qtc - QTC_BUTTERWORTH) / (1.0 - QTC_BUTTERWORTH)
-        else:
-            # High Q: F3 is lower due to peaking
-            f3_ratio = 1.15 + 0.35 * (qtc - 1.0)
+        # Calculate the intermediate variable X
+        # X = 1/(2*Qtc²) - 1
+        X = 1.0 / (2.0 * qtc ** 2) - 1.0
+
+        # Calculate F3/Fc ratio using the correct formula
+        # F3/Fc = sqrt(X + sqrt(X² + 1))
+        f3_ratio = np.sqrt(X + np.sqrt(X ** 2 + 1.0))
 
         return fc * f3_ratio
+
+    def _calculate_f3_numerical(
+        self,
+        frequencies: np.ndarray,
+        spl_db: np.ndarray
+    ) -> float:
+        """
+        Calculate F3 frequency by finding -3dB crossing point.
+
+        Uses numerical method to find where the magnitude response crosses -3dB
+        relative to the maximum SPL level. This matches the approach used by
+        Hornresp and provides more accurate results than empirical formulas.
+
+        For high-pass filters, looks for upward crossing (from below to above).
+
+        Args:
+            frequencies: Frequency array in Hz
+            spl_db: SPL array in dB (absolute or normalized)
+
+        Returns:
+            F3 frequency in Hz
+        """
+        # Use maximum SPL as reference (matches Hornresp's approach)
+        ref_level = np.max(spl_db)
+        target_level = ref_level - 3.0
+
+        # Find -3dB upward crossing for high-pass filters
+        # Search from low to high frequency
+        for i in range(len(spl_db) - 1):
+            if spl_db[i] <= target_level < spl_db[i + 1]:
+                # Linear interpolation for accuracy
+                frac = (target_level - spl_db[i]) / (spl_db[i + 1] - spl_db[i])
+                return frequencies[i] + frac * (frequencies[i + 1] - frequencies[i])
+
+        # No crossing found - return min or max frequency
+        if spl_db[0] > target_level:
+            return frequencies[0]
+        else:
+            return frequencies[-1]
 
     def get_summary(self) -> Dict:
         """

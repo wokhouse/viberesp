@@ -86,13 +86,18 @@ class SealedEnclosure(BaseEnclosure):
 
     def calculate_f3(self) -> float:
         """
-        Calculate -3dB frequency based on Qtc.
+        Calculate -3dB frequency using the correct formula.
 
-        For Qtc=0.707 (Butterworth): F3 = Fc
+        Uses the established formula for sealed box systems:
+        F3 = Fc × sqrt(X + sqrt(X² + 1))
+        where X = 1/(2×Qtc²) - 1
+
+        This is the theoretically correct method derived from the 2nd-order
+        high-pass filter transfer function.
+
+        For Qtc=0.707 (Butterworth): F3 ≈ Fc
         For Qtc<0.707: F3 is above Fc
         For Qtc>0.707: F3 is below Fc (due to peaking)
-
-        Uses empirical relationships from Thiele's alignment tables.
 
         Returns:
             -3dB frequency (Hz)
