@@ -48,15 +48,23 @@ src/viberesp/
 │   ├── sealed.py            # SealedEnclosure implementation
 │   ├── horns/
 │   │   ├── base_horn.py     # BaseHorn abstract class with shared horn logic
-│   │   └── exponential_horn.py # ExponentialHorn implementation
+│   │   ├── exponential_horn.py # ExponentialHorn implementation
+│   │   └── front_loaded_horn.py # FrontLoadedHorn implementation
 │   └── [ported, passive radiator, etc.]
 ├── simulation/
 │   └── frequency_response.py # FrequencyResponseSimulator - unified response calculator
+├── validation/
+│   ├── hornresp_parser.py   # Parse Hornresp output and parameter files
+│   ├── comparison.py        # Compare Viberesp and Hornresp responses
+│   ├── metrics.py           # Calculate validation metrics (RMSE, MAE, F3, etc.)
+│   └── plotting.py          # Generate validation plots (comprehensive and Hornresp-style)
 ├── optimization/
 │   └── (pymoo-based multi-objective optimization)
-└── io/
-    ├── driver_db.py         # JSON driver database management
-    └── frd_parser.py        # FRD/ZMA measurement file parsing
+├── io/
+│   ├── driver_db.py         # JSON driver database management
+│   └── frd_parser.py        # FRD/ZMA measurement file parsing
+└── utils/
+    └── plotting.py          # Plotting utilities for frequency response
 ```
 
 ### Key Design Patterns
@@ -198,10 +206,82 @@ Horn implementations are validated against Hornresp reference designs:
 - Mouth reflection ripple analysis
 - Reference designs in `tests/fixtures/hornresp_*.txt`
 
+**CLI Usage:**
+
+```bash
+# Validate sealed enclosure against Hornresp output
+viberesp validate hornresp <driver_name> <hornresp_output.txt> \
+    --volume 40 \
+    --export-plot validation_comparison.png
+
+# Validate horn enclosure with Hornresp-style clean plot
+viberesp validate hornresp <driver_name> <hornresp_output.txt> \
+    -e exponential_horn \
+    --params-file hornresp_params.txt \
+    --hornresp-style \
+    --export-plot hornresp_style_validation.png
+
+# Validate front-loaded horn with comprehensive metrics
+viberesp validate hornresp <driver_name> <hornresp_output.txt> \
+    -e front_loaded_horn \
+    --params-file params.txt \
+    --export-plot full_validation.png \
+    --output validation_metrics.json
+```
+
+**Validation Plot Styles:**
+
+1. **Default (Comprehensive)**: 2×2 subplot layout with:
+   - SPL overlay comparison (Viberesp vs Hornresp)
+   - SPL difference with reference bands (±0.5, ±1, ±2 dB)
+   - Phase comparison (if data available)
+   - Metrics summary panel (RMSE, MAE, F3 error, correlation)
+
+2. **Hornresp-Style** (`--hornresp-style`): Single clean plot with:
+   - Red solid line for Viberesp data
+   - Gray dashed line for Hornresp reference (comparison)
+   - Semilog frequency axis matching Hornresp
+   - Clean minimal grid
+   - No metrics overlay or reference bands
+   - Similar visual appearance to Hornresp software
+
+**Python API Usage:**
+
+```python
+from viberesp.validation import (
+    parse_hornresp_output,
+    parse_hornresp_params,
+    compare_responses,
+    calculate_validation_metrics,
+    plot_hornresp_style,
+)
+
+# Parse Hornresp data
+hornresp_data = parse_hornresp_output('hornresp_sim.txt')
+hornresp_params = parse_hornresp_params('params.txt')
+
+# Run comparison
+comparison = compare_responses(
+    viberesp_freq=frequencies,
+    viberesp_spl=spl_db,
+    hornresp_freq=hornresp_data.frequencies,
+    hornresp_spl=hornresp_data.spl,
+)
+
+# Calculate metrics
+metrics = calculate_validation_metrics(comparison)
+
+# Generate Hornresp-style plot (single curve)
+plot_hornresp_style(
+    comparison=comparison,
+    data_source='viberesp',  # or 'hornresp' or 'both'
+    output_path='hornresp_style.png',
+)
+```
+
 ### Future Horn Types
 
 - **Tapped Horn**: Driver tapped at specific point, interference patterns
-- **Front-Loaded Horn**: Horn loading + sealed box combination
 - **Multi-Segment**: Folded horns, tractrix profiles
 - **Enhanced Physics**: Full Webster equation, mouth reflections
 
@@ -211,6 +291,7 @@ The Click-based CLI has these main command groups:
 - `viberesp driver` - Manage driver database (add, list, show, remove)
 - `viberesp simulate` - Run single enclosure simulation with optional plotting
 - `viberesp scan` - Parameter sweep across volume/tuning ranges
+- `viberesp validate` - Validate simulation output against reference tools (Hornresp)
 - `viberesp optimize` - Multi-objective optimization (planned)
 
 ## Testing Status

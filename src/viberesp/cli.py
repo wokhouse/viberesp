@@ -31,6 +31,7 @@ from viberesp.validation import (
     compare_responses,
     calculate_validation_metrics,
     plot_validation,
+    plot_hornresp_style,
 )
 
 # Check matplotlib availability
@@ -565,7 +566,7 @@ def validate():
 @validate.command('hornresp')
 @click.argument('driver_name')
 @click.argument('hornresp_file', type=click.Path(exists=True))
-@click.option('--enclosure-type', '-e', type=click.Choice(['sealed', 'exponential_horn']), default='sealed',
+@click.option('--enclosure-type', '-e', type=click.Choice(['sealed', 'exponential_horn', 'front_loaded_horn']), default='sealed',
               help='Enclosure type to validate (default: sealed)')
 @click.option('--volume', '-v', type=float, help='Enclosure volume in liters [required for sealed]')
 @click.option('--freq-min', type=float, default=20, help='Minimum frequency for comparison (Hz)')
@@ -573,10 +574,11 @@ def validate():
 @click.option('--params-file', type=click.Path(exists=True), help='Hornresp parameter file [required for horns]')
 @click.option('--show-plot', is_flag=True, help='Display validation plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
+@click.option('--hornresp-style', is_flag=True, help='Use Hornresp-style clean plot (single curve, no metrics overlay)')
 @click.option('--output', '-o', type=click.Path(), help='Save metrics to JSON file')
 @click.option('--verbose', is_flag=True, help='Show detailed output')
 def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_min, freq_max,
-                      params_file, show_plot, export_plot, output, verbose):
+                      params_file, show_plot, export_plot, hornresp_style, output, verbose):
     """Validate Viberesp simulation against Hornresp output.
 
     Compares Viberesp simulation results with Hornresp reference data
@@ -613,9 +615,9 @@ def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_m
                 click.echo(f"  Vrc: {hornresp_params.vrc} L")
 
         # Validate required parameters based on enclosure type
-        if enclosure_type == 'exponential_horn':
+        if enclosure_type in ['exponential_horn', 'front_loaded_horn']:
             if params_file is None:
-                click.echo("✗ --params-file required for exponential_horn validation", err=True)
+                click.echo(f"✗ --params-file required for {enclosure_type} validation", err=True)
                 raise click.Abort()
             if hornresp_params.s1 is None or hornresp_params.s2 is None or hornresp_params.exp is None:
                 click.echo("✗ Horn parameters (S1, S2, Exp) not found in params file", err=True)
@@ -626,7 +628,21 @@ def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_m
                 raise click.Abort()
 
         # Create Viberesp enclosure based on type
-        if enclosure_type == 'exponential_horn':
+        if enclosure_type == 'front_loaded_horn':
+            # Build front-loaded horn parameters from Hornresp params
+            enclosure_params = EnclosureParameters(
+                enclosure_type='front_loaded_horn',
+                vb=hornresp_params.vrc + (hornresp_params.vtc if hornresp_params.vtc else 0),
+                throat_area_cm2=hornresp_params.s1,
+                mouth_area_cm2=hornresp_params.s2,
+                horn_length_cm=hornresp_params.exp,
+                cutoff_frequency=hornresp_params.f12,
+                rear_chamber_volume=hornresp_params.vrc if hornresp_params.vrc and hornresp_params.vrc > 0 else None,
+                front_chamber_volume=hornresp_params.vtc if hornresp_params.vtc and hornresp_params.vtc > 0 else None,
+            )
+            enclosure = FrontLoadedHorn(driver, enclosure_params)
+            enclosure_desc = f"Front-Loaded Horn (Vrc={hornresp_params.vrc:.0f}L, {hornresp_params.s1:.0f}→{hornresp_params.s2:.0f} cm², {hornresp_params.exp:.0f} cm)"
+        elif enclosure_type == 'exponential_horn':
             # Build horn parameters from Hornresp params
             enclosure_params = EnclosureParameters(
                 enclosure_type='exponential_horn',
@@ -744,14 +760,24 @@ def validate_hornresp(driver_name, hornresp_file, enclosure_type, volume, freq_m
             if not MATPLOTLIB_AVAILABLE:
                 click.echo("✗ Matplotlib not available for plotting", err=True)
             else:
-                plot_validation(
-                    comparison=comparison,
-                    metrics=metrics,
-                    driver_name=driver_name,
-                    volume=volume,
-                    output_path=export_plot,
-                    show=show_plot,
-                )
+                if hornresp_style:
+                    # Use Hornresp-style clean plot
+                    plot_hornresp_style(
+                        comparison=comparison,
+                        data_source='both',
+                        output_path=export_plot,
+                        show=show_plot,
+                    )
+                else:
+                    # Use comprehensive validation plot
+                    plot_validation(
+                        comparison=comparison,
+                        metrics=metrics,
+                        driver_name=driver_name,
+                        volume=volume,
+                        output_path=export_plot,
+                        show=show_plot,
+                    )
 
         # Success indicator
         if metrics.rmse < 1.0 and metrics.correlation > 0.99:

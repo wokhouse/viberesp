@@ -276,3 +276,111 @@ def plot_spl_only(
         plt.show()
 
     return fig
+
+
+def plot_hornresp_style(
+    comparison: ComparisonResult,
+    data_source: str = 'viberesp',
+    output_path: Optional[str | Path] = None,
+    show: bool = False,
+) -> plt.Figure:
+    """Generate Hornresp-style single curve plot.
+
+    Creates a minimal, clean visualization matching Hornresp's style:
+    - Single SPL curve (red solid line)
+    - Semilog frequency axis
+    - Clean grid
+    - No legend or metrics overlay
+
+    Args:
+        comparison: ComparisonResult from compare_responses()
+        data_source: Which data to plot - 'viberesp', 'hornresp', or 'both'
+            If 'both', plots Viberesp as solid red and Hornresp as dashed gray
+        output_path: Path to save figure (optional)
+        show: Whether to display the plot interactively
+
+    Returns:
+        matplotlib Figure object
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Select data based on source preference
+    if data_source == 'hornresp':
+        data = comparison.hornresp_spl
+        color = 'red'
+        linestyle = '-'
+        linewidth = 2.0
+        label = None
+    elif data_source == 'viberesp':
+        data = comparison.viberesp_spl_aligned
+        color = 'red'
+        linestyle = '-'
+        linewidth = 2.0
+        label = None
+    elif data_source == 'both':
+        # Plot Viberesp as solid red
+        ax.semilogx(
+            comparison.common_freq,
+            comparison.viberesp_spl_aligned,
+            'r-',
+            linewidth=2.0,
+            label='Viberesp',
+        )
+        # Plot Hornresp as dashed gray for comparison
+        ax.semilogx(
+            comparison.common_freq,
+            comparison.hornresp_spl,
+            color='gray',
+            linestyle='--',
+            linewidth=1.5,
+            alpha=0.7,
+            label='Hornresp',
+        )
+        color = None  # Already set above
+        linestyle = None
+        linewidth = None
+        label = None
+    else:
+        raise ValueError(f"Invalid data_source: {data_source}. Must be 'viberesp', 'hornresp', or 'both'")
+
+    # Plot single curve if not 'both'
+    if data_source in ('viberesp', 'hornresp'):
+        ax.semilogx(
+            comparison.common_freq,
+            data,
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            label=label,
+        )
+
+    # Style to match Hornresp
+    ax.set_xlabel('Frequency (Hz)', fontsize=11)
+    ax.set_ylabel('Sound Pressure Level (dB)', fontsize=11)
+    ax.grid(True, which='both', alpha=0.4, linestyle='-', linewidth=0.5)
+
+    # Set reasonable y-limits
+    all_data = [comparison.hornresp_spl, comparison.viberesp_spl_aligned]
+    valid_data = np.concatenate([d[~np.isnan(d)] for d in all_data])
+    if len(valid_data) > 0:
+        y_min = np.min(valid_data) - 5
+        y_max = np.max(valid_data) + 5
+        ax.set_ylim(y_min, y_max)
+
+    # Add legend only if showing both curves
+    if data_source == 'both':
+        ax.legend(loc='best', fontsize=10)
+
+    plt.tight_layout()
+
+    # Save or show
+    if output_path:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to: {output_path}")
+
+    if show:
+        plt.show()
+
+    return fig

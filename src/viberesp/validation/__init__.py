@@ -14,7 +14,7 @@ from .hornresp_parser import (
 )
 from .comparison import ComparisonResult, compare_responses
 from .metrics import ValidationMetrics, calculate_validation_metrics
-from .plotting import plot_validation, plot_spl_only
+from .plotting import plot_validation, plot_spl_only, plot_hornresp_style
 
 __all__ = [
     # Parser
@@ -32,4 +32,5 @@ __all__ = [
     # Plotting
     'plot_validation',
     'plot_spl_only',
+    'plot_hornresp_style',
 ]
