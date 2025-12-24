@@ -1,0 +1,99 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viberesp"
+version = "0.1.0"
+description = "Loudspeaker enclosure design and optimization using Thiele-Small parameters"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["audio", "speakers", "acoustics", "optimization", "thiele-small"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Science/Research",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    # Core scientific computing
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+
+    # Data validation
+    "pydantic>=2.0.0",
+
+    # Optimization
+    "pymoo>=0.6.0",
+
+    # CLI framework
+    "click>=8.0.0",
+
+    # Plotting (optional but recommended)
+    "matplotlib>=3.5.0",
+
+    # File I/O
+    "pandas>=1.3.0",  # For CSV parsing
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.950",
+    "pre-commit>=2.17.0",
+]
+
+docs = [
+    "sphinx>=4.5.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.18.0",
+]
+
+pdf = [
+    "PyPDF2>=2.0.0",  # Optional: for PDF datasheet parsing
+]
+
+[project.scripts]
+viberesp = "viberesp.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/viberesp"
+Documentation = "https://viberesp.readthedocs.io"
+Repository = "https://github.com/yourusername/viberesp"
+Issues = "https://github.com/yourusername/viberesp/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=src/viberesp --cov-report=term-missing"
