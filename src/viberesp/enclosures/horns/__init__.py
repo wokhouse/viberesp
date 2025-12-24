@@ -10,8 +10,10 @@ listening space.
 
 from viberesp.enclosures.horns.base_horn import BaseHorn
 from viberesp.enclosures.horns.exponential_horn import ExponentialHorn
+from viberesp.enclosures.horns.front_loaded_horn import FrontLoadedHorn
 
 __all__ = [
     "BaseHorn",
     "ExponentialHorn",
+    "FrontLoadedHorn",
 ]

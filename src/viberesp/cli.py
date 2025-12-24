@@ -13,7 +13,7 @@ from viberesp.core.models import (
     DriverType
 )
 from viberesp.enclosures.sealed import SealedEnclosure
-from viberesp.enclosures.horns import ExponentialHorn
+from viberesp.enclosures.horns import ExponentialHorn, FrontLoadedHorn
 from viberesp.simulation.frequency_response import (
     FrequencyResponseSimulator,
     compare_enclosures
@@ -251,7 +251,7 @@ def import_cmd(input_path, overwrite):
 
 @cli.command()
 @click.argument('driver_name')
-@click.argument('enclosure_type', type=click.Choice(['sealed', 'ported', 'exponential_horn']))
+@click.argument('enclosure_type', type=click.Choice(['sealed', 'ported', 'exponential_horn', 'front_loaded_horn']))
 @click.option('--volume', '-v', type=float, required=False, help='Box volume (L) [required for sealed/ported]')
 @click.option('--depth', '-d', type=float, help='Enclosure internal depth (cm)')
 @click.option('--tuning', '-f', type=float, help='Port tuning frequency (Hz) [for ported]')
@@ -262,7 +262,8 @@ def import_cmd(input_path, overwrite):
 @click.option('--horn-length', type=float, help='Horn length (cm) [for horns]')
 @click.option('--flare-rate', type=float, help='Exponential flare rate m (1/m) [for horns]')
 @click.option('--cutoff', '-fc', type=float, help='Horn cutoff frequency (Hz) [for horns]')
-@click.option('--rear-chamber', type=float, help='Rear chamber volume (L) [for horns]')
+@click.option('--rear-chamber', type=float, help='Rear chamber volume (L) [required for front_loaded_horn, optional for exponential_horn]')
+@click.option('--front-chamber', type=float, help='Front chamber volume (L) [optional for front_loaded_horn]')
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.option('--plot', '-p', is_flag=True, help='Show frequency response plot')
 @click.option('--export-plot', type=click.Path(), help='Save plot to file')
@@ -306,6 +307,26 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
             click.echo("✗ --horn-length required for horn enclosures", err=True)
             raise click.Abort()
 
+    if enclosure_type == 'front_loaded_horn':
+        # Check required FLH parameters (same as exponential_horn, plus rear_chamber)
+        throat_area = kwargs.get('throat_area')
+        mouth_area = kwargs.get('mouth_area')
+        horn_length = kwargs.get('horn_length')
+        rear_chamber = kwargs.get('rear_chamber')
+
+        if throat_area is None:
+            click.echo("✗ --throat-area required for front-loaded horn enclosures", err=True)
+            raise click.Abort()
+        if mouth_area is None:
+            click.echo("✗ --mouth-area required for front-loaded horn enclosures", err=True)
+            raise click.Abort()
+        if horn_length is None:
+            click.echo("✗ --horn-length required for front-loaded horn enclosures", err=True)
+            raise click.Abort()
+        if rear_chamber is None:
+            click.echo("✗ --rear-chamber required for front-loaded horn enclosures", err=True)
+            raise click.Abort()
+
     # Create enclosure parameters
     params_dict = {
         'enclosure_type': enclosure_type,
@@ -332,6 +353,16 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
         params_dict['cutoff_frequency'] = kwargs.get('cutoff')
         params_dict['rear_chamber_volume'] = kwargs.get('rear_chamber')
 
+    # Front-loaded horn parameters (includes rear_chamber and optional front_chamber)
+    if enclosure_type == 'front_loaded_horn':
+        params_dict['throat_area_cm2'] = kwargs.get('throat_area')
+        params_dict['mouth_area_cm2'] = kwargs.get('mouth_area')
+        params_dict['horn_length_cm'] = kwargs.get('horn_length')
+        params_dict['flare_rate'] = kwargs.get('flare_rate')
+        params_dict['cutoff_frequency'] = kwargs.get('cutoff')
+        params_dict['rear_chamber_volume'] = kwargs.get('rear_chamber')
+        params_dict['front_chamber_volume'] = kwargs.get('front_chamber')
+
     try:
         enclosure_params = EnclosureParameters(**params_dict)
     except Exception as e:
@@ -343,6 +374,8 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
         enclosure = SealedEnclosure(driver, enclosure_params)
     elif enclosure_type == 'exponential_horn':
         enclosure = ExponentialHorn(driver, enclosure_params)
+    elif enclosure_type == 'front_loaded_horn':
+        enclosure = FrontLoadedHorn(driver, enclosure_params)
     else:
         click.echo(f"✗ Enclosure type '{enclosure_type}' not yet implemented", err=True)
         raise click.Abort()
@@ -374,6 +407,25 @@ def simulate(driver_name, enclosure_type, volume, **kwargs):
             click.echo(f"Cutoff Frequency: {cutoff:.1f} Hz")
         if rear_chamber:
             click.echo(f"Rear Chamber: {rear_chamber:.1f} L")
+    elif enclosure_type == 'front_loaded_horn':
+        throat_area = kwargs.get('throat_area')
+        mouth_area = kwargs.get('mouth_area')
+        horn_length = kwargs.get('horn_length')
+        flare_rate = kwargs.get('flare_rate')
+        cutoff = kwargs.get('cutoff')
+        rear_chamber = kwargs.get('rear_chamber')
+        front_chamber = kwargs.get('front_chamber')
+
+        click.echo(f"Rear Chamber: {rear_chamber:.1f} L")
+        if front_chamber:
+            click.echo(f"Front Chamber: {front_chamber:.1f} L")
+        click.echo(f"Throat Area: {throat_area:.1f} cm²")
+        click.echo(f"Mouth Area: {mouth_area:.1f} cm²")
+        click.echo(f"Horn Length: {horn_length:.1f} cm")
+        if flare_rate:
+            click.echo(f"Flare Rate: {flare_rate:.2f} m⁻¹")
+        if cutoff:
+            click.echo(f"Cutoff Frequency: {cutoff:.1f} Hz")
     else:
         click.echo(f"Volume: {volume:.1f} L")
         if depth is not None:

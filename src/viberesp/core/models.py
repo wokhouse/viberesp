@@ -23,6 +23,7 @@ class EnclosureType(str, Enum):
     BANDPASS = "bandpass"
     TAPPED_HORN = "tapped_horn"
     EXPONENTIAL_HORN = "exponential_horn"
+    FRONT_LOADED_HORN = "front_loaded_horn"
 
 
 class ThieleSmallParameters(BaseModel):
