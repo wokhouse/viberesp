@@ -108,6 +108,66 @@ class BaseHorn(BaseEnclosure):
             "Cutoff frequency must be specified or derived from flare_rate"
         )
 
+    def _get_or_calculate_flare_rate(self) -> float:
+        """
+        Get flare rate from parameters or calculate from cutoff frequency.
+
+        For exponential horns: fc = (m * c) / (4π)
+        Therefore: m = (fc * 4π) / c
+
+        Returns:
+            Flare rate m (1/m)
+
+        Raises:
+            ValueError: If neither flare_rate nor cutoff_frequency is available
+        """
+        if self.params.flare_rate:
+            return self.params.flare_rate
+
+        if self.params.cutoff_frequency:
+            # Calculate flare rate from cutoff frequency
+            fc = self.params.cutoff_frequency
+            m = (fc * 4 * np.pi) / C
+            return m
+
+        raise ValueError(
+            "Either flare_rate or cutoff_frequency must be specified"
+        )
+
+    def calculate_effective_length(self) -> float:
+        """
+        Calculate effective horn length with end correction.
+
+        The effective length of a horn includes both the physical length
+        and an end correction that accounts for the radiation impedance
+        at the mouth. For a circular mouth, the end correction is:
+
+        delta_L = 0.85 * sqrt(mouth_area / (4 * pi))
+
+        This correction accounts for the fact that the acoustic pressure
+        extends beyond the physical mouth of the horn.
+
+        Returns:
+            Effective horn length (m)
+        """
+        # Get physical length
+        physical_length = self.horn_length if self.horn_length else 0.0
+
+        # Check if end correction is enabled (default: True)
+        # Using getattr for backward compatibility in case older params don't have this field
+        end_correction_enabled = getattr(self.params, 'end_correction', True)
+
+        if not end_correction_enabled or not self.mouth_area:
+            return physical_length
+
+        # Calculate end correction for circular mouth
+        # The factor 0.85 is appropriate for a circular piston in an infinite baffle
+        # For other mouth shapes, different correction factors may apply
+        mouth_radius = np.sqrt(self.mouth_area / np.pi)
+        end_correction = 0.85 * mouth_radius
+
+        return physical_length + end_correction
+
     def validate_mouth_size(self) -> None:
         """
         Check if mouth size is adequate for cutoff frequency.
@@ -215,3 +275,79 @@ class BaseHorn(BaseEnclosure):
             'fs_loaded': fs_loaded,
             'vas_loaded': vas_loaded
         }
+
+    def calculate_finite_horn_impedance(self, frequencies: np.ndarray) -> np.ndarray:
+        """
+        Calculate throat impedance for finite exponential horn.
+
+        This method accounts for the finite length of the horn and mouth
+        reflections, which become significant near the cutoff frequency.
+
+        For a finite exponential horn, the throat impedance includes:
+        - Propagation effects through the horn length
+        - Mouth radiation impedance
+        - Standing wave patterns due to reflections
+
+        Uses transmission line approximation:
+        Z_throat = Z_characteristic × coth(γ × L_eff)
+
+        Where γ is the complex propagation constant accounting for flare rate.
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+
+        Returns:
+            Complex acoustic impedance at throat (Pa·s/m³)
+        """
+        # Get or calculate flare rate
+        m = self._get_or_calculate_flare_rate()  # flare rate (1/m)
+        k = 2 * np.pi * frequencies / C  # wavenumber
+        St = self.throat_area  # throat area (m²)
+
+        # Get effective horn length (with end correction if enabled)
+        L_eff = self.calculate_effective_length()
+
+        # Characteristic impedance of air at throat
+        Z0 = (RHO * C) / St
+
+        # For finite exponential horn, use hyperbolic functions
+        # to account for mouth reflections and finite length effects
+
+        # Calculate complex propagation constant for exponential horn
+        # gamma = sqrt(m^2/4 - k^2) for exponential horns
+        gamma_term = m**2 / 4 - k**2
+
+        # Above cutoff: gamma is imaginary (propagating wave)
+        # Below cutoff: gamma is real (evanescent wave)
+        gamma = np.zeros_like(frequencies, dtype=complex)
+
+        above_cutoff = gamma_term < 0
+        below_cutoff = gamma_term >= 0
+
+        # Above cutoff: propagating mode
+        if np.any(above_cutoff):
+            gamma[above_cutoff] = 1j * np.sqrt(-gamma_term[above_cutoff])
+
+        # Below cutoff: evanescent mode
+        if np.any(below_cutoff):
+            gamma[below_cutoff] = np.sqrt(gamma_term[below_cutoff])
+
+        # Calculate throat impedance using transmission line model
+        # Z_throat = Z0 × coth(γ × L_eff)
+        # This accounts for finite length and mouth reflections
+
+        gamma_L = gamma * L_eff
+
+        # Avoid overflow in coth for large arguments
+        # Use: coth(z) = 1/tanh(z)
+        # For large z, tanh(z) → 1, so coth(z) → 1
+
+        tanh_gamma_L = np.tanh(gamma_L)
+
+        # Avoid division by zero
+        tanh_gamma_L = np.where(np.abs(tanh_gamma_L) < 1e-10, 1e-10, tanh_gamma_L)
+
+        # Throat impedance
+        Z_throat = Z0 / tanh_gamma_L
+
+        return Z_throat

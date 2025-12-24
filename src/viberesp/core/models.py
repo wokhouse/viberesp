@@ -404,10 +404,24 @@ class EnclosureParameters(BaseModel):
         gte=0,
         description="Rear chamber volume (L)"
     )
+    rear_chamber_length_cm: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Rear chamber acoustic path length (cm) - used for Hornresp compatibility"
+    )
     front_chamber_volume: Optional[float] = Field(
         None,
         gte=0,
         description="Front chamber volume (L)"
+    )
+    front_chamber_area_cm2: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Front chamber throat area Atc (cm²) - used for Hornresp compatibility"
+    )
+    end_correction: bool = Field(
+        default=True,
+        description="Apply mouth end correction for finite horn length"
     )
 
 

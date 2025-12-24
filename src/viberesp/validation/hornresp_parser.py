@@ -47,6 +47,8 @@ class HornrespParams:
         nd: Number of drivers
         vrc: Rear chamber volume in liters
         lrc: Rear chamber length in cm
+        vtc: Front chamber volume in liters
+        atc: Front chamber throat area in cm²
         eg: Input voltage in volts
         s1: Throat area in cm² (for horns)
         s2: Mouth area in cm² (for horns)
@@ -64,6 +66,8 @@ class HornrespParams:
     nd: int
     vrc: float
     lrc: float
+    vtc: float
+    atc: float
     eg: float
     s1: Optional[float] = None
     s2: Optional[float] = None
@@ -184,6 +188,8 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
         'nd': r'Nd\s*=\s*(\d+)',
         'vrc': r'Vrc\s*=\s*([\d.E+-]+)',
         'lrc': r'Lrc\s*=\s*([\d.E+-]+)',
+        'vtc': r'Vtc\s*=\s*([\d.E+-]+)',
+        'atc': r'Atc\s*=\s*([\d.E+-]+)',
         'eg': r'Eg\s*=\s*([\d.E+-]+)',
     }
 
@@ -221,6 +227,8 @@ def parse_hornresp_params(file_path: str | Path) -> HornrespParams:
         nd=int(parsed['nd']),
         vrc=parsed['vrc'],
         lrc=parsed['lrc'],
+        vtc=parsed['vtc'],
+        atc=parsed['atc'],
         eg=parsed['eg'],
         s1=horn_parsed.get('s1'),
         s2=horn_parsed.get('s2'),
