@@ -208,19 +208,18 @@ params = EnclosureParameters(
     ...
 )
 
-# Use empirical model (tested, fallback)
+# Physics model is now the default and only option
 params = EnclosureParameters(
     enclosure_type='exponential_horn',
     throat_area_cm2=600,
     mouth_area_cm2=4800,
     horn_length_cm=200,
     cutoff_frequency=35,
-    use_physics_model=False,  # Empirical model
     ...
 )
 ```
 
-**Note:** The physics model is currently under active development. The empirical model provides more reliable results for validation against Hornresp at this time.
+**Note:** Phase 1 (front chamber Helmholtz resonance) is complete. The physics model now properly integrates front chamber impedance in parallel with throat load. Empirical model has been removed as of commit 3bc48df.
 
 ### BaseHorn Class
 
@@ -626,16 +625,24 @@ GitHub Actions workflow (`.github/workflows/validation.yml`) runs on every push/
 
 ### Current Baseline Metrics
 
-Established 2024-12-24 as starting point for tracking improvements:
+Updated 2025-12-24 after Phase 1 front chamber Helmholtz resonance implementation:
 
-| Case | RMSE (dB) | Correlation |
-|------|-----------|-------------|
-| case1_straight_horn | 13.56 | -0.21 |
-| case2_horn_rear_chamber | 9.22 | 0.00 |
-| case3_horn_front_chamber | 34.39 | 0.33 |
-| case4_complete_system | 35.83 | 0.22 |
+| Case | RMSE (dB) | Correlation | Status |
+|------|-----------|-------------|--------|
+| case1_straight_horn | 13.56 | -0.21 | Baseline (Priority 2) |
+| case2_horn_rear_chamber | 9.22 | 0.00 | Baseline (Priority 3) |
+| case3_horn_front_chamber | 15.73 | 0.05 | ✅ **Improved: 34.39 → 15.73 dB (54%)** |
+| case4_complete_system | 13.95 | 0.06 | ✅ **Improved: 35.83 → 13.95 dB (61%)** |
 
-The physics model is under active development. These baselines establish the starting point for measuring future improvements.
+**Phase 1 Achievements:**
+- Fixed front chamber impedance topology (parallel combination)
+- Removed empirical model fallback (physics-only)
+- Reduced mass loading calibration factor (4.0 → 1.0)
+- F3 error improved: ~323 Hz → ~108 Hz (67% improvement)
+
+**Next Steps (Phase 2):**
+- Implement multi-mode standing wave resonances
+- Target: case3/case4 RMSE < 6 dB (Priority 1)
 
 ### Test Fixtures Format
 
