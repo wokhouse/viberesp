@@ -435,12 +435,15 @@ class FrontLoadedHorn(BaseHorn):
         """
         Calculate driver mechanical impedance with acoustic loading.
 
-        Phase 1 Enhancement: Includes rear chamber compliance in parallel with throat load.
+        Phase 1 Enhancement: Includes rear chamber AND front chamber compliance in parallel with throat load.
 
         Z_m = R_ms + jωM_ms + 1/(jωC_ms) + S_d² × Z_acoustic_combined
 
-        Where Z_acoustic_combined combines throat and rear chamber impedances in parallel:
-        1/Z_acoustic_combined = 1/Z_throat + 1/Z_rc
+        Where Z_acoustic_combined combines throat, rear chamber, and front chamber impedances in parallel:
+        1/Z_acoustic_combined = 1/Z_throat + 1/Z_rc + 1/Z_fc
+
+        This properly models the acoustic circuit where the driver diaphragm sees all three
+        acoustic loads simultaneously (throat path, rear chamber compliance, front chamber compliance).
 
         Args:
             frequencies: Frequency array (Hz)
@@ -463,17 +466,26 @@ class FrontLoadedHorn(BaseHorn):
         # Diaphragm area (m²)
         S_d = self.driver.sd
 
-        # Add rear chamber compliance in parallel with throat load
+        # Combine rear chamber AND front chamber in parallel with throat load
+        # Start with throat impedance
+        Z_acoustic_combined = Z_acoustic_load
+
+        # Add rear chamber compliance (already correct)
         if self.params.rear_chamber_volume > 0:
             Z_rc = self._calculate_rear_chamber_impedance(frequencies)
+            # Parallel combination: Z_total = (Z1 * Z2) / (Z1 + Z2)
+            Z_acoustic_combined = (Z_acoustic_combined * Z_rc) / (Z_acoustic_combined + Z_rc)
 
-            # Parallel combination: 1/Z_total = 1/Z_throat + 1/Z_rc
-            Z_acoustic_combined = (Z_acoustic_load * Z_rc) / (Z_acoustic_load + Z_rc)
+        # NEW: Add front chamber compliance (Phase 1 fix)
+        # Front chamber is in PARALLEL with throat, meaning driver can push
+        # air either into the horn throat OR compress the front chamber
+        if self.params.front_chamber_volume:
+            Z_fc = self._calculate_front_chamber_impedance(frequencies)
+            # Parallel combination
+            Z_acoustic_combined = (Z_acoustic_combined * Z_fc) / (Z_acoustic_combined + Z_fc)
 
-            # Radiation loading from combined acoustic impedance
-            Z_rad_load = (S_d ** 2) * Z_acoustic_combined
-        else:
-            Z_rad_load = (S_d ** 2) * Z_acoustic_load
+        # Radiation loading from combined acoustic impedance
+        Z_rad_load = (S_d ** 2) * Z_acoustic_combined
 
         # Mechanical impedance
         Z_m = R_ms + 1j * omega * M_ms + 1 / (1j * omega * C_ms) + Z_rad_load
@@ -571,6 +583,47 @@ class FrontLoadedHorn(BaseHorn):
 
         return H_final
 
+    def _calculate_front_chamber_impedance(
+        self,
+        frequencies: np.ndarray
+    ) -> np.ndarray:
+        """
+        Calculate front chamber acoustic impedance (compliance only).
+
+        Phase 1: Pure Helmholtz compliance model (no standing waves yet).
+
+        Front chamber acts as acoustic compliance:
+        Z_chamber = 1 / (jω × C_chamber)
+
+        Where C_chamber = V_front / (ρ₀ × c²)
+
+        This impedance is in PARALLEL with throat impedance, meaning
+        the driver sees both loads simultaneously. The parallel combination
+        properly models the acoustic circuit where driver diaphragm drives
+        into throat AND front chamber at the same time.
+
+        Args:
+            frequencies: Array of frequencies (Hz)
+
+        Returns:
+            Complex front chamber impedance (Pa·s/m³)
+        """
+        if not self.params.front_chamber_volume:
+            return np.inf * np.ones_like(frequencies, dtype=complex)
+
+        # Front chamber compliance (m³/Pa)
+        # C = V / (ρ₀ × c²)
+        C_fc = self._calculate_acoustic_compliance(self.params.front_chamber_volume)
+
+        # Angular frequency
+        omega = 2 * np.pi * frequencies
+
+        # Front chamber impedance (purely compliant)
+        # Z = 1 / (jωC)
+        Z_fc = 1 / (1j * omega * C_fc)
+
+        return Z_fc
+
     def _calculate_horn_mass_loading(self, frequencies: np.ndarray) -> np.ndarray:
         """
         Calculate frequency-dependent mass loading from horn.
@@ -618,13 +671,10 @@ class FrontLoadedHorn(BaseHorn):
         # M_horn / Mms (unitless ratio)
         rho_air = 1.18  # kg/m³ (air density)
 
-        # Apply calibration factor to better match Hornresp low-frequency behavior
-        # The theoretical value underestimates the loading effect in real horns
-        # especially with large front chambers. This factor accounts for:
-        # 1. Front chamber compliance coupling (Vtc = 900L in this case)
-        # 2. Acoustic path length effects
-        # 3. Non-ideal horn behavior
-        calibration_factor = 4.0
+        # Phase 1: Front chamber compliance now properly modeled in impedance chain
+        # Reduce calibration factor from 4.0 → 1.0 as compensation is no longer needed
+        # The previous 4.0× factor was compensating for missing front chamber physics
+        calibration_factor = 1.0  # Was: 4.0 (before Phase 1 fix)
 
         M_horn = rho_air * St * L_eff * mass_loading_ratio * calibration_factor
 
@@ -740,16 +790,19 @@ class FrontLoadedHorn(BaseHorn):
         """
         Calculate frequency response for front-loaded horn using physics-based model.
 
-        Phase 1 Enhancement: Uses acoustic impedance chain method with front chamber effects.
+        Phase 1 Enhancement: Front chamber impedance is now properly integrated into the impedance chain.
 
         Physics model:
         1. Calculate driver mechanical impedance with horn loading
-        2. Include rear chamber compliance in parallel with throat load
+        2. Include rear chamber AND front chamber compliance in parallel with throat load
         3. Calculate electrical impedance with motional branch
-        4. Calculate volume velocity at throat
-        5. Apply front chamber transfer function
-        6. Calculate acoustic pressure at listening position
-        7. Convert to SPL
+        4. Calculate volume velocity at throat (driver already sees front chamber impedance)
+        5. Calculate acoustic pressure at listening position
+        6. Convert to SPL
+
+        Note: Front chamber is no longer applied as post-processing transfer function.
+        It is properly modeled in the impedance chain via parallel combination in
+        _calculate_driver_mechanical_impedance().
 
         Args:
             frequencies: Array of frequencies (Hz)
@@ -757,28 +810,22 @@ class FrontLoadedHorn(BaseHorn):
 
         Returns:
             (spl_magnitude_db, phase_degrees)
+
+        Raises:
+            RuntimeError: If physics model calculation fails
         """
         P_ref = 20e-6
 
-        # Check if physics model should be used
-        use_physics = getattr(self.params, 'use_physics_model', True)
-
-        if not use_physics:
-            return self._calculate_empirical_response(frequencies, voltage)
-
-        # Physics-based calculation
+        # Physics-only calculation (empirical model removed in Phase 1)
         try:
             # Calculate volume velocity at throat
+            # Front chamber impedance is now included in Z_acoustic_combined
+            # so driver already sees it in the impedance chain
             U_throat = self._calculate_volume_velocity(frequencies, voltage)
 
-            # Apply front chamber transfer function
-            H_fc = self._calculate_front_chamber_response(frequencies)
-
-            # Volume velocity at horn throat (after front chamber)
-            U_horn = U_throat * H_fc
-
             # Calculate acoustic pressure at listening position
-            P_r = self._calculate_acoustic_pressure(frequencies, U_horn, distance=1.0)
+            # No front chamber post-processing needed
+            P_r = self._calculate_acoustic_pressure(frequencies, U_throat, distance=1.0)
 
             # Convert to SPL
             spl_db = 20 * np.log10(np.abs(P_r) / P_ref)
@@ -789,153 +836,12 @@ class FrontLoadedHorn(BaseHorn):
             return spl_db, phase_degrees
 
         except Exception as e:
-            warnings.warn(
-                f"Physics model failed: {e}. Falling back to empirical model.",
-                UserWarning
-            )
-            return self._calculate_empirical_response(frequencies, voltage)
-
-    def _calculate_empirical_response(
-        self,
-        frequencies: np.ndarray,
-        voltage: float = VOLTAGE_1W_8OHM
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Original empirical model (kept for backward compatibility).
-
-        Uses parameterized empirical model with physics-informed corrections:
-        - Peak frequency depends on horn cutoff, driver Qts, and rear chamber size
-        - Impedance transformation gain scales with area ratio and effective horn length
-        - End corrections are applied via calculate_effective_length()
-        - Front chamber uses proper acoustic path length from Hornresp parameters
-
-        The empirical coefficients are calibrated to Hornresp validation data,
-        with improvements from enhanced physics modeling.
-
-        Args:
-            frequencies: Array of frequencies (Hz)
-            voltage: Input voltage (default: 2.83V for 1W into 8Ω)
-
-        Returns:
-            (spl_magnitude_db, phase_degrees)
-        """
-        # Calculate design parameters
-        horn_gain_db = self.calculate_horn_gain()
-        alpha = self.driver.vas / self.params.rear_chamber_volume
-        area_ratio = self.mouth_area / self.throat_area if self.throat_area and self.mouth_area else 1.0
-
-        # Use effective horn length (with end correction) instead of physical length
-        # This accounts for mouth radiation impedance effects
-        horn_length_m = self.calculate_effective_length() if self.horn_length else 1.0
-
-        # Get horn cutoff frequency
-        try:
-            fc_horn = self.calculate_cutoff_frequency()
-        except ValueError:
-            fc_horn = self.driver.fs
-
-        # === PARAMETERIZED EMPIRICAL COEFFICIENTS ===
-        # These scale with design parameters and incorporate physics enhancements
-
-        # Peak frequency ratio: scales with Qts and alpha
-        # Higher Qts → higher peak ratio (sharper peak)
-        # Larger alpha (smaller rear chamber) → higher peak ratio
-        # End correction slightly lowers effective fc, affecting peak position
-        qts_factor = self.driver.qts / 0.33  # Normalize to reference design
-        alpha_factor = np.log10(alpha + 1) / np.log10(2.75 + 1)  # Normalize to reference
-
-        # Adjust peak ratio based on effective length vs physical length
-        # Longer effective length (with end correction) slightly lowers peak frequency
-        length_correction = 1.0
-        if self.horn_length:
-            length_correction = self.horn_length / horn_length_m
-
-        peak_ratio = (1.35 + 0.10 * qts_factor + 0.05 * alpha_factor) * length_correction
-        f_peak = fc_horn * peak_ratio
-
-        # Impedance transformation boost: scales with area ratio and effective horn length
-        # Using effective length accounts for end corrections in impedance matching
-        # Reference: area_ratio=11.4, effective_length≈3.0m → boost=10dB
-        area_factor = np.log10(area_ratio) / np.log10(11.4)
-        length_factor = np.log10(horn_length_m) / np.log10(2.87)  # Using effective length
-        impedance_boost = 10.0 * (0.7 * area_factor + 0.3 * length_factor)
-
-        # Peak sharpness: determined by Qts and alpha
-        # Higher Qts = sharper peak
-        # Smaller rear chamber (higher alpha) = sharper peak
-        peak_sharpness = 0.5 + 0.3 * self.driver.qts + 0.1 * np.log10(alpha + 1)
-        peak_sharpness = np.clip(peak_sharpness, 0.3, 1.0)
-
-        # Low-frequency roll-off rate: scales with horn order (exponential ≈ 4th order)
-        # Properly sized horns have steeper roll-off
-        rolloff_steepness = 24 * (0.8 + 0.2 * np.log10(area_ratio) / np.log10(11.4))
-
-        # === BUILD RESPONSE CURVE ===
-        spl_base = self.calculate_sensitivity() + horn_gain_db
-        spl_peak = spl_base + impedance_boost
-
-        response_db = np.zeros_like(frequencies)
-
-        for i, f in enumerate(frequencies):
-            if f < fc_horn * 0.8:
-                # Well below cutoff: reactive regime with mass loading
-                # Calculate mass loading at this frequency
-                freq_array = np.array([f])
-                mass_loading = self._calculate_horn_mass_loading(freq_array)[0]
-
-                # Horn gain is reduced in reactive regime
-                # The driver sees mass loading but not full horn gain
-                reactive_gain_factor = 1.0 / (1.0 + mass_loading)
-
-                # Base response with reactive loading
-                rolloff = rolloff_steepness * np.log10(fc_horn * 0.8 / (f + 1e-10))
-
-                # Apply horn gain reduced by reactive loading
-                response_db[i] = spl_base - 20 + rolloff
-                response_db[i] += horn_gain_db * reactive_gain_factor
-
-            elif f < f_peak:
-                # Between cutoff and peak: rising response
-                f_norm = (f - fc_horn * 0.8) / (f_peak - fc_horn * 0.8)
-                # Smooth rise from base to peak level
-                response_db[i] = spl_base - 20 + (impedance_boost + 20) * f_norm
-
-                # Add peaking boost near peak (sharpness controlled by peak_sharpness)
-                if f_norm > (1.0 - peak_sharpness):
-                    peak_region = (f_norm - (1.0 - peak_sharpness)) / peak_sharpness
-                    peak_boost = 2.0 * peak_region**2
-                    response_db[i] += peak_boost
-
-            elif f < 200:
-                # Peak to 200 Hz: slight roll-off from peak
-                f_norm = (f - f_peak) / (200 - f_peak)
-                response_db[i] = spl_peak - 3 * f_norm
-
-            else:
-                # Above 200 Hz: gradual roll-off
-                f_norm = np.log10(f / 200)
-                response_db[i] = spl_peak - 3 - 2 * f_norm
-
-        # Apply Helmholtz resonance if front chamber present
-        if self.params.front_chamber_volume:
-            # Get Helmholtz transfer function
-            H_helmholtz = self._calculate_front_chamber_response(frequencies)
-
-            # Convert to dB
-            helmholtz_response_db = 20 * np.log10(np.abs(H_helmholtz) + 1e-10)
-
-            # Apply to response (adds resonance peak)
-            response_db = response_db + helmholtz_response_db
-
-            # Also adjust phase
-            helmholtz_phase = np.angle(H_helmholtz) * 180 / np.pi
-            phase = -180 * (frequencies / (frequencies + f_peak)) + helmholtz_phase
-        else:
-            # No front chamber: standard phase calculation
-            phase = -180 * (frequencies / (frequencies + f_peak))
-
-        return response_db, phase
-
+            # Raise error instead of silent fallback
+            raise RuntimeError(
+                f"Physics model calculation failed: {e}\n"
+                f"Front-loaded horn requires physics model. "
+                f"Check parameters and ensure all required values are provided."
+            ) from e
 
     def calculate_system_q(self) -> float:
         """

@@ -1,7 +1,7 @@
 {
   "test_case": "case2_horn_rear_chamber",
-  "commit": "5bad42f607af3a7a1cadb242ddb163f795cb94d5",
-  "date": "2025-12-24T15:36:36.928856",
+  "commit": "b87f0552b8f69728e45ea58f98dd8605c575c820",
+  "date": "2025-12-24T16:17:59.987653",
   "viberesp_version": "0.1.0",
   "metrics": {
     "rmse": 9.214643038931179,
