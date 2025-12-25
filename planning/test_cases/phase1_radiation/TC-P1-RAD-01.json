@@ -1,0 +1,32 @@
+{
+  "id": "TC-P1-RAD-01",
+  "name": "Small ka (Low Frequency)",
+  "phase": "1",
+  "category": "Radiation Impedance",
+  "purpose": "Verify behavior when ka << 1 (mass-controlled region)",
+  "driver": null,
+  "hornresp_parameters": {
+    "mouth_area": 1257,
+    "mouth_radius_cm": 20,
+    "test_frequency": 50
+  },
+  "expected_results": {
+    "ka": 0.18,
+    "R_normalized": 0.016,
+    "X_normalized": 0.24
+  },
+  "validation_targets": {
+    "R_tolerance": "±5%",
+    "X_tolerance": "±5%"
+  },
+  "reference_files": {
+    "impedance_data": "TC-P1-RAD-01_impedance.csv",
+    "screenshot": "TC-P1-RAD-01_hornresp.png"
+  },
+  "notes": [
+    "Below ka=1, radiation mass dominates",
+    "Real part (R) should be very small",
+    "Imaginary part (X) indicates mass loading"
+  ],
+  "status": "pending"
+}

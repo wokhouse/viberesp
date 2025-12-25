@@ -1,0 +1,40 @@
+{
+  "id": "TC-P4-FLH-01",
+  "name": "Basic Front-Loaded Horn",
+  "phase": "4",
+  "category": "Complete Front-Loaded Horn",
+  "purpose": "Validate complete front-loaded horn system with driver A",
+  "driver": "A",
+  "hornresp_parameters": {
+    "S1": 507,
+    "S2": 10000,
+    "L12": 200,
+    "Flare": "Exp",
+    "Vrc": 100,
+    "Vtc": 0,
+    "Ang": "2π"
+  },
+  "derived_values": {
+    "compression_ratio": 1.0,
+    "cutoff_frequency": 26.8,
+    "horn_expansion": "S2/S1 = 19.7"
+  },
+  "validation_targets": {
+    "spl_tolerance": "±0.5 dB",
+    "impedance_tolerance": "±3%",
+    "phase_tolerance": "±2°",
+    "displacement_tolerance": "±5%"
+  },
+  "reference_files": {
+    "spl": "TC-P4-FLH-01_spl.frd",
+    "impedance": "TC-P4-FLH-01_imp.zma",
+    "displacement": "TC-P4-FLH-01_disp.csv",
+    "schematic": "TC-P4-FLH-01_schematic.png"
+  },
+  "notes": [
+    "Unity compression ratio (S1 = Sd)",
+    "No throat chamber",
+    "Half-space radiation (2π)"
+  ],
+  "status": "pending"
+}

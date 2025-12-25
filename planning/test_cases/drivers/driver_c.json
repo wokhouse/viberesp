@@ -1,0 +1,37 @@
+{
+  "name": "Generic 15-inch Pro Woofer",
+  "designation": "Driver C",
+  "purpose": "High-Output Bass Horn Testing",
+  "thiele_small": {
+    "Sd": 855,
+    "Sd_units": "cm²",
+    "Re": 5.2,
+    "Re_units": "Ω",
+    "Bl": 18.5,
+    "Bl_units": "T·m",
+    "Mmd": 145,
+    "Mmd_units": "g",
+    "Cms": 0.22,
+    "Cms_units": "mm/N",
+    "Rms": 8.0,
+    "Rms_units": "Ns/m",
+    "Le": 1.8,
+    "Le_units": "mH"
+  },
+  "derived_parameters": {
+    "fs": 28.1,
+    "fs_units": "Hz",
+    "Qms": 3.21,
+    "Qes": 0.28,
+    "Qts": 0.26,
+    "Vas": 285,
+    "Vas_units": "L"
+  },
+  "application": "High-output bass horns, large format systems",
+  "notes": [
+    "Very low Qts excellent for horn loading",
+    "High Bl product for high efficiency",
+    "Large Sd for high power handling",
+    "Low fs for deep bass extension"
+  ]
+}
