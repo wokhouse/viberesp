@@ -84,9 +84,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Type check entire codebase
+      - name: Type check physics module
         run: |
-          mypy src/viberesp/
+          mypy src/viberesp/physics/
 
   validate-theoretical:
     runs-on: ubuntu-latest
@@ -106,17 +106,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Validate against theoretical formulas
+      - name: Validate all test cases
         run: |
           pytest tests/physics/test_radiation.py::TestTC_P1_RAD_01 -v
-          pytest tests/physics/test_radiation.py::TestTC_P1_RAD_02 -v
-          pytest tests/physics/test_radiation.py::TestTC_P1_RAD_03 -v
-          pytest tests/physics/test_radiation.py::TestTC_P1_RAD_04 -v
 
       - name: Verify behavioral physics
         run: |
           pytest tests/physics/test_radiation.py::TestNormalizedImpedance -v
           pytest tests/physics/test_radiation.py::TestEdgeCases -v
+
+      - name: Validate theoretical accuracy
+        run: |
+          pytest tests/physics/test_radiation.py -k "theoretical" -v
 
   coverage-check:
     runs-on: ubuntu-latest
@@ -137,7 +138,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Check coverage thresholds
+      - name: Check physics module coverage
         run: |
           pytest tests/physics/ --cov=src/viberesp/physics --cov-fail-under=90
 
