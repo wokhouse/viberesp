@@ -1,43 +1,14 @@
 # Viberesp
 
-> **Loudspeaker enclosure design tool - Physics model rewrite in progress**
+> **Loudspeaker enclosure design and driver database tool**
 
-⚠️ **This codebase is currently undergoing a complete physics model rewrite. The simulation features are non-functional.**
+Viberesp is a Python tool for managing loudspeaker driver databases and exporting enclosure parameters to Hornresp format.
 
-## Status
+## Features
 
-The Viberesp physics model and simulation engine are being completely rewritten due to fundamental errors discovered in the initial implementation assumptions.
-
-**What Works:**
-- ✅ Driver database management (`viberesp driver add/list/show/remove`)
-- ✅ Export parameters to Hornresp format (`viberesp export hornresp`)
-
-**What Doesn't Work:**
-- ❌ Enclosure simulation (`viberesp simulate`)
-- ❌ Parameter sweeps (`viberesp scan`)
-- ❌ Validation against Hornresp (`viberesp validate`)
-
-## What Remains
-
-The codebase retains the infrastructure scaffolding for the rewrite:
-
-- **Core Models**: Pydantic models for Thiele-Small parameters
-- **CLI Framework**: Click-based command structure
-- **Driver Database**: JSON-based driver management
-- **Hornresp Exporter**: Export enclosure parameters to Hornresp format
-- **Testing Structure**: Pytest framework (empty, ready for new tests)
-
-## What Was Removed
-
-The following have been completely removed for the rewrite:
-
-- All enclosure implementations (sealed, horns, etc.)
-- Frequency response simulator
-- Hornresp validation code (parser, comparison, metrics, plotting)
-- Literature documentation and research notes
-- All test fixtures and baseline metrics
-
-See `REWRITE_NOTES.md` for detailed information about the cleanup.
+- **Driver Database**: Add, list, and manage loudspeaker drivers with Thiele-Small parameters
+- **Hornresp Export**: Generate Hornresp-compatible parameter files for various enclosure types
+- **Statistics**: View database statistics and driver parameter ranges
 
 ## Installation
 
@@ -53,7 +24,7 @@ pip install -e .
 pip install -e ".[dev,docs]"
 ```
 
-## Usage (Working Features Only)
+## Usage
 
 ### Driver Database
 
@@ -82,11 +53,25 @@ viberesp driver show 18DS115
 
 # Remove a driver
 viberesp driver remove 18DS115
+
+# Export drivers to JSON
+viberesp driver export drivers_backup.json
+
+# Import drivers from JSON
+viberesp driver import drivers_backup.json
+
+# Show database statistics
+viberesp stats
 ```
 
 ### Export to Hornresp
 
 ```bash
+# Export sealed enclosure parameters
+viberesp export hornresp 18DS115 -e sealed \
+    --volume 50 \
+    --output sealed_design.txt
+
 # Export exponential horn parameters
 viberesp export hornresp 18DS115 -e exponential_horn \
     --throat-area 500 \
@@ -110,6 +95,25 @@ viberesp export hornresp 18DS115 -e front_loaded_horn \
 
 The exported Hornresp parameter file can be loaded into Hornresp for detailed acoustic simulation.
 
+## Thiele-Small Parameters
+
+Viberesp uses the standard Thiele-Small parameters:
+
+| Parameter | Description | Units |
+|-----------|-------------|-------|
+| Fs | Free-air resonance frequency | Hz |
+| Vas | Equivalent compliance volume | L |
+| Qes | Electrical Q factor | - |
+| Qms | Mechanical Q factor | - |
+| Qts | Total Q factor | - |
+| Sd | Effective diaphragm area | m² |
+| Re | Voice coil DC resistance | Ω |
+| Bl | Force factor (magnetic field × coil length) | T·m |
+| Xmax | Maximum linear excursion | mm |
+| Mms | Moving mass | g |
+| Cms | Mechanical compliance | m/N |
+| Rms | Mechanical resistance | N·s/m |
+
 ## Development
 
 ```bash
@@ -125,22 +129,16 @@ isort src/
 # Type check
 mypy src/
 
-# Run tests (currently empty - will be repopulated after rewrite)
+# Run tests
 pytest tests/ -v
 ```
 
-## Rewrite Roadmap
+## Enclosure Types Supported for Export
 
-1. ✅ Clean up existing code (remove physics model, literature, fixtures)
-2. ⏳ Design new physics model architecture
-3. ⏳ Implement new simulation engine
-4. ⏳ Rebuild enclosure implementations
-5. ⏳ Create new test fixtures
-6. ⏳ Add validation framework
-
-## Contributing
-
-The codebase is currently in a rewrite phase. Contributions are welcome but should focus on the new physics model architecture rather than trying to fix the old implementation (which has been removed).
+- **Sealed**: Acoustic suspension enclosures
+- **Ported**: Bass reflex enclosures
+- **Exponential Horn**: Horn with exponential flare profile
+- **Front-Loaded Horn**: Horn with front and rear chambers
 
 ## License
 
