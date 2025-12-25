@@ -1,6 +1,6 @@
 ID = 55.30
 
-Comment = Synthetic Case 4: Complete System - B&C 18DS115 F118 Style
+Comment = Synthetic Case 4: Complete System - B&C 18DS115 F118 Style - Properly Sized Mouth (k_rm=1.0)
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -12,11 +12,11 @@ Cir = 0.00
 |HORN PARAMETER VALUES:
 
 S1 = 600.00
-S2 = 4800.00
+S2 = 26006.00
 Exp = 200.00
-F12 = 35.00
-S2 = 4800.00
-S3 = 4800.00
+F12 = 60.00
+S2 = 26006.00
+S3 = 26006.00
 Exp = 0.10
 F23 = 0.00
 S3 = 0.00

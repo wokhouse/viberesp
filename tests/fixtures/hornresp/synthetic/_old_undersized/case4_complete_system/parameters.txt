@@ -1,6 +1,6 @@
 ID = 55.30
 
-Comment = Synthetic Case 1: Straight Exponential Horn - Properly Sized Mouth (k_rm=1.0)
+Comment = Synthetic Case 4: Complete System - B&C 18DS115 F118 Style
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -12,11 +12,11 @@ Cir = 0.00
 |HORN PARAMETER VALUES:
 
 S1 = 600.00
-S2 = 26006.00
+S2 = 4800.00
 Exp = 200.00
-F12 = 60.00
-S2 = 26006.00
-S3 = 26006.00
+F12 = 35.00
+S2 = 4800.00
+S3 = 4800.00
 Exp = 0.10
 F23 = 0.00
 S3 = 0.00
@@ -31,12 +31,12 @@ F45 = 0.00
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
 Sd = 1210.00
-Bl = 35.00
+Bl = 39.00
 Cms = 8.24E-05
-Rms = 15.00
-Mmd = 300.00
-Le = 3.50
-Re = 6.00
+Rms = 14.72
+Mmd = 330.00
+Le = 3.85
+Re = 5.00
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,22 +58,22 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.00
+Vrc = 100.00
 Lrc = 15.00
 Fr = 40000.00
 Tal = 4.00
-Vtc = 0.00
-Atc = 0.00
+Vtc = 6.00
+Atc = 600.00
 
 Acoustic Path Length = 0.0
 
 |MAXIMUM SPL PARAMETER VALUES:
 
-Pamp = 100
+Pamp = 500
 Vamp = 25
 Iamp = 4
-Pmax = 100
-Xmax = 15.0
+Pmax = 500
+Xmax = 16.5
 
 Maximum SPL Setting = 3
 

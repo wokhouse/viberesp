@@ -1,19 +1,19 @@
 {
   "test_case": "case1_straight_horn",
-  "commit": "52bec36d38a3dd955a74b09d09227c5ddc9ebb74",
-  "date": "2025-12-24T17:07:09.141476",
+  "commit": "b87f0552b8f69728e45ea58f98dd8605c575c820",
+  "date": "2025-12-24T16:17:59.979199",
   "viberesp_version": "0.1.0",
   "metrics": {
-    "rmse": 15.042911217402045,
-    "mae": 9.116826201134714,
-    "max_error": 41.61378957752932,
+    "rmse": 13.556665864315756,
+    "mae": 8.022054655477188,
+    "max_error": 39.14573820073704,
     "max_error_freq": 20.000000000000004,
-    "passband_rmse": 4.596287812674265,
-    "bass_rmse": 17.65712017837798,
+    "passband_rmse": 4.587908801910735,
+    "bass_rmse": 15.861561722160062,
     "f3_viberesp": null,
     "f3_hornresp": 48.08449892776651,
     "f3_error": null,
-    "correlation": -0.2645684456561574,
+    "correlation": -0.2073453177811351,
     "agreement_score": 0.0
   },
   "model_settings": {
