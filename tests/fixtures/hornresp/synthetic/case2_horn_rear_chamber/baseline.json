@@ -1,19 +1,19 @@
 {
   "test_case": "case2_horn_rear_chamber",
-  "commit": "52bec36d38a3dd955a74b09d09227c5ddc9ebb74",
-  "date": "2025-12-24T17:07:09.151029",
+  "commit": "974e778433ab66968ac7752388faad5bb0c07f70",
+  "date": "2025-12-24T18:25:08.976481",
   "viberesp_version": "0.1.0",
   "metrics": {
-    "rmse": 10.727909822159411,
-    "mae": 5.798109371629837,
-    "max_error": 30.287469794020723,
+    "rmse": 11.822186442713916,
+    "mae": 6.875446986032338,
+    "max_error": 30.916726735789666,
     "max_error_freq": 20.000000000000004,
-    "passband_rmse": 0.21261929187849196,
-    "bass_rmse": 12.76802908561765,
+    "passband_rmse": 0.3242375296487817,
+    "bass_rmse": 14.069659789148966,
     "f3_viberesp": null,
-    "f3_hornresp": 43.00464757165511,
+    "f3_hornresp": 68.19966896241104,
     "f3_error": null,
-    "correlation": -0.05953155538963244,
+    "correlation": -0.2204079793390129,
     "agreement_score": 0.0
   },
   "model_settings": {

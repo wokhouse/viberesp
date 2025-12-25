@@ -1,26 +1,26 @@
 {
-  "updated": "2025-12-24T17:07:09.172208",
-  "commit": "52bec36d38a3dd955a74b09d09227c5ddc9ebb74",
+  "updated": "2025-12-24T18:25:08.994449",
+  "commit": "974e778433ab66968ac7752388faad5bb0c07f70",
   "test_cases": {
     "case1_straight_horn": {
-      "rmse": 15.042911217402045,
+      "rmse": 16.89556656480906,
       "f3_error": null,
-      "correlation": -0.2645684456561574
+      "correlation": -0.4425478867337826
     },
     "case2_horn_rear_chamber": {
-      "rmse": 10.727909822159411,
+      "rmse": 11.822186442713916,
       "f3_error": null,
-      "correlation": -0.05953155538963244
+      "correlation": -0.2204079793390129
     },
     "case3_horn_front_chamber": {
-      "rmse": 15.410787137916833,
-      "f3_error": 37.49797471901644,
-      "correlation": 0.09470683257697735
+      "rmse": 16.392303465493733,
+      "f3_error": 5.991162482416954,
+      "correlation": 0.07841263134779877
     },
     "case4_complete_system": {
-      "rmse": 13.059459991032934,
-      "f3_error": 41.56362203899033,
-      "correlation": 0.2450066941727157
+      "rmse": 13.540512601095402,
+      "f3_error": 14.726068295906359,
+      "correlation": 0.24451532844017299
     }
   }
 }
