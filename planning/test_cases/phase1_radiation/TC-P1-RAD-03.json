@@ -1,0 +1,41 @@
+{
+  "id": "TC-P1-RAD-03",
+  "name": "High Frequency (ka >> 1)",
+  "phase": "1",
+  "category": "Radiation Impedance",
+  "purpose": "Verify high frequency behavior where radiation becomes purely resistive",
+  "driver": null,
+  "hornresp_parameters": {
+    "mouth_area_cm2": 1257,
+    "mouth_radius_cm": 20,
+    "test_frequency": 2000,
+    "notes": "ka ≈ 7.2 at this frequency - clearly in high frequency region"
+  },
+  "expected_results": {
+    "ka": 7.2,
+    "R_normalized": 0.99,
+    "X_normalized": 0.1,
+    "behavior": "Radiation-controlled: R → 1, X → 0"
+  },
+  "validation_targets": {
+    "R_tolerance": "±5%",
+    "X_tolerance": "±10%",
+    "notes": "High frequency asymptote: R approaches 1, X approaches 0"
+  },
+  "hornresp_input": "reference_data/inputs/TC-P1-RAD-03/hornresp_params.txt",
+  "setup_notes": "reference_data/inputs/TC-P1-RAD-03/setup_notes.md",
+  "reference_files": {
+    "impedance_data": "reference_data/outputs/TC-P1-RAD-03/impedance_data.csv",
+    "screenshot": "reference_data/outputs/TC-P1-RAD-03/hornresp_screenshot.png",
+    "extraction_log": "reference_data/outputs/TC-P1-RAD-03/extraction_log.txt",
+    "validation_results": "reference_data/outputs/TC-P1-RAD-03/validation_results.json"
+  },
+  "notes": [
+    "At ka >> 1, radiation impedance becomes purely resistive",
+    "R approaches 1 (characteristic impedance)",
+    "X approaches 0 (no reactive component)",
+    "Tests high frequency asymptotic behavior",
+    "Near 100% radiation efficiency"
+  ],
+  "status": "reference_ready"
+}
