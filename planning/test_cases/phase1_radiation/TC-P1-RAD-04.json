@@ -1,0 +1,41 @@
+{
+  "id": "TC-P1-RAD-04",
+  "name": "Small Piston Scaling",
+  "phase": "1",
+  "category": "Radiation Impedance",
+  "purpose": "Verify area scaling with small piston (50 cm²)",
+  "driver": null,
+  "hornresp_parameters": {
+    "mouth_area_cm2": 50,
+    "mouth_radius_cm": 4.0,
+    "test_frequency": 50,
+    "notes": "Small piston tests area scaling relationship"
+  },
+  "expected_results": {
+    "ka": 0.036,
+    "R_normalized": 0.00033,
+    "X_normalized": 0.0061,
+    "full_impedance": "Z_rad ≈ 940 + j17500 Pa·s/m³"
+  },
+  "validation_targets": {
+    "R_tolerance": "±5%",
+    "X_tolerance": "±5%",
+    "impedance_scaling": "Z ∝ 1/A for constant ka"
+  },
+  "hornresp_input": "reference_data/inputs/TC-P1-RAD-04/hornresp_params.txt",
+  "setup_notes": "reference_data/inputs/TC-P1-RAD-04/setup_notes.md",
+  "reference_files": {
+    "impedance_data": "reference_data/outputs/TC-P1-RAD-04/impedance_data.csv",
+    "screenshot": "reference_data/outputs/TC-P1-RAD-04/hornresp_screenshot.png",
+    "extraction_log": "reference_data/outputs/TC-P1-RAD-04/extraction_log.txt",
+    "validation_results": "reference_data/outputs/TC-P1-RAD-04/validation_results.json"
+  },
+  "notes": [
+    "Small piston area (50 cm² vs 1257 cm² in TC-P1-RAD-01)",
+    "Same ka (0.036) as TC-P1-RAD-01 due to radius scaling",
+    "Full impedance should be much larger (smaller area)",
+    "Normalized impedance should match theoretical values",
+    "Tests area scaling: Z_char = ρ₀c/S"
+  ],
+  "status": "reference_ready"
+}

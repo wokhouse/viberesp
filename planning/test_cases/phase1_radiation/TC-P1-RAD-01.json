@@ -19,14 +19,20 @@
     "R_tolerance": "±5%",
     "X_tolerance": "±5%"
   },
+  "hornresp_input": "reference_data/inputs/TC-P1-RAD-01/hornresp_params.txt",
+  "setup_notes": "reference_data/inputs/TC-P1-RAD-01/setup_notes.md",
   "reference_files": {
-    "impedance_data": "TC-P1-RAD-01_impedance.csv",
-    "screenshot": "TC-P1-RAD-01_hornresp.png"
+    "impedance_data": "reference_data/outputs/TC-P1-RAD-01/impedance_data.csv",
+    "screenshot": "reference_data/outputs/TC-P1-RAD-01/hornresp_screenshot.png",
+    "extraction_log": "reference_data/outputs/TC-P1-RAD-01/extraction_log.txt",
+    "validation_results": "reference_data/outputs/TC-P1-RAD-01/validation_results.json"
   },
   "notes": [
     "Below ka=1, radiation mass dominates",
     "Real part (R) should be very small",
-    "Imaginary part (X) indicates mass loading"
+    "Imaginary part (X) indicates mass loading",
+    "Hornresp configuration: Short straight duct with idealized driver",
+    "Extraction method: Throat impedance normalized to radiation impedance"
   ],
-  "status": "pending"
+  "status": "reference_ready"
 }
