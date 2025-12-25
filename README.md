@@ -38,6 +38,19 @@ Viberesp is a Python tool for rapidly exploring enclosure designs for a given dr
 - **FRD/ZMA File Support**: Import measurement data
 - **Visualization**: Frequency response plots and performance metrics
 
+## Physics Model Development
+
+The horn physics model is under active development. Current validation status:
+
+| Test Case | Current RMSE | Target | Priority |
+|-----------|--------------|--------|----------|
+| Front chamber (case3) | 34.39 dB | 4-6 dB | 🔴 Critical |
+| Complete system (case4) | 35.83 dB | 5-7 dB | 🔴 Critical |
+| Straight horn (case1) | 13.56 dB | 3-5 dB | 🟡 High |
+| Rear chamber (case2) | 9.21 dB | 2-4 dB | 🟢 Medium |
+
+**Literature Knowledge Base**: See [`literature/`](literature/) for curated references on horn theory, Helmholtz resonance, and finite horn modeling. This knowledge base documents the mathematical foundations and planned improvements to the physics model.
+
 ## Installation
 
 ```bash
