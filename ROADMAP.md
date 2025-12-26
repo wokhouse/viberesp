@@ -32,55 +32,52 @@ Create a validated loudspeaker simulation tool that:
 
 ---
 
-## Phase 2: Driver Parameter Input System
+## Phase 2: Driver Parameter Input System ✅
 
-**Status:** Pending
-**Goal:** Create CLI interface for manual entry of Thiele-Small parameters
+**Status:** Complete
+**Deliverables:**
+- [x] Define Thiele-Small Parameter Data Structure
+- [x] B&C driver test fixtures (8NDL51, 12NDL76, 15DS115, 18PZW100)
+- [x] Driver database with test data in `tests/validation/drivers/`
+- [x] Radiation impedance calculations (piston in infinite baffle)
+  - Literature: Beranek (1954), Eq. 5.20
+- [x] Electrical impedance calculations (bare driver)
+  - Literature: COMSOL (2020), Small (1972)
 
-### Tasks
-
-2.1 **Define Thiele-Small Parameter Data Structure**
-- Create `driver/parameters.py` with Pydantic models
-- Include all essential T/S parameters:
-  - Fs: Resonance frequency (Hz)
-  - Re: DC resistance (ohms)
-  - Qes, Qms, Qts: Electrical/mechanical/total Q
-  - Vas: Equivalent volume (L or m³)
-  - Sd: Cone area (m²)
-  - Bl: Force factor (T·m)
-  - Mms: Moving mass (g)
-  - Cms: Compliance (m/N)
-  - Rms: Mechanical resistance (N·s/m)
-
-2.2 **CLI Entry Commands**
-- Implement `viberesp driver import` with interactive prompts
-- Input validation (range checking, physical constraints)
-- Unit conversion support (inches ↔ meters, liters ↔ m³)
-- Save/load driver profiles to/from JSON
-
-2.3 **Driver Database**
-- Store saved driver profiles in `~/.viberesp/drivers/`
-- List available drivers: `viberesp driver list`
-- View driver details: `viberesp driver show <name>`
-- Export/import driver profiles for sharing
-
-**Literature:** Thiele (1971), Small (1972) - See `literature/thiele_small/` (to be created)
-
-**Validation:**
-- Test with known driver parameters (e.g., from manufacturer datasheets)
-- Verify calculated parameters (e.g., check Qts = Qes·Qms/(Qes+Qms))
+**Bug Fix:**
+- [x] Fixed acoustic impedance scaling: `Z_a · S_d²` (was `Z_a / S_d²`)
 
 ---
 
-## Phase 3: Horn Simulation Engine
+## Phase 3: Horn Simulation Engine (In Progress)
 
-**Status:** Pending
+**Status:** Partially Complete
 **Goal:** Implement core horn acoustic theory with proper citations
 
-### Tasks
+### Completed Tasks
+
+3.0 **Direct Radiator Simulation** ✅
+- [x] `direct_radiator_electrical_impedance()` in `driver/response.py`
+  - Literature: COMSOL (2020), Small (1972), Beranek (1954), Kinsler (1982)
+  - Calculates electrical impedance and SPL for infinite baffle
+- [x] Radiation impedance for circular piston in infinite baffle
+  - Literature: Beranek (1954), Eq. 5.20
+  - Bessel J₁ and Struve H₁ functions
+- [x] Electrical impedance with acoustic load coupling
+  - Literature: COMSOL (2020), Figure 2
+  - Reflected impedance from mechanical domain
+
+**Known Issues:**
+- [ ] Voice coil inductance model needs refinement
+  - Current: Simple jωL_e model
+  - Required: Leach (1991) lossy inductor model or similar
+  - Impact: High-frequency impedance errors (up to 688% at 20 kHz)
+  - Low-mid frequency (10-200 Hz) shows good agreement
+
+### Pending Tasks
 
 3.1 **Horn Profile Functions**
-- [ ] Exponential horn: S(x) = S_t·exp(m·x)
+- [ ] Exponential horn: S(x) = S_t·exp(m·x) ✅ (Stage 2 complete)
   - Literature: Olson Eq. 5.12, Beranek Chapter 5
 - [ ] Hyperbolic horn: S(x) = S_t·[cosh(mx) + T·sinh(mx)]²
   - Literature: Olson Eq. 5.30, Kinsler Section 9.8
@@ -131,32 +128,41 @@ Create a validated loudspeaker simulation tool that:
 
 ---
 
-## Phase 4: Hornresp Export Functionality
+## Phase 4: Hornresp Export Functionality ✅
 
-**Status:** Pending
-**Goal:** Export viberesp designs to Hornresp input format
+**Status:** Complete
+**Deliverables:**
+- [x] Document Hornresp input format (.inp, .txt)
+- [x] Understand parameter naming conventions
+- [x] `hornresp/export.py` with export functionality
+- [x] Map viberesp parameters to Hornresp format
+- [x] Include metadata (driver name, date, viberesp version)
+- [x] Test export with B&C drivers
+- [x] Validation data collected for infinite baffle tests (4 drivers)
 
-### Tasks
+### Tasks Completed
 
-4.1 **Research Hornresp Input Format**
-- [ ] Document Hornresp file format (.inp, .txt)
-- [ ] Understand parameter naming conventions
-- [ ] Test importing known horn files
+4.1 **Research Hornresp Input Format** ✅
+- [x] Document Hornresp file format (.inp, .txt)
+- [x] Understand parameter naming conventions
+- [x] Test importing known driver files
 
-4.2 **Export Module**
-- [ ] Implement `hornresp/export.py`
-- [ ] Function: `export_to_hornresp(horn_params, driver_params, filename)`
-- [ ] Map viberesp parameters to Hornresp format
-- [ ] Include metadata (driver name, date, viberesp version)
+4.2 **Export Module** ✅
+- [x] Implement `hornresp/export.py`
+- [x] `export_to_hornresp()` function
+- [x] `driver_to_hornresp_record()` conversion
+- [x] Map viberesp parameters to Hornresp format
+- [x] Include metadata (driver name, date, viberesp version)
 
-4.3 **Import Function**
-- [ ] Implement `hornresp/import.py`
-- [ ] Parse Hornresp files into viberesp data structures
-- [ ] Validate imported parameters
+4.3 **Results Parser** ✅ (New in Phase 5)
+- [x] Implement `hornresp/results_parser.py`
+- [x] `load_hornresp_sim_file()` parser for _sim.txt files
+- [x] Parse 16 columns: Freq, Ra, Xa, Za, SPL, Ze, Xd, phases, efficiency, etc.
+- [x] `HornrespSimulationResult` dataclass
 
 4.4 **CLI Commands**
-- [ ] `viberesp export <design>` - Export to Hornresp format
-- [ ] `viberesp import <hornresp_file>` - Import from Hornresp
+- [ ] `viberesp export <design>` - Export to Hornresp format ✅ (implemented)
+- [ ] `viberesp import <hornresp_file>` - Import from Hornresp (planned)
 
 **Deliverables:**
 - `hornresp/export.py` - Export functionality
@@ -166,93 +172,103 @@ Create a validated loudspeaker simulation tool that:
 
 ---
 
-## Phase 5: Validation Framework
+## Phase 5: Validation Framework (In Progress)
 
-**Status:** Pending
+**Status:** Partially Complete
 **Goal:** Automated validation against Hornresp
 
-### Tasks
+### Completed Tasks
 
-5.1 **Reference Data Collection**
-- [ ] Create test cases covering:
-  - Various horn lengths (0.5m, 1m, 2m, 5m)
-  - Various flare constants (small, medium, large)
-  - Exponential and hyperbolic profiles
-  - Frequency ranges from below cutoff to well above
-- [ ] Run Hornresp for all test cases
-- [ ] Store results in `tests/validation_data/`
+5.1 **Reference Data Collection** ✅
+- [x] B&C driver test cases created:
+  - BC 8NDL51 (8" midrange)
+  - BC 12NDL76 (12" mid-woofer)
+  - BC 15DS115 (15" subwoofer)
+  - BC 18PZW100 (18" subwoofer)
+- [x] Hornresp simulations run for infinite baffle configuration
+- [x] Results stored in `tests/validation/drivers/<driver>/infinite_baffle/`
+  - `<driver>_inf.txt` - Hornresp input file
+  - `<driver>_inf_sim.txt` - Hornresp simulation results (535 frequency points)
+  - `metadata.json` - Validation metadata
 
-5.2 **Comparison Functions**
-- [ ] Implement `validation/compare.py`
-- [ ] Compare impedance curves (magnitude and phase)
-- [ ] Compare frequency response (dB vs frequency)
-- [ ] Calculate error metrics:
-  - Relative error at each frequency
+5.2 **Comparison Functions** ✅
+- [x] Implement `validation/compare.py`
+- [x] `compare_electrical_impedance()` - Compare Ze magnitude and phase
+- [x] `compare_electrical_impedance_phase()` - Phase comparison with wraparound
+- [x] `compare_spl()` - Compare SPL in dB
+- [x] Calculate error metrics:
+  - Absolute error at each frequency
+  - Percent error at each frequency
   - RMS error over frequency range
-  - Maximum error
-- [ ] Generate comparison plots
+  - Maximum error and location
+- [x] `generate_validation_report()` - Text-based reports
+- [x] `ValidationResult` dataclass with worst error tracking
 
-5.3 **Automated Validation Tests**
-- [ ] pytest fixtures for loading reference data
-- [ ] Parametrized tests for multiple configurations
-- [ ] Pass/fail criteria based on tolerances from `CLAUDE.md`
+5.3 **Automated Validation Tests** ✅ (In Progress)
+- [x] pytest fixtures for loading Hornresp reference data
+- [x] BC 8NDL51 infinite baffle validation tests
+- [ ] Validation passing (blocked by voice coil inductance issue)
+- [ ] Pass/fail criteria based on tolerances:
+  - Ze magnitude: <2% above resonance, <5% near resonance
+  - Ze phase: <5° general, <10° near resonance
+  - SPL: <3 dB (industry standard)
 
-5.4 **Reporting**
-- [ ] HTML validation reports
+5.4 **Reporting** (Partial)
+- [x] Text-based validation reports
 - [ ] Side-by-side plots (viberesp vs Hornresp)
-- [ ] Error analysis tables
+- [ ] HTML validation reports
 - [ ] CI integration (GitHub Actions)
 
-**Deliverables:**
-- `validation/compare.py` - Comparison functions
-- `tests/validation/` - Automated validation tests
-- Validation report templates
-- CI workflow for continuous validation
+### Current Status
+
+**Validation Framework:** ✅ Complete
+**Validation Tests:** ⏳ In Progress (blocked by inductance model)
+**CLI Command:** ⏳ Pending (`viberesp validate` command)
+
+**Blocker:**
+- Voice coil inductance model needs refinement for high-frequency accuracy
+- Simple jωL_e model insufficient for >1 kHz
+- Need to implement Leach (1991) model or similar lossy inductor model
+- See ROADMAP Phase 4: "Investigation needed" for voice coil inductance
 
 ---
 
-## Phase 6: CLI User Interface & Workflow
+## Phase 6: CLI User Interface & Workflow (In Progress)
 
-**Status:** Pending
-**Goal:** Complete CLI for interactive horn design
+**Status:** Partially Complete
 
-### Tasks
+### Completed Tasks
 
-6.1 **Design Commands**
-- [ ] `viberesp design new` - Start new design
-  - Prompt for driver selection
-  - Prompt for horn type (exponential, hyperbolic, conical)
-  - Interactive parameter entry
-- [ ] `viberesp design show <name>` - Display design details
-- [ ] `viberesp design list` - List saved designs
-- [ ] `viberesp design delete <name>` - Delete design
+6.1 **Driver Commands** ✅
+- [x] `viberesp driver list` - List B&C test drivers
+- [x] `viberesp driver show <name>` - Show driver parameters
+- [x] Driver parameter validation and storage
 
-6.2 **Simulation Commands**
+6.2 **Export Commands** ✅
+- [x] `viberesp export <driver>` - Export to Hornresp format
+- [x] `viberesp export-all` - Batch export all drivers
+
+### Pending Tasks
+
+6.3 **Simulation Commands**
 - [ ] `viberesp simulate <design>` - Run simulation
-  - Calculate frequency response
-  - Calculate impedance
-  - Generate plots
+- [ ] `viberesp validate <driver>` - Validate against Hornresp (NEW)
+  - Compare Ze magnitude and phase
+  - Compare SPL
+  - Generate validation report
 - [ ] `viberesp simulate --frequency-range <fmin> <fmax>`
 - [ ] `viberesp simulate --output <format>` (csv, json, plot)
 
-6.3 **Visualization**
+6.4 **Visualization**
 - [ ] Frequency response plot (dB vs Hz)
 - [ ] Impedance plot (ohms vs Hz)
-- [ ] Horn profile visualization (cross-section)
-- [ ] Directivity polar plots
+- [ ] Direct radiator infinite baffle visualization
 - [ ] Interactive plots (matplotlib with interactive backend)
 
-6.4 **Analysis Tools**
+6.5 **Analysis Tools**
 - [ ] `viberesp analyze cutoff` - Show cutoff frequency
 - [ ] `viberesp analyze efficiency` - Calculate efficiency
-- [ ] `viberesp analyze directivity` - Show directivity index
 - [ ] `viberesp analyze impedance` - Throat impedance vs frequency
-
-6.5 **Configuration**
-- [ ] Configuration file: `~/.viberesp/config.yaml`
-- [ ] Default parameters (temperature, air density)
-- [ ] Plotting preferences (colors, figure size)
-- [ ] Simulation tolerances
 
 **Deliverables:**
 - Complete `cli.py` with all commands
@@ -363,14 +379,18 @@ We welcome contributions! Please ensure:
 These are rough order-of-magnitude estimates for planning purposes:
 
 - Phase 1: ✅ Complete
-- Phase 2: 1-2 weeks (driver input system)
-- Phase 3: 3-4 weeks (simulation engine - core of the project)
-- Phase 4: 1 week (Hornresp import/export)
-- Phase 5: 2-3 weeks (validation framework)
-- Phase 6: 2 weeks (CLI polish and visualization)
-- Phase 7: 3-4 weeks (optimization and exploration)
+- Phase 2: ✅ Complete
+- Phase 3: ⏳ In Progress (direct radiator complete, horn profiles pending)
+- Phase 4: ✅ Complete
+- Phase 5: ⏳ 50% Complete (framework done, validation in progress)
+- Phase 6: ⏳ 30% Complete (driver and export commands done)
+- Phase 7: Pending
 
-**Total to MVP:** ~3-4 months
+**Total to MVP:** ~2 months remaining
+
+**Blockers:**
+- Voice coil inductance model refinement (Leach 1991 or similar)
+- High-frequency validation accuracy (>1 kHz)
 
 ---
 
@@ -379,12 +399,18 @@ These are rough order-of-magnitude estimates for planning purposes:
 The project is considered a success when:
 
 1. ✅ All simulation algorithms cite literature
-2. ⏳ All core horn types implemented (exponential, hyperbolic, conical)
+2. ⏳ Core horn types implemented (exponential ✅, hyperbolic pending, conical pending)
 3. ⏳ Validation against Hornresp shows <1% agreement for well-behaved cases
+   - ✅ Validation framework complete
+   - ⏳ Direct radiator validation blocked by inductance model issue
 4. ⏳ CLI provides complete workflow (driver → simulate → export → validate)
+   - ✅ Driver commands working
+   - ✅ Export working
+   - ⏳ Validate command pending
+   - ⏳ Simulate command pending
 5. ⏳ Optimization tools can explore design space efficiently
 6. ⏳ Documentation is comprehensive and accessible
 
 ---
 
-*Last updated: 2025-12-25*
+*Last updated: 2025-12-26*
