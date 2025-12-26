@@ -34,6 +34,9 @@ def direct_radiator_electrical_impedance(
     measurement_distance: float = 1.0,
     speed_of_sound: float = SPEED_OF_SOUND,
     air_density: float = AIR_DENSITY,
+    voice_coil_model: str = "simple",
+    leach_K: float = None,
+    leach_n: float = None,
 ) -> dict:
     """
     Calculate complete electrical impedance response for direct radiator in infinite baffle.
@@ -48,12 +51,13 @@ def direct_radiator_electrical_impedance(
         - Small (1972) - Direct radiator electrical impedance analysis
         - Beranek (1954), Eq. 5.20 - Circular piston radiation impedance
         - Kinsler et al. (1982), Chapter 4 - SPL from volume velocity
+        - Leach (2002) - Voice coil inductance losses
         - literature/thiele_small/comsol_lumped_loudspeaker_driver_2020.md
         - literature/horns/beranek_1954.md
 
     Model Description:
         The electrical impedance consists of:
-        1. Voice coil impedance: Z_vc = R_e + jωL_e
+        1. Voice coil impedance: Z_vc (depends on model)
         2. Reflected mechanical impedance: Z_mech = (BL)² / Z_m_total
         3. Acoustic loading from radiation impedance
 
@@ -73,6 +77,15 @@ def direct_radiator_electrical_impedance(
         measurement_distance: Distance for SPL measurement in m, default 1m
         speed_of_sound: Speed of sound in m/s, default 343 m/s at 20°C
         air_density: Air density in kg/m³, default 1.18 kg/m³ at 20°C
+        voice_coil_model: Voice coil impedance model, default "simple"
+            - "simple": Standard jωL_e model (lossless inductor)
+            - "leach": Leach (2002) lossy inductance model (accounts for eddy currents)
+        leach_K: Leach model K parameter (Ω·s^n), required for "leach" model
+                 - For BC 8NDL51: K ≈ 2.7
+        leach_n: Leach model n parameter (loss exponent), required for "leach" model
+                 - n = 0: Pure resistor (maximum losses)
+                 - n = 1: Lossless inductor (no losses)
+                 - For BC 8NDL51: n ≈ 0
 
     Returns:
         Dictionary containing:
@@ -94,11 +107,21 @@ def direct_radiator_electrical_impedance(
     Examples:
         >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
         >>> driver = get_bc_8ndl51()
+        >>> # Simple model (lossless inductor)
         >>> result = direct_radiator_electrical_impedance(100, driver)
         >>> result['Ze_magnitude']
         5.42...  # Ω
         >>> result['SPL']
         67.2...  # dB SPL at 1m
+
+        >>> # Leach model (lossy inductor, matches Hornresp)
+        >>> result_leach = direct_radiator_electrical_impedance(
+        ...     20000, driver,
+        ...     voice_coil_model="leach",
+        ...     leach_K=2.7, leach_n=0.0
+        ... )
+        >>> result_leach['Ze_magnitude']
+        8.0...  # Ω (matches Hornresp)
 
         At resonance, impedance should peak:
         >>> result_fs = direct_radiator_electrical_impedance(driver.F_s, driver)
@@ -138,13 +161,20 @@ def direct_radiator_electrical_impedance(
 
     # Step 2: Calculate electrical impedance with radiation load
     # COMSOL (2020), Figure 2 - Equivalent circuit model
-    # Z_e = R_e + jωL_e + (BL)² / Z_m_total
+    # Z_e = Z_vc + (BL)² / Z_m_total
     # where Z_m_total = Z_mechanical + Z_acoustic_reflected
     # and Z_acoustic_reflected = Z_rad / S_d²
+    #
+    # Voice coil model options:
+    # - "simple": Z_vc = R_e + jωL_e (lossless inductor)
+    # - "leach": Z_vc = R_e + K·(jω)^n (lossy inductor, accounts for eddy currents)
     Ze = electrical_impedance_bare_driver(
         frequency,
         driver,
-        acoustic_load=Z_rad
+        acoustic_load=Z_rad,
+        voice_coil_model=voice_coil_model,
+        leach_K=leach_K,
+        leach_n=leach_n,
     )
 
     # Step 3: Calculate diaphragm velocity from electrical circuit
