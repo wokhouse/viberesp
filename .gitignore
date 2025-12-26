@@ -127,6 +127,14 @@ outputs/
 figures/
 examples/output/
 
+# Viberesp working directories
+exports/*.txt
+imports/*.txt
+
+# Keep README files
+!exports/README.md
+!imports/README.md
+
 # numpy
 .npy
 .npz

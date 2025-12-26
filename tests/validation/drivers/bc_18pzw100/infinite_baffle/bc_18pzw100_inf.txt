@@ -1,23 +1,23 @@
-ID = 440.07
+ID = 588.50
 
 Comment = BC_18PZW100 driver parameters exported from viberesp
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 4.00
+Ang = 2.00
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
 
 |HORN PARAMETER VALUES:
 
-S1 = 100.00
-S2 = 5000.00
-Exp = 1.30
-F12 = 150.00
-S2 = 5000.00
-S3 = 5000.00
-Exp = 0.10
+S1 = 0.00
+S2 = 0.00
+Exp = 0.00
+F12 = 0.00
+S2 = 0.00
+S3 = 0.00
+Exp = 0.00
 F23 = 0.00
 S3 = 0.00
 S4 = 0.00
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.001
-Lrc = 15.00
-Fr = 40000.00
-Tal = 4.00
+Vrc = 0.00
+Lrc = 0.00
+Fr = 0.00
+Tal = 0.00
 Vtc = 0.00
 Atc = 0.00
 

@@ -1,23 +1,23 @@
-ID = 685.60
+ID = 641.97
 
-Comment = BC_8NDL51 driver parameters exported from viberesp
+Comment = BC_12NDL76 driver parameters exported from viberesp
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 4.00
+Ang = 2.00
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
 
 |HORN PARAMETER VALUES:
 
-S1 = 100.00
-S2 = 5000.00
-Exp = 1.30
-F12 = 150.00
-S2 = 5000.00
-S3 = 5000.00
-Exp = 0.10
+S1 = 0.00
+S2 = 0.00
+Exp = 0.00
+F12 = 0.00
+S2 = 0.00
+S3 = 0.00
+Exp = 0.00
 F23 = 0.00
 S3 = 0.00
 S4 = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 215.00
-Bl = 7.50
-Cms = 2.40E-04
-Rms = 2.30
-Mmd = 0.025
+Sd = 522.00
+Bl = 16.50
+Cms = 1.90E-04
+Rms = 5.20
+Mmd = 0.054
 Le = 0.001
-Re = 5.30
+Re = 3.10
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.001
-Lrc = 15.00
-Fr = 40000.00
-Tal = 4.00
+Vrc = 0.00
+Lrc = 0.00
+Fr = 0.00
+Tal = 0.00
 Vtc = 0.00
 Atc = 0.00
 

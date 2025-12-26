@@ -1,0 +1,8 @@
+{
+  "driver": "BC_12NDL76",
+  "configuration": "infinite_baffle",
+  "date_created": "2025-12-26",
+  "date_run": "2025-12-26",
+  "hornresp_version": null,
+  "notes": "12 inch mid-woofer driver - bare driver electrical impedance validation"
+}
