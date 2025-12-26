@@ -33,6 +33,12 @@ from viberesp.validation.compare import (
 )
 from viberesp.driver.bc_drivers import get_bc_8ndl51
 
+# Leach (2002) model parameters for BC 8NDL51
+# These values account for eddy current losses in the voice coil former
+# Source: Fitted to Hornresp impedance data
+LEACH_K_BC8NDL51 = 2.02  # Ω·s^n (impedance coefficient)
+LEACH_N_BC8NDL51 = 0.03   # Loss exponent (0 = pure resistor, 1 = lossless inductor)
+
 # NOTE: Hornresp manual input has Le = 0.00, so Leach model parameters
 # are not applicable to this dataset. New simulations with proper Le values
 # are needed for voice coil inductance validation.
@@ -54,7 +60,7 @@ class TestInfiniteBaffleValidationBC8NDL51:
             / "drivers"
             / "bc_8ndl51"
             / "infinite_baffle"
-            / "8ndl51_man_sim.txt"
+            / "8ndl51_sim.txt"
         )
         return load_hornresp_sim_file(data_path)
 
@@ -70,8 +76,15 @@ class TestInfiniteBaffleValidationBC8NDL51:
 
         Expected: Resonance near 64-68 Hz with Ze ≈ 50 Ω
         """
-        # Find resonance in Hornresp data
-        max_idx = bc_8ndl51_hornresp_data.ze_ohms.argmax()
+        # Find resonance in Hornresp data (mechanical resonance in 10-200 Hz range)
+        # Voice coil inductance causes impedance to rise at high frequencies,
+        # so we need to limit our search to the mechanical resonance region
+        resonance_region = (bc_8ndl51_hornresp_data.frequency >= 10) & \
+                          (bc_8ndl51_hornresp_data.frequency <= 200)
+        region_ze = bc_8ndl51_hornresp_data.ze_ohms[resonance_region]
+        max_idx_in_region = region_ze.argmax()
+        all_indices = np.where(resonance_region)[0]
+        max_idx = all_indices[max_idx_in_region]
         f_res_hornresp = bc_8ndl51_hornresp_data.frequency[max_idx]
         ze_res_hornresp = bc_8ndl51_hornresp_data.ze_ohms[max_idx]
 
