@@ -47,7 +47,7 @@ def electrical_impedance_bare_driver(
     where:
         Z_m_total = Z_mechanical + Z_acoustic_reflected
         Z_mechanical = R_ms + jωM_ms + 1/(jωC_ms)
-        Z_acoustic_reflected = Z_a / S_d²
+        Z_acoustic_reflected = Z_a · S_d² (acoustic to mechanical transformation)
         ω = 2πf (angular frequency)
 
     Args:
@@ -106,11 +106,12 @@ def electrical_impedance_bare_driver(
     else:
         Z_mechanical = driver.R_ms + complex(0, omega * driver.M_ms) + complex(0, -1 / (omega * driver.C_ms))
 
-    # Acoustic impedance reflected to mechanical side: Z_a / S_d²
+    # Acoustic impedance reflected to mechanical side: Z_a · S_d²
     # COMSOL (2020), Eq. 1-2 - Mechano-acoustic coupling
     # Force on diaphragm: F_D = ∫(Δp · n_z) dA ≈ p · S_d
-    # This creates an impedance scaling of 1/S_d²
-    Z_acoustic_reflected = acoustic_load / (driver.S_d ** 2)
+    # Diaphragm velocity: u_D = U / S_d
+    # Mechanical impedance: Z_m = F/u = (p·S_d) / (U/S_d) = Z_a·S_d²
+    Z_acoustic_reflected = acoustic_load * (driver.S_d ** 2)
 
     # Total mechanical impedance (including acoustic load)
     Z_mechanical_total = Z_mechanical + Z_acoustic_reflected
