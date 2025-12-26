@@ -1,10 +1,10 @@
-ID = 310.87
+ID = 55.30
 
-Comment = BC_8NDL51 driver parameters exported from viberesp
+Comment = BC 8NDL51 infinite baffle - params manually input
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -18,7 +18,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -30,12 +30,12 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 215.00
-Bl = 7.50
-Cms = 2.40E-04
-Rms = 2.30
-Mmd = 0.025
-Le = 0.001
+Sd = 220.00
+Bl = 12.39
+Cms = 2.03E-04
+Rms = 3.30
+Mmd = 26.77
+Le = 0.00
 Re = 5.30
 Nd = 1
 

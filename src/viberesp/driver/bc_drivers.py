@@ -15,30 +15,31 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
     """
     B&C 8NDL51-8 8" Midrange driver.
 
-    Datasheet specifications:
+    Datasheet specifications from www.bcspeakers.com:
     - Fs: 66 Hz
     - Re: 5.3 Ω
+    - Qes: 0.41
+    - Qms: 3.6
     - Qts: 0.37
-    - Qes: 0.39
-    - Qms: 4.5
-    - Vas: 15 L
-    - Sd: 215 cm²
-    - BL: 7.5 T·m
-    - Mms: 25 g
-    - Cms: 0.24 mm/N
-    - Rms: 2.3 N·s/m
+    - Vas: 14 dm³ (14 L)
+    - Sd: 220 cm²
+    - η0: 1%
+    - Xmax: 7 mm
+    - Mms: 28 g
+    - Bl: 12.4 T·m
     - Le: 0.5 mH
+    - EBP: 161 Hz
 
     Literature: B&C 8NDL51 datasheet
     """
     return ThieleSmallParameters(
-        M_ms=0.025,    # 25g moving mass
-        C_ms=0.00024,  # 0.24 mm/N compliance
-        R_ms=2.3,      # 2.3 N·s/m mechanical resistance
-        R_e=5.3,       # 5.3 Ω DC resistance
-        L_e=0.5e-3,    # 0.5 mH voice coil inductance
-        BL=7.5,        # 7.5 T·m force factor
-        S_d=0.0215     # 215 cm² effective area
+        M_ms=0.028,    # 28g moving mass (datasheet)
+        C_ms=0.000209,  # Calculated from Fs and Mms: Cms = 1 / ((2π·Fs)² · Mms)
+        R_ms=3.22,      # Calculated from Qms: Rms = (2π·Fs·Mms) / Qms
+        R_e=5.3,        # 5.3 Ω DC resistance (datasheet)
+        L_e=0.5e-3,     # 0.5 mH voice coil inductance (datasheet)
+        BL=12.4,        # 12.4 T·m force factor (datasheet - CORRECTED)
+        S_d=0.0220,     # 220 cm² effective area (datasheet)
     )
 
 

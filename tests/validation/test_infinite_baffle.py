@@ -4,34 +4,19 @@ Integration tests for direct radiator infinite baffle validation.
 These tests validate the viberesp simulation against Hornresp reference
 data for the BC 8NDL51 driver in infinite baffle configuration.
 
-Voice Coil Model:
-    Uses Leach (2002) lossy inductance model to account for eddy current
-    losses at high frequencies. Parameters fitted to Hornresp data:
-    - K = 2.02 Ω·s^n
-    - n = 0.03 (loss exponent, nearly resistive at high frequencies)
+Hornresp Data Source:
+    File: 8ndl51_man_sim.txt (from manually input Hornresp parameters)
+    - Parameters based on B&C datasheet measurements
+    - Bl = 12.4 T·m (corrected from previous 7.5 T·m value)
+    - Mmd = 26.77g, Cms = 2.03E-04, Rms = 3.30
+    - Note: Manual input has Le = 0.00 (no voice coil inductance model)
+    - Resonance at 64.2 Hz (matches datasheet Fs = 66 Hz)
 
-    Reference: Leach (2002), "Loudspeaker Voice-Coil Inductance Losses",
-    AES Journal Vol. 50 No. 6.
-
-KNOWN ISSUE - Hornresp Data Mismatch:
-    The existing Hornresp .sim files show impedance peaks at frequencies
-    1.4-2.5x HIGHER than the driver F_s calculated from T/S parameters.
-    This suggests the simulations were run with different parameters or
-    configuration than specified in the .txt files.
-
-    Example for BC 8NDL51:
-    - Driver F_s (from M_ms, C_ms): 65 Hz
-    - Hornresp peak: 165 Hz (2.54x higher)
-    - This causes validation failures in the resonance region (50-500 Hz)
-
-    Workaround: Validation focuses on high-frequency behavior (>1 kHz)
-    where:
-    1. Voice coil inductance effects dominate
-    2. Leach model validation is critical
-    3. Hornresp data matches theoretical expectations
-
-    TODO: Regenerate Hornresp data with correct parameters to enable
-    full-frequency validation.
+Voice Coil Model Note:
+    The Hornresp manual input uses Le = 0.00, so high-frequency impedance
+    is just Re = 5.3 Ω (no inductive reactance). For validation of
+    voice coil inductance models (Leach 2002), new Hornresp simulations
+    should be run with proper Le values.
 """
 
 import pytest
@@ -48,10 +33,9 @@ from viberesp.validation.compare import (
 )
 from viberesp.driver.bc_drivers import get_bc_8ndl51
 
-# Leach model parameters for BC 8NDL51 (fitted to Hornresp data)
-# These parameters account for eddy current losses at high frequencies
-LEACH_K_BC8NDL51 = 2.02  # Ω·s^n
-LEACH_N_BC8NDL51 = 0.03   # Loss exponent (0 = pure resistor, 1 = lossless inductor)
+# NOTE: Hornresp manual input has Le = 0.00, so Leach model parameters
+# are not applicable to this dataset. New simulations with proper Le values
+# are needed for voice coil inductance validation.
 
 
 class TestInfiniteBaffleValidationBC8NDL51:
@@ -64,82 +48,54 @@ class TestInfiniteBaffleValidationBC8NDL51:
 
     @pytest.fixture
     def bc_8ndl51_hornresp_data(self):
-        """Load Hornresp reference data for BC 8NDL51."""
+        """Load Hornresp reference data for BC 8NDL51 (from manual input)."""
         data_path = (
             Path(__file__).parent
             / "drivers"
             / "bc_8ndl51"
             / "infinite_baffle"
-            / "bc_8ndl51_inf_sim.txt"
+            / "8ndl51_man_sim.txt"
         )
         return load_hornresp_sim_file(data_path)
 
-    def test_bc_8ndl51_electrical_impedance_magnitude_high_freq(
+    def test_bc_8ndl51_electrical_impedance_magnitude_resonance(
         self, bc_8ndl51_driver, bc_8ndl51_hornresp_data
     ):
         """
-        Validate high-frequency electrical impedance magnitude for BC 8NDL51.
+        Validate electrical impedance magnitude at resonance for BC 8NDL51.
 
-        Focuses on frequencies >1 kHz where voice coil inductance effects
-        dominate and the Leach (2002) model is critical. This avoids the
-        resonance region (50-500 Hz) where Hornresp data shows mismatch.
+        Tests that viberesp correctly predicts the resonance frequency and
+        impedance peak magnitude. The manual Hornresp input has correct
+        parameters (Bl=12.4 T·m, Mmd=26.77g) giving resonance at 64.2 Hz.
 
-        Tolerance: <5% for frequencies >1 kHz.
+        Expected: Resonance near 64-68 Hz with Ze ≈ 50 Ω
         """
-        # Filter data to high frequencies only (>1 kHz)
-        mask = bc_8ndl51_hornresp_data.frequency >= 1000
-        freqs_hf = bc_8ndl51_hornresp_data.frequency[mask]
+        # Find resonance in Hornresp data
+        max_idx = bc_8ndl51_hornresp_data.ze_ohms.argmax()
+        f_res_hornresp = bc_8ndl51_hornresp_data.frequency[max_idx]
+        ze_res_hornresp = bc_8ndl51_hornresp_data.ze_ohms[max_idx]
 
-        # Calculate viberesp response at high frequencies
-        ze_viberesp_hf = np.array(
-            [
-                direct_radiator_electrical_impedance(
-                    f, bc_8ndl51_driver,
-                    voice_coil_model="leach",
-                    leach_K=LEACH_K_BC8NDL51,
-                    leach_n=LEACH_N_BC8NDL51,
-                )["Ze_magnitude"]
-                for f in freqs_hf
-            ]
+        # Calculate viberesp response at Hornresp resonance frequency
+        result = direct_radiator_electrical_impedance(
+            f_res_hornresp,
+            bc_8ndl51_driver,
+            voice_coil_model="simple"
         )
 
-        # Compare with Hornresp (high-frequency data only)
-        # Create filtered result data
-        from viberesp.hornresp.results_parser import HornrespSimulationResult
-        hornresp_hf = HornrespSimulationResult(
-            frequency=freqs_hf,
-            ra_norm=bc_8ndl51_hornresp_data.ra_norm[mask],
-            xa_norm=bc_8ndl51_hornresp_data.xa_norm[mask],
-            za_norm=bc_8ndl51_hornresp_data.za_norm[mask],
-            spl_db=bc_8ndl51_hornresp_data.spl_db[mask],
-            ze_ohms=bc_8ndl51_hornresp_data.ze_ohms[mask],
-            xd_mm=bc_8ndl51_hornresp_data.xd_mm[mask],
-            wphase_deg=bc_8ndl51_hornresp_data.wphase_deg[mask],
-            uphase_deg=bc_8ndl51_hornresp_data.uphase_deg[mask],
-            cphase_deg=bc_8ndl51_hornresp_data.cphase_deg[mask],
-            delay_msec=bc_8ndl51_hornresp_data.delay_msec[mask],
-            efficiency_percent=bc_8ndl51_hornresp_data.efficiency_percent[mask],
-            ein_volts=bc_8ndl51_hornresp_data.ein_volts[mask],
-            pin_watts=bc_8ndl51_hornresp_data.pin_watts[mask],
-            iin_amps=bc_8ndl51_hornresp_data.iin_amps[mask],
-            zephase_deg=bc_8ndl51_hornresp_data.zephase_deg[mask],
-            metadata=bc_8ndl51_hornresp_data.metadata,
-        )
+        print(f"\\nRESONANCE VALIDATION:")
+        print(f"  Hornresp resonance: {f_res_hornresp:.1f} Hz, Ze = {ze_res_hornresp:.3f} Ω")
+        print(f"  Viberesp F_s: {bc_8ndl51_driver.F_s:.1f} Hz")
+        print(f"  Viberesp at {f_res_hornresp:.1f} Hz: Ze = {result['Ze_magnitude']:.3f} Ω")
+        print(f"  Resonance frequency difference: {abs(f_res_hornresp - bc_8ndl51_driver.F_s):.1f} Hz")
 
-        result = compare_electrical_impedance(
-            freqs_hf,
-            ze_viberesp_hf,
-            hornresp_hf,
-            tolerance_percent=5.0,
-        )
+        # Check resonance frequency is within 5 Hz
+        assert abs(f_res_hornresp - bc_8ndl51_driver.F_s) < 5.0, \
+            f"Resonance mismatch: {f_res_hornresp:.1f} Hz vs {bc_8ndl51_driver.F_s:.1f} Hz"
 
-        # Print summary for manual review
-        print("HIGH-FREQUENCY VALIDATION (>1 kHz):")
-        print(result.summary)
-
-        # Assert validation passes
-        assert result.passed, f"HF IMPEDANCE validation failed: {result.summary}"
-        assert result.max_percent_error < 5.0, f"Max error {result.max_percent_error:.2f}% exceeds 5%"
+        # Check impedance magnitude at resonance (within 20% tolerance)
+        ze_error = abs(result['Ze_magnitude'] - ze_res_hornresp) / ze_res_hornresp * 100
+        assert ze_error < 20.0, \
+            f"Impedance error at resonance: {ze_error:.1f}% ({result['Ze_magnitude']:.1f} vs {ze_res_hornresp:.1f} Ω)"
 
     def test_bc_8ndl51_electrical_impedance_magnitude(
         self, bc_8ndl51_driver, bc_8ndl51_hornresp_data
