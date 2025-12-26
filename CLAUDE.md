@@ -42,9 +42,9 @@ def calculate_horn_cutoff(flare_constant: float, speed_of_sound: float = 343.0) 
     Both sources derive the same expression from the horn equation.
 
     Literature:
-    - literature/horns/olson_1947.md - Exponential horn theory, Eq. 5.18
-    - literature/horns/beranek_1954.md - Horn impedance, Chapter 5
-    - literature/horns/kinsler_1982.md - Derivation from wave equation
+    - literature/horns/olson_1947.md - Exponential horn theory, Eq. 5.12, 5.18
+    - literature/horns/beranek_1954.md - Horn impedance, Chapter 5, Eq. 5.20
+    - literature/horns/kolbrek_horn_theory_tutorial.md - Modern treatment with validation
 
     Args:
         flare_constant: Horn flare constant m (1/m), where S(x) = S_t · exp(m·x)
@@ -333,9 +333,11 @@ Be explicit about which model you're implementing:
 - `literature/README.md` - Overview of citation system
 - `ROADMAP.md` - Development phases
 - Hornresp manual: http://www.hornresp.net/
-- Olson (1947) - Classic horn theory
-- Beranek (1954) - Finite horn corrections
-- Kinsler (1982) - Rigorous derivations
+- `literature/horns/olson_1947.md` - Classic horn theory (exponential profiles, cutoff frequency)
+- `literature/horns/beranek_1954.md` - Radiation impedance (piston in infinite baffle)
+- `literature/horns/kolbrek_horn_theory_tutorial.md` - Modern horn theory with T-matrix method
+- `literature/transmission_lines/chabassier_tournemenne_2018_tmatrix.md` - T-matrix propagation
+- `literature/simulation_methods/aarts_janssen_2003_struve_approximation.md` - Struve H₁ approximation
 
 ---
 
