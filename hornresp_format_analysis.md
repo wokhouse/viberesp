@@ -45,8 +45,41 @@ $ grep "Cms =" exports/*.txt
 exports/BC_12NDL76.txt:  Cms = 1.90E-04  ✓
 exports/BC_15DS115.txt:  Cms = 2.50E-04  ✓
 exports/BC_18PZW100.txt: Cms = 1.70E-04  ✓
-exports/BC_8NDL51.txt:   Cms = 2.40E-04  ✓
+exports/BC_8NDL51.txt:   Cms = 2.03E-04  ✓
 ```
+
+### ✅ Issue 2b: CRITICAL - Unit Conversion Bug (MASS & INDUCTANCE)
+
+**Problem:**
+- Hornresp expects **grams (g)** for Mmd, but exporter was passing **kilograms (kg)**
+- Hornresp expects **millihenries (mH)** for Le, but exporter was passing **henries (H)**
+- This resulted in exported values being 1000x too small!
+
+**Symptoms:**
+- Export showed `Mmd = 0.054` (kg) instead of `54.000` (g)
+- Export showed `Le = 0.001` (H) instead of `1.000` (mH)
+- These values are 1000x smaller than Hornresp expects!
+
+**Fix Applied:**
+- Added unit conversions in `driver_to_hornresp_record()`:
+  ```python
+  # Convert mass from kg to g
+  mmd_g = driver.M_ms * 1000.0
+
+  # Convert inductance from H to mH
+  le_mh = driver.L_e * 1000.0
+  ```
+
+**Verification:**
+```bash
+$ grep -E "^(Mmd|Le) =" tests/validation/drivers/*/infinite_baffle/*.txt
+bc_15ds115.txt: Mmd = 254.000  ✓ (was 0.254 kg, now 254g)
+bc_15ds115.txt: Le = 4.500     ✓ (was 0.0045 H, now 4.5mH)
+bc_18pzw100.txt: Mmd = 209.000  ✓ (was 0.209 kg, now 209g)
+bc_18pzw100.txt: Le = 1.580     ✓ (was 0.00158 H, now 1.58mH)
+```
+
+**Impact:** All driver parameters were updated to match official datasheets after this fix was applied.
 
 ### ✅ Issue 3: Direct Radiator Configuration (CRITICAL for Stage 1B)
 
@@ -59,10 +92,11 @@ exports/BC_8NDL51.txt:   Cms = 2.40E-04  ✓
 - Set all horn parameters to 0 for direct radiator mode:
   ```
   S1 = 0.00, S2 = 0.00, Exp = 0.00, F12 = 0.00
-  S2 = 0.00, S3 = 0.00, Exp = 0.00, F23 = 0.00
+  S2 = 0.00, S3 = 0.00, Exp = 0.00, AT = 0.00
   S3 = 0.00, S4 = 0.00, L34 = 0.00, F34 = 0.00
   S4 = 0.00, S5 = 0.00, L45 = 0.00, F45 = 0.00
   ```
+- **Note:** Line 21 uses `AT` (throat area correction), not `F23`
 
 ### ✅ Issue 4: Radiation Angle and Rear Chamber
 
@@ -82,20 +116,30 @@ exports/BC_8NDL51.txt:   Cms = 2.40E-04  ✓
 
 ### Driver Parameter Format
 
-| Parameter | Example Format | Our Format | Status |
-|-----------|---------------|------------|--------|
-| Sd        | `100.00`      | `522.00`   | ✓ Match |
-| Bl        | `1.00`        | `16.50`    | ✓ Match |
-| Cms       | `1.00E-06`    | `1.90E-04` | ✓ Fixed |
-| Rms       | `0.00`        | `5.20`     | ✓ Match |
-| Mmd       | `0.00` (2 dec)| `0.054` (3 dec) | ⚠️ 3 decimals for precision |
-| Le        | `0.00` (2 dec)| `0.001` (3 dec) | ⚠️ 3 decimals for precision |
-| Re        | `0.01`        | `3.10`     | ✓ Match |
-| Nd        | `1`           | `1`        | ✓ Match |
+| Parameter | Hornresp Units | Example Format | Our Format | Status |
+|-----------|---------------|---------------|------------|--------|
+| Sd        | cm²           | `100.00`      | `522.00`   | ✓ Match |
+| Bl        | T·m           | `1.00`        | `16.50`    | ✓ Match |
+| Cms       | m/N           | `1.00E-06`    | `1.90E-04` | ✓ Fixed |
+| Rms       | N·s/m         | `0.00`        | `5.20`     | ✓ Match |
+| Mmd       | **g** (not kg) | `0.00`       | `53.000`   | ✓ Unit conversion fixed |
+| Le        | **mH** (not H) | `0.00`       | `1.000`    | ✓ Unit conversion fixed |
+| Re        | Ω             | `0.01`        | `5.30`     | ✓ Match |
+| Nd        | count         | `1`           | `1`        | ✓ Match |
 
-**Note:** Mmd and Le use 3 decimal places for precision on real driver values.
-The example shows `0.00` but that's a placeholder zero value. Real measurements
-require more precision (e.g., 0.054 kg = 54g, 0.001 H = 1mH).
+**CRITICAL UNIT CONVERSIONS:**
+Hornresp uses **non-SI units** for some parameters:
+- **Mmd (mass):** grams (g), not kilograms (kg)
+  - Conversion: `Mmd_g = M_ms_kg × 1000`
+  - Example: 0.053 kg → 53.000 g
+- **Le (inductance):** millihenries (mH), not henries (H)
+  - Conversion: `Le_mH = L_e_H × 1000`
+  - Example: 0.001 H → 1.000 mH
+- **Sd (area):** cm², not m²
+  - Conversion: `Sd_cm2 = S_d_m2 × 10000`
+  - Example: 0.0522 m² → 522.00 cm²
+
+**Implementation:** The `driver_to_hornresp_record()` function handles these conversions automatically.
 
 ### Horn Configuration (Direct Radiator)
 
@@ -138,19 +182,20 @@ All sections match the Hornresp format:
 
 ## Exported Drivers
 
-All 4 B&C drivers exported with direct radiator configuration:
+All 4 B&C drivers exported with direct radiator configuration and **corrected datasheet parameters**:
 
-| Driver | Sd (cm²) | Fs (Hz) | Purpose |
-|--------|----------|---------|---------|
-| BC_8NDL51   | 215.00  | ~65  | 8" Midrange |
-| BC_12NDL76  | 522.00  | ~50  | 12" Mid-Woofer |
-| BC_15DS115  | 860.00  | ~33  | 15" Subwoofer |
-| BC_18PZW100 | 1250.00 | ~31  | 18" Subwoofer |
+| Driver | Sd (cm²) | Mms (g) | BL (T·m) | Le (mH) | Fs (Hz) | Purpose |
+|--------|----------|---------|----------|---------|---------|---------|
+| BC_8NDL51   | 220.00  | 26.77  | 12.39   | 0.50   | ~66  | 8" Midrange |
+| BC_12NDL76  | 522.00  | 53.00  | 20.10   | 1.00   | ~50  | 12" Mid-Woofer |
+| BC_15DS115  | 855.00  | 254.00 | 38.70   | 4.50   | ~33  | 15" Subwoofer |
+| BC_18PZW100 | 1210.00 | 209.00 | 25.50   | 1.58   | ~37  | 18" Subwoofer |
 
 All configured for:
-- Half-space radiation (Ang = 2.00)
+- Half-space radiation (Ang = 2.0 x Pi)
 - Direct radiator (no horn loading)
 - Bare driver electrical impedance validation
+- **Correct unit conversions** (g for mass, mH for inductance, cm² for area)
 
 ---
 
@@ -335,16 +380,30 @@ F12 = horn_length   # Non-zero
 
 **Key Functions:**
 - `export_to_hornresp()` - Export single driver to Hornresp .txt file
-- `batch_export_to_hornresp()` - Export multiple drivers
+- `driver_to_hornresp_record()` - Convert SI units to Hornresp units
 - `HornrespRecord.to_hornresp_format()` - Format driver parameters
+- `batch_export_to_hornresp()` - Export multiple drivers
+
+**Unit Conversions (CRITICAL):**
+```python
+# Input: SI units (ThieleSmallParameters)
+M_ms: kg   # Moving mass
+L_e: H     # Voice coil inductance
+S_d: m²    # Effective piston area
+
+# Output: Hornresp units (HornrespRecord)
+Mmd: g     # Moving mass (×1000)
+Le: mH     # Voice coil inductance (×1000)
+Sd: cm²    # Effective piston area (×10000)
+```
 
 **Default Configuration (for Stage 1B bare driver testing):**
 ```
-Ang = 2.00          # Half-space (2π steradians)
-S1-S5 = 0.00        # No horn segments
-Exp = 0.00          # No flare
-F12, F23, F34, F45 = 0.00  # No horn lengths
-Vrc = 0.00          # No rear chamber
+Ang = 2.0 x Pi     # Half-space (2π steradians)
+S1-S5 = 0.00       # No horn segments
+Exp = 0.00         # No flare
+F12, AT, F34, F45 = 0.00  # No horn lengths (note: AT not F23 on line 21)
+Vrc = 0.00         # No rear chamber
 ```
 
 This configuration represents a driver mounted in an infinite baffle,
