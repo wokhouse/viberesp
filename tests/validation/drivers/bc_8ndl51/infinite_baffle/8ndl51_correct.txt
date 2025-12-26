@@ -1,6 +1,6 @@
 ID = 55.30
 
-Comment = BC 8NDL51 infinite baffle - params manually input
+Comment = BC 8NDL51 infinite baffle - CORRECTED DATASHEET PARAMETERS (Bl=12.4, Le=0.5m
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -35,7 +35,7 @@ Bl = 12.39
 Cms = 2.03E-04
 Rms = 3.30
 Mmd = 26.77
-Le = 0.00
+Le = 0.50
 Re = 5.30
 Nd = 1
 
@@ -73,7 +73,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 
