@@ -1,169 +1,76 @@
-# Literature Collection
+# Literature Library
 
-This directory holds research papers, books, and reference materials for the Viberesp physics model rewrite. Organized by development phase for RAG-augmented development.
+This directory will contain the foundational references for the viberesp simulation engine. All algorithms implemented in viberesp must be derived from and cite the literature contained in this library.
 
-## Directory Structure
+## Status
 
-```
-literature/
-├── phase1_radiation/      # Radiation impedance, piston models
-├── phase2_tmatrix/        # Transfer matrix method, horn theory
-├── phase3_driver/         # Thiele-Small parameters, driver modeling
-├── phase4_systems/        # Complete horn systems, chambers
-├── phase5_multisegment/   # Multi-segment horns, composite systems
-├── phase6_advanced/       # Tapped horns, transmission lines, directivity
-└── general_reference/     # General acoustics, foundational texts
-```
+**Literature references will be added during development.**
 
-## Key References
+The literature citation framework is established, but specific reference documents have not yet been populated. As simulation features are implemented, relevant literature will be added following the structure below.
 
-### Primary References (Must-Have)
+## Purpose
 
-1. **Kolbrek & Dunker (2019)** - *High Quality Horn Loudspeaker Systems*
-   - Definitive reference on horn theory
-   - Covers T-matrix method, radiation impedance, all flare types
-   - Available: https://hornspeakersystems.info/
-   - Purchase: https://www.parts-express.com/High-Quality-Horn-Loudspeaker-Systems-500-032
+The literature library will serve as:
+1. **Authoritative source** for all acoustic theory and equations implemented in viberesp
+2. **Reference documentation** linking code implementations to theoretical foundations
+3. **Validation framework** ensuring the simulation engine is grounded in established science
+4. **Educational resource** for understanding the acoustic principles behind horn design
 
-2. **Kolbrek's Tutorial Series** (hornspeakersystems.info)
-   - Part 1: Radiation and T-Matrix ✅ **ACQUIRED**
-   - Part 2: Adding a Driver ✅ **ACQUIRED**
-   - Part 3: Multiple segments and more T-matrices ✅ **ACQUIRED**
+## Planned Structure
 
-3. **Aarts & Janssen (2003)** - "Approximation of the Struve function H1"
-   - JASA 113(5):2635
-   - Radiation impedance calculations
-   - ℹ️ Optional (SciPy has struve function)
+### `horns/` - Horn Theory References
+Foundational texts on horn-loaded loudspeaker design:
+- Exponential and hyperbolic horn profiles
+- Acoustic impedance calculations
+- Throat and mouth area requirements
+- Directivity patterns
+- Horn equation derivations
 
-4. **Thiele (1971), Small (1972-1974)** - JAES papers
-   - Foundation of Thiele-Small parameters
-   - ✅ **Small (1972)** ACQUIRED
-   - ℹ️ Thiele (1971) available via AES archive
+**Planned key references:**
+- Olson (1947) - Elements of Acoustical Engineering
+- Beranek (1954) - Acoustics
+- Kinsler et al. (1982) - Fundamentals of Acoustics
 
-5. **Webster (1919)** - "Acoustical impedance and the theory of horns"
-   - PNAS 5(7):275-282
-   - Original horn equation
-   - ✅ **Rienstra (2005)** commentary on Webster's equation ACQUIRED
+### `thiele_small/` - Thiele-Small Parameters
+Driver parameters and small-signal modeling:
+- Thiele (1971) - Loudspeaker enclosure calculations
+- Small (1972) - Direct radiator loudspeaker analysis
+- Equivalent circuit models
+- Parameter measurement techniques
 
-6. **Beranek & Mellow (2012)** - *Acoustics: Sound Fields and Transducers*
-   - Updated treatment of Beranek's classic text
-   - Chapter 4: Radiation impedance
-   - Available: https://www.sciencedirect.com/book/9780123914217/
+### `transmission_lines/` - Transmission Line Theory
+Quarter-wave and transmission line enclosures (future development):
+- Transmission line acoustic theory
+- Tapered line designs
+- Absorptive loading techniques
 
-### Secondary References
+### `simulation_methods/` - Numerical Methods
+Implementation techniques:
+- Electrical analogies for acoustic systems
+- Numerical solution methods
+- Frequency response calculations
+- Optimization algorithms
 
-- **Hélie (2020)** - "Passive modelling of the electrodynamic loudspeaker" ✅ **ACQUIRED**
-- **Kulik (2007)** - "Transfer matrix of conical waveguides" ✅ **ACQUIRED**
-- **Ernoult & Kergomard (2020)** - "Transfer matrix with viscothermal losses" ✅ **ACQUIRED**
-- **Olson (1957)** - *Acoustical Engineering* ✅ **ACQUIRED** (free PDF)
-- Leach, *Introduction to Electroacoustics* (2003)
+## Adding New Literature
 
-## File Naming Convention
+When adding new references:
 
-```
-[AuthorLastName]_[Year]_[ShortTitle].md
-Example: Small_1972_Closed_Box_Systems.md
-```
+1. Create a new markdown file in the appropriate directory
+2. Include:
+   - Full citation (authors, title, publication, year)
+   - DOI or ISBN if available
+   - Key equations with numbering
+   - Relevant page numbers
+   - Summary of applicable theory
+3. Update this README with the new reference
+4. Link to the reference from any code that uses it
 
-## Literature Citation Policy
+## Validation Against Hornresp
 
-**IMPORTANT**: All implementations MUST cite the specific literature source(s) used.
+Hornresp is the industry-standard tool for horn simulation. All viberesp implementations must:
+1. Implement the theory as described in literature/
+2. Validate results against Hornresp for test cases
+3. Document any discrepancies and their causes
+4. Maintain agreement within acceptable tolerances (typically <1% for key parameters)
 
-### Citation Format in Code
-
-```python
-def radiation_impedance(area: float, frequency: float) -> complex:
-    """
-    Calculate radiation impedance for circular piston in infinite baffle.
-
-    References:
-        - Kolbrek (2019) Part 1: Radiation and T-Matrix
-          https://hornspeakersystems.info/
-        - literature/phase2_tmatrix/Kolbrek_2019_Part1_Radiation_TMatrix.md
-    """
-    # Implementation follows Kolbrek Part 1, Eq. (X)
-    ...
-```
-
-### Citation Format in Documentation
-
-```markdown
-## Throat Impedance Calculation
-
-Based on **Kolbrek (2019) Part 1**, Section "Throat Impedance Calculation":
-
-> Given the radiation impedance at the mouth Z₂, the throat impedance Z₁ is:
-> Z₁ = (a·Z₂ + b) / (c·Z₂ + d)
-
-For normalized impedance (as shown in Hornresp):
-> Z₁_norm = Z₁ · S₁ / (ρ₀c)
-
-See: `literature/phase2_tmatrix/Kolbrek_2019_Part1_Radiation_TMatrix.md`
-```
-
-## RAG Usage
-
-When developing a phase, reference the corresponding literature directory:
-
-```bash
-# Phase 1: Radiation impedance
-viberesp chat --rag literature/phase1_radiation/
-
-# Phase 2: T-matrix implementation
-viberesp chat --rag literature/phase2_tmatrix/
-
-# Phase 3: Driver modeling
-viberesp chat --rag literature/phase3_driver/
-
-# All phases
-viberesp chat --rag literature/
-```
-
-## Acquisition Status
-
-### ✅ **Completed Acquisitions**
-
-| Phase | Literature | Location | Source |
-|-------|-----------|----------|--------|
-| P2 | Kolbrek Part 1: Radiation & T-Matrix | `phase2_tmatrix/Kolbrek_2019_Part1_Radiation_TMatrix.md` | hornspeakersystems.info |
-| P2 | Rienstra (2005): Webster's Horn Equation | `phase2_tmatrix/Rienstra_2005_Websters_Horn_Equation_Revisited.md` | arXiv |
-| P2 | Kulik (2007): Conical Waveguides | `phase2_tmatrix/Kulik_2007_Conical_Waveguide_Transfer_Matrix.md` | JASA |
-| P3 | Kolbrek Part 2: Adding a Driver | `phase3_driver/Kolbrek_2019_Part2_Adding_Driver.md` | hornspeakersystems.info |
-| P3 | Small (1972): Closed-Box Systems | `phase3_driver/Small_1972_Closed_Box_Systems.md` | ReadResearch |
-| P3 | Hélie (2020): Passive Loudspeaker Modeling | `phase3_driver/Helie_2020_Passive_Modelling_Electrodynamic_Loudspeaker.md` | Acta Acustica |
-| P5 | Kolbrek Part 3: Multiple Segments | `phase5_multisegment/Kolbrek_2019_Part3_Multiple_Segments.md` | hornspeakersystems.info |
-| P5 | Ernoult (2020): Viscothermal Losses | `phase5_multisegment/Ernoult_2020_Truncaated_Cone_Viscothermal_Losses.md` | Acta Acustica |
-
-### 🟡 **Partial Coverage**
-
-| Phase | Coverage | Notes |
-|-------|----------|-------|
-| P1: Radiation | ✅ **Adequate** | Kolbrek Part 1 covers radiation impedance formulas |
-| P2: T-Matrix | ✅ **Good** | Exponential (Kolbrek), conical (Kulik), Webster's equation |
-| P3: Driver | ✅ **Excellent** | TS parameters (Small), PHS framework (Hélie) |
-| P4: Systems | 🟡 Partial | General theory in Kolbrek tutorials, need complete system examples |
-| P5: Multi-segment | ✅ **Good** | Matrix multiplication, viscothermal losses (Ernoult) |
-| P6: Advanced | ⬜ Not started | Need tapped horn, transmission line references |
-
-### 🔵 **High Priority Acquisition List**
-
-| Literature | Phase | Priority | Access |
-|------------|-------|----------|--------|
-| **Kolbrek & Dunker (2019) Book** | All | **HIGH** | Purchase ($80) |
-| Beranek & Mellow (2012) | P1, P4 | Medium | University library / purchase |
-| Thiele (1971) JAES paper | P3 | Medium | AES archive |
-| Small (1973-74) Vented-Box | P3 | Medium | DIYAudioProjects |
-
----
-
-*Last updated: 2025-12-25*
-
-**Next Actions:**
-1. ✅ Download Kolbrek tutorial Parts 1-3
-2. ✅ Download Small (1972) closed-box paper
-3. ✅ Download Hélie (2020) passive modeling paper
-4. ✅ Download Kulik (2007) conical waveguide paper
-5. ✅ Download Ernoult (2020) viscothermal losses paper
-6. ⬜ Purchase Kolbrek & Dunker (2019) book
-7. ⬜ Download Small (1973-74) vented-box papers
-8. ⬜ Search for tapped horn and transmission line papers (P6)
+This ensures viberesp provides accurate exploration results while being grounded in established acoustic theory.

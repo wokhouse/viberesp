@@ -1,1 +1,1 @@
-"""Tests for Viberesp physics module."""
+"""Test fixtures for physics simulation tests."""
