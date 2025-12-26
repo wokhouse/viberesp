@@ -1,6 +1,6 @@
-ID = 55.30
+ID = 170.91
 
-Comment = BC 8NDL51 infinite baffle - CORRECTED DATASHEET PARAMETERS (Bl=12.4, Le=0.5m
+Comment = BC_8NDL51 - 26.8g Mms, 12.4Tm BL, 0.50mH Le, 5.3ohm Re
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -34,8 +34,8 @@ Sd = 220.00
 Bl = 12.39
 Cms = 2.03E-04
 Rms = 3.30
-Mmd = 26.77
-Le = 0.50
+Mmd = 26.770
+Le = 0.500
 Re = 5.30
 Nd = 1
 
