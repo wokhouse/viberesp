@@ -1,81 +1,94 @@
-# BC_15PS100 Sealed Box Validation Issue
+# BC_15PS100 Sealed Box Validation Results
 
-## Problem Identified
+## Parser Verification ✅
 
-The Hornresp sim.txt file shows **major discrepancies** with viberesp calculations:
+The Hornresp parser is **working correctly**. After regenerating the sim.txt file:
+- Impedance peak correctly at 59.76 Hz (56.04 Ω) - matches expected Fc
+- Parser correctly reading all 16 columns
+- Validation checks pass
 
-### Impedance Comparison @ 60 Hz (Fc)
-- **Viberesp**: Ze = 73.51 Ω
-- **Hornresp**: Ze = 103.4 Ω
-- **Error**: 40% (way beyond acceptable tolerance)
+## Current Status
 
-### Displacement Analysis
-The Hornresp displacement peaks at **10 Hz** (0.647 mm), which suggests:
-1. Hornresp may have simulated a **ported box** instead of sealed box
-2. OR the input file parameters were incorrectly exported/imported
-3. OR there's a fundamental configuration issue
+The validation tests confirm the **same systematic error** as BC_8NDL51:
+- Mechanical impedance ~40% too high
+- Velocity ~27% too low
+- SPL ~12 dB too low
 
-### Expected vs Actual
-- **Expected Fc**: 59.7 Hz (calculated from F_s=37.3 Hz, α=1.56)
-- **Hornresp impedance peak**: ~135 Hz (106.8 Ω)
-- **Hornresp displacement peak**: 10 Hz (wrong enclosure type?)
+This is the **known issue** documented in `sealed_box_spl_investigation.md`.
 
-## Driver Parameters (Verified)
+## Detailed Comparison @ 60 Hz
+
 ```
-F_s: 37.29 Hz
-Q_ts: 0.44
-V_as: 105.54 L
-M_md: 147 g
-C_ms: 1.04E-04 m/N
-R_ms: 6.53 N·s/m
-BL: 21.2 T·m
-Re: 5.2 Ω
-```
+Hornresp (reference):
+  Ze: 56.0 Ω @ 7.3°
+  Velocity: 0.171 m/s
+  SPL: 103.4 dB
+  Current: 0.0505 A
 
-## Enclosure Parameters (Verified)
-```
-Vb: 67.5 L
-α = V_as/Vb = 1.56
-Fc = F_s × √(1+α) = 37.3 × √2.56 = 59.7 Hz ✓
-Qtc = Q_ts × √(1+α) = 0.44 × √2.56 = 0.707 ✓
+Viberesp (current):
+  Ze: 73.5 Ω @ -5.0°
+  Velocity: 0.124 m/s
+  SPL: 91.5 dB
+  Current: 0.0385 A
+
+Error:
+  Ze: +31.2% (17.5 Ω too high)
+  Velocity: -27.5% (0.047 m/s too low)
+  SPL: -11.9 dB
 ```
 
-## Action Required
+## Root Cause (from investigation)
 
-**The user needs to regenerate the Hornresp sim.txt file with the following steps:**
+Mechanical impedance is too high:
+- **Current Z_mech**: 5.44 N·s/m
+- **Required Z_mech**: ~3.9 N·s/m (to match Hornresp velocity)
+- **Error**: +40%
 
-1. Open Hornresp fresh
-2. File → New (clear any previous configuration)
-3. File → Import → Select `input_qtc0.707.txt`
-4. **Verify the imported parameters**:
-   - Vrc = 67.45 L (sealed box volume)
-   - Vtc = 0 (no port, sealed box)
-   - Mmd = 147 g
-   - Cms = 1.04E-04
-   - BL = 21.2
-5. Run simulation: 10-20000 Hz
-6. **Check the impedance peak** - should be around 60 Hz, not 135 Hz
-7. Export to sim.txt
+This affects both BC_8NDL51 and BC_15PS100 similarly (systematic, not random error).
 
-## Test Results (Current Status)
+## What's Working ✅
+
+1. **Parser**: Correctly reading all columns from sim.txt
+2. **Complex current model**: Using F = BL × I_complex correctly
+3. **System parameters**: Fc = 59.7 Hz, Qtc = 0.707 (accurate)
+4. **Phase validation**: Passes within tolerance
+5. **Test infrastructure**: Robust with validation checks
+
+## What Needs Investigation ❌
+
+The **mechanical impedance model** in `sealed_box.py`:
+- We use `driver.M_ms` (with 2× radiation mass) for sealed boxes
+- But this gives ~40% higher impedance than Hornresp expects
+- Possible causes:
+  - Frequency-dependent radiation mass
+  - Box damping (Q_b) not included
+  - Different compliance model
+  - Hornresp uses a different algorithm
+
+## Next Steps
+
+1. ✅ Parser verified - no issues here
+2. ✅ Test infrastructure working correctly
+3. ⏳ Research agent investigating mechanical impedance formula
+4. ⏳ Implement fix based on research findings
+
+## Test Results
 
 ```
 test_electrical_impedance_magnitude: FAILED
   Max error: 32.99% @ 58.9 Hz
   RMS error: 1.70 Ω
-  Pass: ✗
+  Expected tolerance: <10%
+  Status: Known issue - mechanical impedance model
 
 test_electrical_impedance_phase: PASSED ✓
+  Phase correctly matches Hornresp
 
-test_spl: FAILED (likely due to wrong impedance)
+test_spl: FAILED
+  Max error: ~12 dB
+  Due to velocity error from mechanical impedance
 ```
-
-## Notes
-
-- The phase test passing suggests the **shape** of the impedance curve is correct
-- But the magnitude is scaled wrong, pointing to a parameter mismatch
-- Most likely: Hornresp simulated wrong enclosure type
 
 ---
 Generated: 2025-12-27
-Status: Awaiting correct Hornresp sim.txt file
+Updated: Parser verified, awaiting mechanical impedance research
