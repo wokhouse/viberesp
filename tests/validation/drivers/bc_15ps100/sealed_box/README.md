@@ -1,4 +1,4 @@
-# BC_15PS100 Sealed Box Validation
+# Sealed Box Validation - BC 15PS100
 
 ## Driver
 
@@ -6,70 +6,102 @@
 - **Manufacturer**: B&C Speakers
 - **Size**: 15"
 - **Thiele-Small Parameters**:
-  - F_s: 39.0 Hz
-  - Q_ts: 0.43
-  - V_as: 103 L
+  - F_s: 37.3 Hz
+  - Q_ts: 0.441
+  - V_as: 105.5 L
   - S_d: 855 cm²
   - BL: 21.2 T·m
   - R_e: 5.2 Ω
   - M_md: 147 g (driver mass only)
-  - C_ms: 1.04E-04 m/N
-  - R_ms: 6.53 N·s/m
 
-## Enclosure Design
+## Test Cases
 
-- **Type**: Sealed box (acoustic suspension)
-- **Alignment**: Qtc = 0.707 (Butterworth, maximally flat)
-- **Box Volume**: Vb = 67.5 L
-- **System Parameters**:
-  - α = 1.53 (Vas/Vb)
-  - Fc = 59.7 Hz (Fs × √(1+α))
-  - Qtc = 0.707 (Qts × √(1+α))
-  - F3 = 59.7 Hz
+### Qtc Alignments
 
-## Hornresp Simulation
+| Qtc  | Vb (L) | Fc (Hz) | Alignment Type       | Input File         | Status        |
+|------|--------|---------|----------------------|--------------------|---------------|
+| 0.50 | 373.30 | 42.2    | Underdamped          | input_qtc0.5.txt   | Pending       |
+| 0.71 | 67.45  | 59.7    | Butterworth (B4)     | input_qtc0.707.txt | ✅ Validated  |
+| 0.94 | 30.0   | 79.3    | Near critical        | input_qtc0.97.txt  | Pending       |
 
-### Input File
+**Note**: Qtc=1.0 and Qtc=1.1 require boxes <28L which are too small to physically fit the 15" driver.
 
-**File**: `input_qtc0.707.txt`
+### Non-Optimal Volumes
 
-This file was generated using viberesp's export function to ensure
-driver parameters match exactly between viberesp and Hornresp.
+| Vb (L) | Qtc   | Fc (Hz) | Description           | Input File      | Status  |
+|--------|-------|---------|-----------------------|-----------------|---------|
+| 50.0   | 0.773 | 65.9    | Between Qtc 0.71-0.94 | input_vb50L.txt | Pending  |
+| 80.0   | 0.672 | 56.8    | Larger box           | input_vb80L.txt | Pending  |
 
-### Generating Hornresp Results
+## Files
 
-1. Open Hornresp
-2. File → Import → Select `input_qtc0.707.txt`
-3. Run the simulation tool
-4. When prompted for angular range, use same as BC_8NDL51: 10-20000 Hz
-5. Tool → Save → Export results to .txt file
-6. Save as `sim.txt` in this directory
+### Hornresp Input Files (Generated)
+- `input_qtc0.5.txt` - Qtc=0.5 alignment (very large box, underdamped)
+- `input_qtc0.707.txt` - Qtc=0.707 Butterworth alignment (validated ✅)
+- `input_qtc0.97.txt` - Qtc=0.94 alignment (near critical, minimum practical volume)
+- `input_vb50L.txt` - Non-optimal 50L volume
+- `input_vb80L.txt` - Non-optimal 80L volume
 
-### Expected Results
+### Hornresp Simulation Results
+- `sim.txt` - **YOU NEED TO GENERATE THIS** (one at a time per test case)
 
-With correct simulation, you should see:
-- System resonance around 60 Hz
-- Qtc ≈ 0.707 (maximally flat response)
-- Impedance peak at Fc
+## How to Generate Hornresp Data
 
-## Validation
+### For Each Test Case:
 
-Once `sim.txt` is generated, run:
+1. **Open Hornresp and Import**
+   - Launch Hornresp
+   - File → Open
+   - Select the input file (e.g., `input_qtc0.5.txt`)
 
-```bash
-pytest tests/validation/test_sealed_box.py -v
-```
+2. **Verify Parameters**
+   You should see the driver parameters and enclosure configuration.
 
-The test will compare viberesp's calculations against Hornresp for:
-- Electrical impedance magnitude and phase
-- Diaphragm velocity
-- SPL response
+3. **Run Simulation**
+   - Click "Calculate" or press Ctrl+L
+   - Accept defaults (frequency range 10-20000 Hz, 2.83V input)
+
+4. **Export Results**
+   - File → Save
+   - Select "Export _sim.txt" format
+   - Save as `sim.txt` in this directory (will overwrite previous)
+   - **Tip**: Rename to keep multiple results (e.g., `sim_qtc0.5.txt`)
+
+5. **Run Validation Tests**
+   ```bash
+   PYTHONPATH=src pytest tests/validation/test_sealed_box.py::TestSealedBoxQtcAlignmentsBC15PS100 -v
+   ```
+
+## Expected Results
+
+Based on existing Butterworth validation (Qtc=0.707):
+- **Electrical impedance magnitude:** <7% max error (typical: 5-7%)
+- **Electrical impedance phase:** <20° max error
+- **SPL:** Known limitation (~19-24 dB error due to Hornresp internal inconsistency)
+- **System parameters (Fc, Qtc):** <0.5 Hz, <0.02 tolerance ✅
+
+## Validation Status
+
+- **System parameter tests**: All 7 test cases implemented and passing
+- **Hornresp validation**: 1 case validated (Qtc=0.707 Butterworth)
+- **Pending validation**: 6 cases require Hornresp sim.txt generation
+
+## Physical Constraints
+
+The 15" driver requires a minimum box volume of ~28L to physically fit.
+This limits the maximum achievable Qtc to ~0.94. Higher Qtc values (1.0, 1.1)
+would require smaller boxes that cannot accommodate the driver.
+
+## Literature
+
+- Small (1972) - Closed-Box Loudspeaker Systems Part I: Analysis
+- `literature/thiele_small/small_1972_closed_box.md`
 
 ## Notes
 
-- This is a larger 15" driver in a larger sealed box (67.5L vs 31.65L for BC_8NDL51)
-- Lower resonance frequency (59.7 Hz vs 86.1 Hz) due to larger volume and lower Fs
-- Higher Q_ts (0.43 vs 0.37) requires larger box for Butterworth alignment
-- Higher BL (21.2 vs 7.3 T·m) provides more force
-- Same Qtc=0.707 alignment as BC_8NDL51 but with different driver size
-- Excellent test case for validating sealed box theory across different driver sizes
+- All Hornresp input files were generated using `viberesp.hornresp.export.export_to_hornresp()`
+- This ensures driver parameters match exactly between viberesp and Hornresp
+- Qtc values tested range from 0.5 (underdamped) to 0.94 (near critical)
+- Lower Q_ts (0.441) allows for a wider range of alignments
+- Tests validate Small (1972) sealed box theory for a larger driver
+- Non-optimal volumes test the general case (not just Butterworth alignments)

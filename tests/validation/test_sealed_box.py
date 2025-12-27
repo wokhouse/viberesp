@@ -548,3 +548,176 @@ class TestSealedBoxCornerCases:
         print(f"  Fs = {bc_8ndl51_driver.F_s:.1f} Hz")
         print(f"  Fc = {params.Fc:.1f} Hz")
         print(f"  Stiffness factor √(1+α) = {params.Fc/bc_8ndl51_driver.F_s:.3f}")
+
+
+class TestSealedBoxQtcAlignmentsBC8NDL51:
+    """
+    Test different Qtc alignments for BC_8NDL51.
+
+    Validates system parameter calculations across various alignments:
+    - Qtc=0.65 (near Butterworth, larger box)
+    - Qtc=0.8 (slight overdamp)
+    - Qtc=1.0 (critically damped)
+    - Qtc=1.1 (overdamped)
+    - Vb=20L (non-optimal volume)
+
+    Literature:
+    - Small (1972) - Closed-box system parameters
+    """
+
+    @pytest.fixture
+    def bc_8ndl51_driver(self):
+        """Get BC_8NDL51 driver parameters."""
+        return get_bc_8ndl51()
+
+    @pytest.mark.parametrize("qtc,vb_liters,expected_fc,alignment", [
+        (0.65, 87.83, 79.2, "Near Butterworth"),
+        (0.8, 14.66, 97.5, "Slight overdamp"),
+        (1.0, 6.16, 121.8, "Critical damped"),
+        (1.1, 4.60, 134.0, "Overdamped"),
+    ])
+    def test_qtc_system_parameters(
+        self, bc_8ndl51_driver, qtc, vb_liters, expected_fc, alignment
+    ):
+        """
+        Validate Fc and Qtc calculations for different alignments.
+
+        Small (1972), Eq. for system resonance and Q.
+        literature/thiele_small/small_1972_closed_box.md
+
+        Tolerance: <0.5 Hz for Fc, <0.02 for Qtc
+        """
+        Vb_m3 = vb_liters / 1000.0
+        params = calculate_sealed_box_system_parameters(bc_8ndl51_driver, Vb_m3)
+
+        # Check Fc within 0.5 Hz
+        assert abs(params.Fc - expected_fc) < 0.5, \
+            f"Fc mismatch for Qtc={qtc}: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
+
+        # Check Qtc within 0.02
+        assert abs(params.Qtc - qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc:.3f} vs expected {qtc:.3f}"
+
+        print(f"\\nBC_8NDL51 {alignment} (Qtc={qtc:.2f}):")
+        print(f"  Vb = {params.Vb*1000:.2f} L")
+        print(f"  α = Vas/Vb = {params.alpha:.3f}")
+        print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
+        print(f"  Qtc = {params.Qtc:.3f} (expected {qtc:.3f})")
+
+    def test_non_optimal_vb20L(self, bc_8ndl51_driver):
+        """
+        Test non-optimal box volume (Vb=20L, between Qtc=0.8 and 1.0).
+
+        Validates that the formulas work correctly for arbitrary box volumes,
+        not just optimal alignments.
+        """
+        Vb_m3 = 20.0 / 1000.0
+        params = calculate_sealed_box_system_parameters(bc_8ndl51_driver, Vb_m3)
+
+        # Expected Qtc around 0.755 for this volume
+        expected_qtc = 0.755
+        expected_fc = 92.0
+
+        assert abs(params.Qtc - expected_qtc) < 0.01, \
+            f"Qtc mismatch for Vb=20L: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Fc - expected_fc) < 0.5, \
+            f"Fc mismatch for Vb=20L: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
+
+        print(f"\\nBC_8NDL51 Non-optimal Vb=20L:")
+        print(f"  Vb = {params.Vb*1000:.2f} L")
+        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
+
+
+class TestSealedBoxQtcAlignmentsBC15PS100:
+    """
+    Test different Qtc alignments for BC_15PS100.
+
+    Validates system parameter calculations across various alignments:
+    - Qtc=0.5 (underdamped, very large box)
+    - Qtc=0.97 (near critical, minimum practical volume)
+    - Vb=50L, Vb=80L (non-optimal volumes)
+
+    Note: Qtc=1.0 and Qtc=1.1 require boxes <28L which are too small to
+    physically fit the 15" driver, so we use Qtc=0.97 and non-optimal volumes.
+
+    Literature:
+    - Small (1972) - Closed-box system parameters
+    """
+
+    @pytest.fixture
+    def bc_15ps100_driver(self):
+        """Get BC_15PS100 driver parameters."""
+        return get_bc_15ps100()
+
+    def test_qtc0_5_system_parameters(self, bc_15ps100_driver):
+        """
+        Validate Qtc=0.5 (underdamped) alignment.
+
+        This is a very large box that provides very low Qtc.
+        """
+        Vb_m3 = 373.30 / 1000.0
+        params = calculate_sealed_box_system_parameters(bc_15ps100_driver, Vb_m3)
+
+        expected_qtc = 0.5
+        expected_fc = 42.2
+
+        assert abs(params.Qtc - expected_qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Fc - expected_fc) < 0.5, \
+            f"Fc mismatch: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
+
+        print(f"\\nBC_15PS100 Qtc=0.5 (Underdamped):")
+        print(f"  Vb = {params.Vb*1000:.2f} L (large box)")
+        print(f"  α = Vas/Vb = {params.alpha:.3f}")
+        print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
+        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+
+    def test_qtc0_97_system_parameters(self, bc_15ps100_driver):
+        """
+        Validate Qtc=0.94 (near critical) alignment.
+
+        This is close to the minimum practical volume for a 15" driver.
+        """
+        Vb_m3 = 30.0 / 1000.0
+        params = calculate_sealed_box_system_parameters(bc_15ps100_driver, Vb_m3)
+
+        expected_qtc = 0.938
+        expected_fc = 79.3
+
+        assert abs(params.Qtc - expected_qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Fc - expected_fc) < 0.5, \
+            f"Fc mismatch: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
+
+        print(f"\\nBC_15PS100 Qtc=0.94 (Near Critical):")
+        print(f"  Vb = {params.Vb*1000:.2f} L (min practical)")
+        print(f"  α = Vas/Vb = {params.alpha:.3f}")
+        print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
+        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+
+    @pytest.mark.parametrize("vb_liters,expected_qtc,expected_fc", [
+        (50.0, 0.773, 65.9),
+        (80.0, 0.672, 56.8),
+    ])
+    def test_non_optimal_volumes(
+        self, bc_15ps100_driver, vb_liters, expected_qtc, expected_fc
+    ):
+        """
+        Test non-optimal box volumes.
+
+        Validates that formulas work correctly for arbitrary volumes.
+        """
+        Vb_m3 = vb_liters / 1000.0
+        params = calculate_sealed_box_system_parameters(bc_15ps100_driver, Vb_m3)
+
+        assert abs(params.Qtc - expected_qtc) < 0.01, \
+            f"Qtc mismatch for Vb={vb_liters}L: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Fc - expected_fc) < 0.5, \
+            f"Fc mismatch for Vb={vb_liters}L: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
+
+        print(f"\\nBC_15PS100 Non-optimal Vb={vb_liters}L:")
+        print(f"  Vb = {params.Vb*1000:.2f} L")
+        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
+
