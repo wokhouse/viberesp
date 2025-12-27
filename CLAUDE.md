@@ -229,6 +229,126 @@ export_to_hornresp(
 - Hornresp User Manual - File format specification
 - `src/viberesp/hornresp/export.py` - Implementation with format details
 
+## File Organization Guidelines
+
+### CRITICAL: No Files in Top-Level Directory (TLD)
+
+**DO NOT create files in the project root directory.** All files must be organized in appropriate subdirectories.
+
+### Directory Structure for Documentation and Research
+
+```
+viberesp/
+├── docs/                    # Documentation (git tracked)
+│   ├── validation/          # Validation investigation reports
+│   │   ├── sealed_box_spl_investigation.md
+│   │   ├── sealed_box_spl_research_summary.md
+│   │   └── ported_box_impedance_fix.md
+│   └── [other docs]
+├── tasks/                   # Active work items (git tracked)
+│   ├── research_validation_plan.md
+│   ├── driver_validation_status.md
+│   └── [other active tasks]
+├── tests/                   # Test infrastructure (git tracked)
+│   └── validation/
+│       └── drivers/
+│           └── [driver_name]/
+│               └── [enclosure_type]/
+│                   ├── README.md
+│                   ├── VALIDATION_ISSUE.md
+│                   └── sim.txt
+└── [only CLAUDE.md, README.md, ROADMAP.md, pyproject.toml in TLD]
+```
+
+### File Placement Rules
+
+**Documentation (permanent reference material):**
+- Validation investigation results → `docs/validation/`
+- Technical specifications → `docs/`
+- User guides → `docs/`
+
+**Active Tasks (work-in-progress):**
+- Research plans → `tasks/`
+- Investigation notes → `tasks/`
+- Status tracking → `tasks/`
+- Temporary analysis scripts → `tasks/`
+
+**Test Data:**
+- Hornresp simulation results → `tests/validation/drivers/{driver}/{enclosure}/`
+- Test configuration → `tests/validation/drivers/{driver}/{enclosure}/`
+- Validation status → `tests/validation/drivers/{driver}/{enclosure}/VALIDATION_ISSUE.md`
+
+**Literature:**
+- Academic papers → `literature/{category}/`
+- Reference materials → `literature/{category}/`
+
+**Code:**
+- Source code → `src/viberesp/`
+- Tests → `tests/`
+- Examples → `examples/` (if it exists)
+
+### What Belongs in TLD (Top-Level Directory)
+
+**ONLY these files should be in the project root:**
+- `CLAUDE.md` - Project-specific instructions (this file)
+- `README.md` - Project overview and setup
+- `ROADMAP.md` - Development roadmap
+- `pyproject.toml` - Python project configuration
+- `.gitignore` - Git ignore rules
+- `LICENSE` - License file
+- Standard config files (`.github/`, etc.)
+
+**NOT in TLD:**
+- ❌ Investigation notes (→ `tasks/` or `docs/validation/`)
+- ❌ Research summaries (→ `tasks/` or `docs/validation/`)
+- ❌ Status reports (→ `tasks/`)
+- ❌ Temporary analysis scripts (→ `tasks/`)
+- ❌ Test data (→ `tests/`)
+
+### Tracked vs Untracked Files
+
+**Git Tracked (project files):**
+- All documentation in `docs/`
+- Active tasks in `tasks/`
+- Test data in `tests/`
+- Source code in `src/`
+- Literature reference files in `literature/`
+
+**Git Untracked (personal/temporary):**
+- Python cache in `/tmp/` or `/private/tmp/`
+- Session summaries in `/tmp/`
+- Personal notes outside project tree
+- Build artifacts (handled by `.gitignore`)
+- Virtual environments (`.venv/`)
+
+**When to commit:**
+- Investigation results → Yes (to `docs/` or `tasks/`)
+- Completed research → Yes (to `docs/validation/`)
+- Working scripts → Yes (to `tasks/`)
+- `/tmp/` files → No (temporary workspace)
+
+### Examples
+
+**✅ CORRECT:**
+```bash
+# Create investigation report in docs/
+docs/validation/sealed_box_spl_investigation.md
+
+# Create active research plan in tasks/
+tasks/research_validation_plan.md
+
+# Create temporary script for debugging
+tasks/diagnose_spl_rolloff.py
+```
+
+**❌ WRONG:**
+```bash
+# DON'T create in TLD
+sealed_box_investigation.md  # Wrong! → docs/validation/
+research_plan.md             # Wrong! → tasks/
+debug_script.py              # Wrong! → tasks/
+```
+
 ## Code Structure Conventions
 
 ### Directory Organization
@@ -462,6 +582,126 @@ The 2× multiplier on radiation mass matches Hornresp's empirical methodology
 2. **Cite your sources** - Even if uncertain, cite the literature you're using
 3. **Validate against Hornresp** - When viberesp and Hornresp disagree, investigate why
 4. **Ask for clarification** - It's better to ask than to implement without citations
+
+## Using an Online Research Agent
+
+For difficult questions requiring external research, you can delegate to an online research agent. This is particularly useful for:
+- Complex acoustic theory not in the existing literature
+- Finding alternative approaches or implementations
+- Researching specific libraries, frameworks, or tools
+- Investigating edge cases or advanced topics
+
+### When to Use a Research Agent
+
+**Good candidates:**
+- "How does pymoo handle constrained optimization for acoustic parameters?"
+- "Find modern approaches to calculating horn throat impedance"
+- "What are the best practices for validating physics simulations?"
+- "Research numerical methods for solving transmission line equations"
+
+**Not suitable for:**
+- Questions about local code structure (use Explore agent instead)
+- Simple documentation lookups (use Context7 instead)
+- File searching or code navigation (use Glob/Grep instead)
+
+### Research Agent Workflow
+
+**Critical constraint:** The online research agent **does NOT have access to the local codebase**. You must provide relevant context.
+
+**Step 1: Prepare the research prompt**
+
+Use the following template to generate a prompt for the research agent:
+
+```
+RESEARCH OBJECTIVE:
+[Clearly state what you need to find out]
+
+SUCCESS CRITERIA:
+[What would a successful answer look like? What specific information do you need?]
+
+CONTEXT:
+[Briefly explain the viberesp project context - it's a horn simulation tool, validates against Hornresp, etc.]
+
+RELEVANT CODE/DETAILS:
+[Paste relevant code snippets, function signatures, or error messages here]
+
+CONSTRAINTS:
+- Focus on Python-based solutions
+- Prefer approaches with citations to acoustic literature
+- Numerical accuracy is critical (validated against Hornresp)
+- Avoid over-engineering - keep solutions minimal
+
+DELIVERABLE:
+[Specifically what you want the agent to provide: explanation, code example, references, etc.]
+```
+
+**Step 2: Generate and copy the prompt**
+
+Generate a well-structured prompt following the template above and use `pbcopy` to copy it for the user:
+
+```bash
+echo "YOUR_RESEARCH_PROMPT_HERE" | pbcopy
+```
+
+**Step 3: Inform the user**
+
+Tell the user the prompt has been copied and instruct them to paste it to the online research agent.
+
+### Example Research Prompt
+
+Here's an example for researching numerical optimization:
+
+```
+RESEARCH OBJECTIVE:
+Find the best approach for optimizing horn parameters (flare constant, length, mouth area) to maximize efficiency at a target frequency range.
+
+SUCCESS CRITERIA:
+- Recommend a Python library for constrained optimization
+- Provide code example showing how to set up the optimization problem
+- Explain how to handle constraints (e.g., minimum horn length, maximum mouth size)
+- Reference any acoustic literature on horn optimization
+
+CONTEXT:
+Viberesp is a Python CLI tool for horn-loaded enclosure design. It calculates horn impedance and frequency response from first principles, validated against Hornresp. We're adding optimization capabilities to help users find optimal horn parameters.
+
+RELEVANT CODE/DETAILS:
+We have these functions already implemented:
+- `calculate_horn_efficiency(flare_constant, length, mouth_area, frequency)` -> returns efficiency (0-1)
+- `calculate_horn_cutoff(flare_constant)` -> returns cutoff frequency (Hz)
+- Driver Thiele-Small parameters available via `driver.F_s`, `driver.V_as`, etc.
+
+Target frequency range: 40-80 Hz (bass horn)
+
+CONSTRAINTS:
+- Must use Python libraries (preferably already common in scientific computing)
+- Solution must be numerically accurate - this drives physical horn designs
+- Need to handle both continuous and discrete parameters
+- Should provide convergence diagnostics
+
+DELIVERABLE:
+1. Recommended library with rationale
+2. Code example showing objective function and constraint setup
+3. Explanation of how to validate the optimization results
+4. Any acoustic literature references on horn parameter optimization
+```
+
+### After Research
+
+When the research agent provides results:
+1. **Evaluate the solution** - Check if it meets the success criteria
+2. **Verify citations** - Ensure any literature references are accurate
+3. **Test locally** - Create a minimal test case before full implementation
+4. **Document** - Add proper citations to CLAUDE.md or function docstrings
+5. **Integrate** - Implement following the project's coding conventions
+
+### Research Agent Output Format
+
+The research agent should provide:
+- **Direct answer** to your question
+- **Code examples** (if applicable)
+- **References** to literature or documentation
+- **Recommendations** with rationale
+- **Caveats or limitations** of the suggested approach
 
 ## Resources
 

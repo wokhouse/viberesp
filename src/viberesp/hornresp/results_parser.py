@@ -90,6 +90,71 @@ class HornrespSimulationResult:
         }
 
 
+def _validate_parsed_data(
+    frequency: np.ndarray,
+    ze_ohms: np.ndarray,
+    spl_db: np.ndarray,
+    filepath: Path,
+) -> None:
+    """
+    Validate that parsed Hornresp data looks reasonable.
+
+    Performs sanity checks to catch parsing errors early:
+    - Frequency should be positive and monotonically increasing
+    - Impedance should be > DC resistance and < 1000 Ω
+    - SPL should be in reasonable range (40-120 dB)
+
+    Args:
+        frequency: Parsed frequency array (Hz)
+        ze_ohms: Parsed electrical impedance (Ω)
+        spl_db: Parsed SPL values (dB)
+        filepath: Path to file (for error messages)
+
+    Raises:
+        ValueError: If data fails validation checks
+    """
+    # Check frequency range
+    if np.any(frequency <= 0):
+        raise ValueError(
+            f"Invalid frequency data in {filepath}: "
+            f"frequency must be positive, got min={np.min(frequency)}"
+        )
+
+    if np.any(frequency[1:] <= frequency[:-1]):
+        raise ValueError(
+            f"Invalid frequency data in {filepath}: "
+            f"frequency must be monotonically increasing"
+        )
+
+    # Check impedance range (should be > Re and < 1000 Ω for typical drivers)
+    if np.any(ze_ohms <= 0):
+        raise ValueError(
+            f"Invalid impedance data in {filepath}: "
+            f"impedance must be positive, got min={np.min(ze_ohms)} Ω"
+        )
+
+    if np.any(ze_ohms > 1000):
+        # This might indicate reading wrong column (e.g., reading SPL dB instead of Ze)
+        raise ValueError(
+            f"Invalid impedance data in {filepath}: "
+            f"impedance > 1000 Ω suggests parsing error. "
+            f"Max Ze={np.max(ze_ohms)} Ω. "
+            f"Check if columns are aligned correctly."
+        )
+
+    # Check SPL range (should be reasonable for typical systems at 1m, 2.83V)
+    # Sealed boxes below resonance can have very low SPL (< 40 dB)
+    # High-efficiency horns can have SPL > 120 dB
+    # Only flag clearly unreasonable values
+    if np.any(spl_db < 0) or np.any(spl_db > 150):
+        raise ValueError(
+            f"Invalid SPL data in {filepath}: "
+            f"SPL out of reasonable range [0, 150] dB. "
+            f"Min={np.min(spl_db):.1f} dB, Max={np.max(spl_db):.1f} dB. "
+            f"This may indicate reading wrong column (SPL is column 5, index 4)."
+        )
+
+
 def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
     """
     Load Hornresp simulation results from _sim.txt file.
@@ -97,17 +162,39 @@ def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
     Hornresp outputs simulation results in a tab-separated format with
     the following columns:
 
-    Freq(hertz) Ra(norm) Xa(norm) Za(norm) SPL(dB) Ze(ohms) Xd(mm)
-    WPhase(deg) UPhase(deg) CPhase(deg) Delay(msec) Efficiency(%)
-    Ein(volts) Pin(watts) Iin(amps) ZePhase(deg)
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ Hornresp _sim.txt File Format (tab-separated, 16 columns)      │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Col │ Index │ Name            │ Unit    │ Description           │
+    ├─────┼───────┼─────────────────┼─────────┼───────────────────────┤
+    │  1  │   0   │ Freq            │ hertz   │ Frequency             │
+    │  2  │   1   │ Ra              │ norm    │ Radiation resistance │
+    │  3  │   2   │ Xa              │ norm    │ Radiation reactance  │
+    │  4  │   3   │ Za              │ norm    │ Rad. impedance mag.  │
+    │  5  │   4   │ SPL             │ dB      │ Sound pressure level │
+    │  6  │   5   │ Ze              │ ohms    │ Electrical impedance │
+    │  7  │   6   │ Xd              │ mm      │ Diaphragm displac.   │
+    │  8  │   7   │ WPhase          │ deg     │ W phase angle        │
+    │  9  │   8   │ UPhase          │ deg     │ U phase angle        │
+    │ 10  │   9   │ CPhase          │ deg     │ C phase angle        │
+    │ 11  │  10   │ Delay           │ msec    │ Time delay           │
+    │ 12  │  11   │ Efficiency      │ %       │ Acoustic efficiency   │
+    │ 13  │  12   │ Ein             │ volts   │ Input voltage        │
+    │ 14  │  13   │ Pin             │ watts   │ Input power          │
+    │ 15  │  14   │ Iin             │ amps    │ Input current        │
+    │ 16  │  15   │ ZePhase         │ deg     │ Ze phase angle       │
+    └─────┴───────┴─────────────────┴─────────┴───────────────────────┘
 
-    Note: The header shows "Xd (mm)" with trailing space, which creates
-    a visual gap but the actual data has 16 columns.
+    IMPORTANT: Column numbers above are 1-indexed (as shown in file).
+    Array indices below are 0-indexed (Python standard).
+
+    Example header line:
+    Freq (hertz)	Ra (norm)	Xa (norm)	Za (norm)	SPL (dB)	Ze (ohms)	Xd (mm) 	WPhase (deg)	UPhase (deg)	CPhase (deg)	Delay (msec)	Efficiency (%)	Ein (volts)	Pin (watts)	Iin (amps)	ZePhase (deg)
 
     The file has:
-    - Line 1: Header with column names
+    - Line 1: Header with column names (tab-separated)
     - Line 2: Blank
-    - Line 3+: Data rows
+    - Line 3+: Data rows (tab-separated, 16 columns)
 
     Args:
         filepath: Path to _sim.txt file
@@ -122,9 +209,11 @@ def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
     Examples:
         >>> result = load_hornresp_sim_file("bc_8ndl51_inf_sim.txt")
         >>> result.frequency[0]
-        10.0  # First frequency point
+        10.0  # First frequency point (column 1, index 0)
         >>> result.ze_ohms[100]
-        42.5  # Electrical impedance at 100th point
+        42.5  # Electrical impedance at 100th point (column 6, index 5)
+        >>> result.spl_db[50]
+        85.3  # SPL at 50th point (column 5, index 4)
         >>> len(result)
         535  # Number of frequency points
 
@@ -134,6 +223,15 @@ def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
         10.0
         >>> point['ze_ohms']
         5.39...
+
+    Validation:
+        - Verifies file has exactly 16 columns
+        - Verifies all data can be parsed as floats
+        - Provides helpful error messages with line numbers
+
+    Literature:
+        - Hornresp manual: http://www.hornresp.net/
+        - File format specification in Hornresp help documentation
     """
     filepath = Path(filepath)
 
@@ -188,7 +286,8 @@ def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
     # Convert to numpy arrays (transpose so each column is an array)
     data_array = np.array(data).T
 
-    # Extract columns
+    # Extract columns (0-indexed)
+    # See table in docstring for column mapping
     frequency = data_array[0]
     ra_norm = data_array[1]
     xa_norm = data_array[2]
@@ -205,6 +304,9 @@ def load_hornresp_sim_file(filepath: str | Path) -> HornrespSimulationResult:
     pin_watts = data_array[13]
     iin_amps = data_array[14]
     zephase_deg = data_array[15]
+
+    # Validate parsed data looks reasonable
+    _validate_parsed_data(frequency, ze_ohms, spl_db, filepath)
 
     # Extract metadata from filename
     metadata = {
