@@ -17,7 +17,7 @@ Viberesp is a CLI tool for simulating horn-loaded loudspeaker enclosures using a
 
 ## Project Status
 
-**Phase 7.2 Complete** - Viberesp has a fully functional optimization system for sealed and ported enclosures. Horn simulation is in development.
+**Phase 7.4 Complete** - Viberesp has fully functional optimization and parameter sweep tools. Horn simulation is in development.
 
 ### ✅ Implemented (Phase 7)
 - Multi-objective optimization (NSGA-II)
@@ -27,12 +27,13 @@ Viberesp is a CLI tool for simulating horn-loaded loudspeaker enclosures using a
 - Agent-friendly Python API
 - Constraint handling (physical and performance)
 - Pareto front analysis
+- **Parameter sweep with sensitivity analysis** (NEW!)
+- **Automatic design recommendations** (optimal ranges, trends, diminishing returns)
 
 ### 🔄 In Development
 - Horn simulation engine (exponential, hyperbolic, conical)
 - Hornresp validation integration
 - CLI interface for human users
-- Parameter sweep tools
 
 ### ⏳ Planned
 - Folded horn support
@@ -267,7 +268,64 @@ for design in result.best_designs:
         print(f"Vb={Vb:.1f}L gives F3={design['objectives']['f3']:.1f}Hz")
 ```
 
-### 4. Ported Box Optimization
+### 4. Parameter Sweep (Design Space Exploration)
+
+```python
+# Sweep a parameter to see how it affects performance
+sweep = assistant.sweep_parameter(
+    driver_name="BC_12NDL76",
+    enclosure_type="sealed",
+    parameter="Vb",
+    param_min=0.010,  # 10L
+    param_max=0.050,  # 50L
+    steps=50
+)
+
+# Access sweep results
+print(f"Swept: {sweep.parameter_swept}")
+print(f"Points: {len(sweep.parameter_values)}")
+
+# Find best F3
+import numpy as np
+best_idx = np.nanargmin(sweep.results["F3"])
+best_f3 = sweep.results["F3"][best_idx]
+best_vb = sweep.parameter_values[best_idx] * 1000
+print(f"Best F3: {best_f3:.1f} Hz at Vb={best_vb:.1f}L")
+
+# Check sensitivity
+print(f"F3 sensitivity: {sweep.sensitivity_analysis['f3_sensitivity']:.2f}")
+print(f"Trend: {sweep.sensitivity_analysis['trend_description']}")
+
+# View recommendations
+for rec in sweep.recommendations:
+    print(f"  • {rec}")
+```
+
+**What Parameter Sweep Provides:**
+
+- **Complete visibility**: See entire relationship between parameter and performance
+- **Sensitivity analysis**: Understand which objectives are most affected by parameter changes
+- **Optimal ranges**: Identify "good enough" parameter ranges (not just optimal points)
+- **Diminishing returns**: Detect when further increases give minimal benefit
+- **Trend identification**: See if increasing parameter helps or hurts performance
+
+**Sweep vs Optimization:**
+
+```python
+# Use sweep when:
+# - You have 1-2 parameters to explore
+# - You want to understand the physics/relationships
+# - You need to identify "good enough" ranges
+# - You want sensitivity analysis
+
+# Use optimization when:
+# - You have 3+ parameters (ported box with Vb, Fb, port dimensions)
+# - You want the optimal design for multiple objectives
+# - You have complex constraints
+# - You just want the answer, not the exploration
+```
+
+### 5. Ported Box Optimization
 
 ```python
 # Ported box optimization includes tuning frequency (Fb)
@@ -293,7 +351,7 @@ for design in result.best_designs:
     print(f"Vb={Vb:.1f}L, Fb={Fb:.1f}Hz → F3={F3:.1f}Hz")
 ```
 
-### Complete Example: Design Subwoofer
+### 6. Complete Example: Design Subwoofer
 
 ```python
 from viberesp.optimization import DesignAssistant
