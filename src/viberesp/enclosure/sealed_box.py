@@ -21,7 +21,6 @@ import cmath
 from dataclasses import dataclass
 
 from viberesp.driver.parameters import ThieleSmallParameters
-from viberesp.driver.radiation_mass import calculate_resonance_with_radiation_mass_tuned
 from viberesp.driver.radiation_impedance import radiation_impedance_piston
 from viberesp.driver.electrical_impedance import voice_coil_impedance_leach
 from viberesp.simulation.constants import (
@@ -259,18 +258,10 @@ def sealed_box_electrical_impedance(
     # literature/thiele_small/small_1972_closed_box.md
     C_mb = driver.C_ms / (1.0 + alpha)
 
-    # Step 2: Calculate system resonance with 1× radiation mass (front side only)
-    # Use iterative solver with radiation_multiplier=1.0 for sealed box
-    # Small (1972): Fc = Fs × √(1 + α)  (with radiation mass correction)
+    # Step 2: Calculate system resonance
+    # Small (1972): Fc = Fs × √(1 + α)
     # literature/thiele_small/small_1972_closed_box.md
-    Fc, M_ms_enclosed = calculate_resonance_with_radiation_mass_tuned(
-        driver.M_md,
-        C_mb,  # Use box compliance, not driver compliance
-        driver.S_d,
-        radiation_multiplier=1.0,  # Front radiation only (sealed box)
-        air_density=air_density,
-        speed_of_sound=speed_of_sound,
-    )
+    Fc = driver.F_s * math.sqrt(1.0 + alpha)
 
     # Step 3: Calculate radiation impedance for circular piston
     # Beranek (1954), Eq. 5.20: Z_R = ρc·S·[R₁(2ka) + jX₁(2ka)]
@@ -287,7 +278,11 @@ def sealed_box_electrical_impedance(
     # COMSOL (2020), Figure 2: Mechanical equivalent circuit
     # Z_m = R_ms + jωM_ms + 1/(jωC_mb)
     # literature/thiele_small/small_1972_closed_box.md
-    Z_mechanical = driver.R_ms + complex(0, omega * M_ms_enclosed) + \
+    #
+    # IMPORTANT: Use driver.M_ms (includes 2× radiation mass) for sealed box
+    # Research shows sealed boxes need both front and rear air loads
+    # See: sealed_box_spl_investigation.md for details
+    Z_mechanical = driver.R_ms + complex(0, omega * driver.M_ms) + \
                    complex(0, -1 / (omega * C_mb))
 
     # Total mechanical impedance including radiation load
