@@ -138,6 +138,18 @@ def direct_radiator_electrical_impedance(
         The I_active force model significantly improves high-frequency accuracy:
         - Previous error at 20 kHz: ~26 dB
         - New error at 20 kHz: ~6-8 dB (78% improvement)
+
+    Known Limitations:
+        SPL validation fails for 3/4 tested drivers (BC_12NDL76, BC_15DS115, BC_18PZW100)
+        with errors up to 10 dB. This is attributed to:
+        1. Simple voice coil model (lossless inductor) - Hornresp uses lossy inductance
+           models (Leach 2002) that account for eddy currents in the pole piece
+        2. Large drivers (S_d > 500 cm²) have higher sensitivity to resonance frequency
+           mismatch and radiation impedance effects
+        3. Possible cone breakup modes at high frequencies not modeled by T/S parameters
+
+        Future work: Implement Leach (2002) lossy voice coil model for improved high-frequency
+        SPL accuracy. See `voice_coil_model="leach"` parameter for experimental implementation.
     """
     # Validate inputs
     if frequency <= 0:

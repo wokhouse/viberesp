@@ -77,10 +77,19 @@ class ThieleSmallParameters:
         0.19...  # Total Q factor
 
     Note on M_md vs M_ms:
-        M_md is the driver's physical mass (voice coil + diaphragm).
+        M_md is the driver's physical mass (voice coil + diaphragm) only,
+        excluding any air load. This is the value you specify when creating
+        a driver.
+
         M_ms includes radiation mass loading from the air mass that moves
-        with the piston. This is calculated internally using Beranek's
-        radiation impedance theory and matches Hornresp's methodology.
+        with the piston. This is calculated automatically using Beranek's
+        radiation impedance theory.
+
+        Datasheet note: Many manufacturers provide "Mms" which already includes
+        radiation mass. When using datasheet values, you may need to subtract
+        the radiation component (typically 2-4g for 8" drivers, more for larger
+        cones) to obtain M_md. Alternatively, use M_md directly if the datasheet
+        provides "Mmd" or specifies the moving mass without air load.
     """
 
     # Fundamental physical parameters

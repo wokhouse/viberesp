@@ -103,12 +103,14 @@ def calculate_resonance_with_radiation_mass(
     - M_ms = M_md + 2×M_rad(f)
     - M_rad depends on frequency
 
-    The 2× multiplier on radiation mass matches Hornresp's methodology
-    (empirically determined from Hornresp validation data).
+    The 2× radiation mass multiplier accounts for both sides of the infinite
+    baffle: the piston radiates into half-space on the front and rear sides,
+    each contributing equal radiation mass loading. Total: M_rad,total = 2×M_rad.
 
     Literature:
         - Beranek (1954), Eq. 5.20 - Radiation impedance
-        - Hornresp methodology (empirical: 2× radiation mass)
+        - Beranek (1954), Chapter 4 - Piston in infinite baffle (both sides radiate)
+        - Hornresp methodology - 2× radiation mass for infinite baffle
         - literature/horns/beranek_1954.md
 
     Args:
@@ -164,8 +166,8 @@ def calculate_resonance_with_radiation_mass(
         # Calculate radiation mass at this frequency
         M_rad = calculate_radiation_mass(F_s, S_d, air_density, speed_of_sound)
 
-        # Update total mass (Hornresp uses 2× radiation mass)
-        # Empirically determined from Hornresp validation data
+        # Update total mass (2× radiation mass for infinite baffle)
+        # Both front and rear sides radiate, each contributing equal radiation mass
         M_ms = M_md + 2.0 * M_rad
 
     # Final resonance calculation
