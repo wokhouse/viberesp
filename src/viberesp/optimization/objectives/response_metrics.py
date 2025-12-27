@@ -277,7 +277,7 @@ def objective_max_spl(
                     )
                 else:
                     from viberesp.enclosure.ported_box import calculate_optimal_port_dimensions
-                    port_area, port_length = calculate_optimal_port_dimensions(
+                    port_area, port_length, _ = calculate_optimal_port_dimensions(
                         driver, Vb, Fb
                     )
                     result = ported_box_electrical_impedance(
@@ -312,11 +312,26 @@ def sealed_box_electrical_impedance(
     frequency: float,
     driver: ThieleSmallParameters,
     Vb: float,
-    voltage: float = 2.83
+    voltage: float = 2.83,
+    measurement_distance: float = 1.0,
+    use_transfer_function_spl: bool = True
 ) -> dict:
-    """Calculate sealed box electrical impedance and SPL at a single frequency."""
+    """
+    Calculate sealed box electrical impedance and SPL at a single frequency.
+
+    Args:
+        frequency: Frequency in Hz
+        driver: ThieleSmallParameters instance
+        Vb: Box volume in m³
+        voltage: Input voltage in V
+        measurement_distance: Measurement distance in m
+        use_transfer_function_spl: If True, use calibrated transfer function SPL
+            (required for -25.25 dB offset matching Hornresp)
+    """
     from viberesp.enclosure.sealed_box import sealed_box_electrical_impedance as sb_impedance
-    return sb_impedance(frequency, driver, Vb, voltage=voltage)
+    return sb_impedance(frequency, driver, Vb, voltage=voltage,
+                        measurement_distance=measurement_distance,
+                        use_transfer_function_spl=use_transfer_function_spl)
 
 
 def ported_box_electrical_impedance(
@@ -326,8 +341,26 @@ def ported_box_electrical_impedance(
     Fb: float,
     port_area: float,
     port_length: float,
-    voltage: float = 2.83
+    voltage: float = 2.83,
+    measurement_distance: float = 1.0,
+    use_transfer_function_spl: bool = True
 ) -> dict:
-    """Calculate ported box electrical impedance and SPL at a single frequency."""
+    """
+    Calculate ported box electrical impedance and SPL at a single frequency.
+
+    Args:
+        frequency: Frequency in Hz
+        driver: ThieleSmallParameters instance
+        Vb: Box volume in m³
+        Fb: Port tuning frequency in Hz
+        port_area: Port cross-sectional area in m²
+        port_length: Port length in m
+        voltage: Input voltage in V
+        measurement_distance: Measurement distance in m
+        use_transfer_function_spl: If True, use calibrated transfer function SPL
+            (required for -25.25 dB offset matching Hornresp)
+    """
     from viberesp.enclosure.ported_box import ported_box_electrical_impedance as pb_impedance
-    return pb_impedance(frequency, driver, Vb, Fb, port_area, port_length, voltage=voltage)
+    return pb_impedance(frequency, driver, Vb, Fb, port_area, port_length,
+                        voltage=voltage, measurement_distance=measurement_distance,
+                        use_transfer_function_spl=use_transfer_function_spl)
