@@ -1,0 +1,28 @@
+{
+  "target_Qtc": 0.707,
+  "alignment_class": "Butterworth B4 (maximally flat) \u2713",
+  "alignment_description": "Maximally flat amplitude response in the passband. F3 = Fb.",
+  "box_parameters": {
+    "Vb_L": 31.65,
+    "alpha": 0.319,
+    "Fb_Hz": 65.3,
+    "h": 0.871
+  },
+  "system_parameters": {
+    "F3_Hz": 65.3,
+    "Qtc": 0.707
+  },
+  "port_parameters": {
+    "diameter_in": 2.5,
+    "area_cm2": 31.67,
+    "length_cm": 4.29
+  },
+  "literature": "Thiele (1971) - Vented Boxes Part 2, Table 1",
+  "validation_tolerance": {
+    "Fb_Hz": 0.5,
+    "Vb_L": 0.5,
+    "port_length_cm": 0.5,
+    "Ze_magnitude_percent": 5,
+    "Ze_phase_degrees": 10
+  }
+}

@@ -74,11 +74,10 @@ Sd = {self.Sd:.2f}
 Bl = {self.Bl:.2f}
 Cms = {cms_formatted}
 Rms = {self.Rms:.2f}
-Mmd = {self.Mmd:.3f}
-Le = {self.Le:.3f}
+Mmd = {self.Mmd:.2f}
+Le = {self.Le:.2f}
 Re = {self.Re:.2f}
 Nd = {self.Nd}"""
-
 
 def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -> HornrespRecord:
     """
@@ -152,6 +151,9 @@ def export_to_hornresp(
     enclosure_type: str = "infinite_baffle",
     Vb_liters: Optional[float] = None,
     Lrc_cm: Optional[float] = None,
+    Fb_hz: Optional[float] = None,
+    port_area_cm2: Optional[float] = None,
+    port_length_cm: Optional[float] = None,
 ) -> None:
     """
     Export driver parameters to Hornresp input file format.
@@ -161,21 +163,25 @@ def export_to_hornresp(
 
     Literature:
         - Hornresp User Manual - File format specification
-        - Hornresp uses Ang = 0.5 x Pi for sealed box (hemisphere radiation)
+        - Hornresp uses Ang = 0.5 x Pi for sealed/ported box (hemisphere radiation)
         - Hornresp uses Ang = 2.0 x Pi for infinite baffle (full sphere radiation)
         - https://www.diyaudio.com/community/threads/hornresp.119854/ - Lrc parameter
         - https://www.hometheatershack.com/threads/hornresp-for-dum-hmm-everyone.36532/ - Lrc usage
+        - Thiele (1971) - Ported box vent parameters (Ap, Lpt, Fr)
 
     Args:
         driver: ThieleSmallParameters instance in SI units
         driver_name: Name/identifier for the driver
         output_path: Path to output .txt file
         comment: Optional comment/description for the file
-        enclosure_type: "infinite_baffle" or "sealed_box"
-        Vb_liters: Box volume in liters (required for sealed_box)
+        enclosure_type: "infinite_baffle", "sealed_box", or "ported_box"
+        Vb_liters: Box volume in liters (required for sealed_box and ported_box)
         Lrc_cm: Rear chamber depth in cm (optional, auto-calculated if None)
                 If not provided, calculated from Vb assuming cube shape: Lrc = (Vb)^(1/3)
-                Hornresp requires Lrc > 0 for sealed boxes (cannot be zero)
+                Hornresp requires Lrc > 0 for sealed/ported boxes (cannot be zero)
+        Fb_hz: Port tuning frequency in Hz (required for ported_box)
+        port_area_cm2: Port cross-sectional area in cm² (required for ported_box)
+        port_length_cm: Port physical length in cm (required for ported_box)
 
     Raises:
         ValueError: If parameters are outside Hornresp valid ranges
@@ -194,6 +200,13 @@ def export_to_hornresp(
         ...     driver, "BC_12NDL76", "bc_12ndl76_sealed_50L.txt",
         ...     enclosure_type="sealed_box", Vb_liters=50.0
         ... )
+        >>>
+        >>> # Ported box export
+        >>> export_to_hornresp(
+        ...     driver, "BC_12NDL76", "bc_12ndl76_ported_80L_fb30hz.txt",
+        ...     enclosure_type="ported_box", Vb_liters=80.0, Fb_hz=30.0,
+        ...     port_area_cm2=30.0, port_length_cm=15.0
+        ... )
 
     Validation:
         Exported files should be directly importable into Hornresp.
@@ -206,9 +219,13 @@ def export_to_hornresp(
     # Set radiation angle based on enclosure type
     if enclosure_type == "sealed_box":
         ang_value = "0.5"  # Hemisphere (front radiation only)
+        cir_value = "0.00"
         if Vb_liters is None:
             raise ValueError("Vb_liters must be specified for sealed_box enclosure")
         vrc_value = Vb_liters
+        fr_value = 0.0  # No port tuning for sealed box
+        ap_value = None
+        lpt_value = None
 
         # Calculate or use provided Lrc (rear chamber depth in cm)
         # Hornresp requires Lrc > 0 for sealed boxes (cannot be zero)
@@ -254,12 +271,112 @@ def export_to_hornresp(
 
         if lrc_value <= 0:
             raise ValueError(f"Lrc must be > 0 for sealed boxes, got {lrc_value}")
+
+        # No vent parameters for sealed box
+        tal_format = "Tal = 0.00"
+    elif enclosure_type == "ported_box":
+        ang_value = "2.0"  # Full sphere for ported boxes (Hornresp convention)
+        cir_value = "-200.00"
+        if Vb_liters is None:
+            raise ValueError("Vb_liters must be specified for ported_box enclosure")
+        if Fb_hz is None:
+            raise ValueError("Fb_hz must be specified for ported_box enclosure")
+        if port_area_cm2 is None:
+            raise ValueError("port_area_cm2 must be specified for ported_box enclosure")
+        if port_length_cm is None:
+            raise ValueError("port_length_cm must be specified for ported_box enclosure")
+
+        vrc_value = Vb_liters
+        ap_value = port_area_cm2
+        lpt_value = port_length_cm
+        fr_value = 0.0  # Not used for ported boxes in Hornresp
+
+        # Calculate or use provided Lrc (rear chamber depth in cm)
+        # Same physical constraints as sealed box
+        if Lrc_cm is None:
+            # Vb is in liters, convert to cm³
+            vb_cm3 = Vb_liters * 1000.0
+
+            # Calculate physical constraints
+            piston_radius_cm = math.sqrt(driver.S_d / math.pi) * 100.0
+            piston_area_cm2 = driver.S_d * 10000.0
+
+            # Constraint 1: Minimum depth for magnet structure clearance
+            lrc_min = 2.0 * piston_radius_cm
+
+            # Constraint 2: Maximum depth for driver to fit through opening
+            lrc_max = vb_cm3 / piston_area_cm2
+
+            # Constraint 3: Port must fit inside box
+            # Port diameter should be less than half the box dimension
+            # Assuming cube proportions: dimension = vb_cm3^(1/3)
+            # Port diameter: d_port = 2 × sqrt(port_area/π)
+            port_diameter_cm = 2.0 * math.sqrt(port_area_cm2 / math.pi)
+            box_dimension_cm = vb_cm3 ** (1.0/3.0)
+            if port_diameter_cm >= box_dimension_cm / 2.0:
+                raise ValueError(
+                    f"Port diameter {port_diameter_cm:.1f}cm is too large for box. "
+                    f"Box dimension: {box_dimension_cm:.1f}cm\n"
+                    f"  - Port diameter should be < {box_dimension_cm/2:.1f}cm "
+                    f"(half box dimension)\n"
+                    f"  - Increase box volume or decrease port diameter"
+                )
+
+            # Check if box is physically realizable
+            if lrc_min > lrc_max + 0.1:
+                min_vb_liters = (lrc_min * piston_area_cm2) / 1000.0
+                raise ValueError(
+                    f"Box volume {Vb_liters:.1f}L is too small for driver. "
+                    f"Minimum volume to fit driver: {min_vb_liters:.1f}L\n"
+                    f"  - Piston diameter: {2*piston_radius_cm:.1f} cm\n"
+                    f"  - Piston area: {piston_area_cm2:.0f} cm²\n"
+                    f"  - Min depth for magnet: {lrc_min:.1f} cm\n"
+                    f"  - Max depth for fit: {lrc_max:.1f} cm"
+                )
+
+            # Cube-shaped chamber
+            lrc_cube = vb_cm3 ** (1.0/3.0)
+
+            # Use cube depth, clamped to valid range
+            lrc_value = max(lrc_min, min(lrc_cube, lrc_max))
+        else:
+            lrc_value = Lrc_cm
+
+        if lrc_value <= 0:
+            raise ValueError(f"Lrc must be > 0 for ported boxes, got {lrc_value}")
+
+        # Validate port parameters
+        if port_area_cm2 <= 0:
+            raise ValueError(f"Port area must be > 0, got {port_area_cm2} cm²")
+        if port_length_cm <= 0:
+            raise ValueError(f"Port length must be > 0, got {port_length_cm} cm")
+
+        # Check if port fits in box (length should be less than 1.5 × box depth)
+        if port_length_cm > 1.5 * lrc_value:
+            raise ValueError(
+                f"Port length {port_length_cm:.1f}cm is too long for box. "
+                f"Rear chamber depth: {lrc_value:.1f}cm\n"
+                f"  - Port length should be < {1.5 * lrc_value:.1f}cm "
+                f"(1.5 × chamber depth)\n"
+                f"  - Increase box volume or decrease port length"
+            )
+
+        # Ported box format: Ap and Lpt go in CHAMBER section, no separate vent section
+        tal_format = "Tal = -0"
     elif enclosure_type == "infinite_baffle":
         ang_value = "2.0"  # Full sphere (both sides radiate)
+        cir_value = "0.00"
         vrc_value = 0.0
         lrc_value = 0.0
+        fr_value = 0.0
+        ap_value = None
+        lpt_value = None
+        tal_format = "Tal = 0.00"
     else:
-        raise ValueError(f"Unknown enclosure_type: {enclosure_type}. Use 'infinite_baffle' or 'sealed_box'")
+        raise ValueError(
+            f"Unknown enclosure_type: {enclosure_type}. "
+            f"Use 'infinite_baffle', 'sealed_box', or 'ported_box'"
+        )
 
     # Generate Hornresp file content
     comment_text = comment or f"{driver_name} driver parameters exported from viberesp"
@@ -267,6 +384,30 @@ def export_to_hornresp(
     # Generate unique ID (use hash of driver name)
     id_hash = abs(hash(driver_name)) % 100000
     id_value = f"{id_hash / 100:.2f}"
+
+    # Build chamber section based on enclosure type
+    # Ported boxes: Vrc, Lrc, Ap, Lpt, Vtc, Atc (no Fr, no Tal)
+    # Sealed boxes: Vrc, Lrc, Fr, Tal, Vtc, Atc
+    # Infinite baffle: Vrc, Lrc, Fr, Tal, Vtc, Atc
+    if enclosure_type == "ported_box":
+        chamber_section = f"""|CHAMBER PARAMETER VALUES:
+
+Vrc = {vrc_value:.2f}
+Lrc = {lrc_value:.2f}
+Ap = {ap_value:.2f}
+Lpt = {lpt_value:.2f}
+Vtc = 0.00
+Atc = 0.00"""
+    else:
+        # sealed_box and infinite_baffle
+        chamber_section = f"""|CHAMBER PARAMETER VALUES:
+
+Vrc = {vrc_value:.2f}
+Lrc = {lrc_value:.2f}
+Fr = {fr_value:.2f}
+{tal_format}
+Vtc = 0.00
+Atc = 0.00"""
 
     content = f"""ID = {id_value}
 
@@ -277,7 +418,7 @@ Comment = {comment_text}
 Ang = {ang_value} x Pi
 Eg = 2.83
 Rg = 0.00
-Cir = 0.00
+Cir = {cir_value}
 
 |HORN PARAMETER VALUES:
 
@@ -317,14 +458,7 @@ Ams = 0.00
 
 Added Mass = 0.00
 
-|CHAMBER PARAMETER VALUES:
-
-Vrc = {vrc_value:.2f}
-Lrc = {lrc_value:.2f}
-Fr = 0.00
-Tal = 0.00
-Vtc = 0.00
-Atc = 0.00
+{chamber_section}
 
 Acoustic Path Length = 0.0
 
@@ -345,10 +479,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 0.00
-Tal2 = 0.00
-Tal3 = 0.00
-Tal4 = 0.00
+Tal1 = -0
+Tal2 = -0
+Tal3 = -0
+Tal4 = -0
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 

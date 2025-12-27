@@ -1,13 +1,13 @@
-ID = 451.55
+ID = 845.85
 
-Comment = BC_15DS115 driver parameters exported from viberesp
+Comment = BC_8NDL51 ported box B4 alignment Vb31.6L Fb65.3Hz 2.5in port
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
 Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
-Cir = 0.00
+Cir = -200.00
 
 |HORN PARAMETER VALUES:
 
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 855.00
-Bl = 38.70
-Cms = 2.50E-04
-Rms = 10.15
-Mmd = 64.860
-Le = 4.500
-Re = 4.90
+Sd = 220.00
+Bl = 7.30
+Cms = 1.50E-04
+Rms = 2.44
+Mmd = 26.29
+Le = 0.15
+Re = 2.60
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.00
-Lrc = 0.00
-Fr = 0.00
-Tal = 0.00
+Vrc = 31.65
+Lrc = 31.63
+Ap = 31.67
+Lpt = 4.29
 Vtc = 0.00
 Atc = 0.00
 
@@ -84,10 +84,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 0.00
-Tal2 = 0.00
-Tal3 = 0.00
-Tal4 = 0.00
+Tal1 = -0
+Tal2 = -0
+Tal3 = -0
+Tal4 = -0
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 
