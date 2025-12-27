@@ -1,10 +1,10 @@
-ID = 975.41
+ID = 449.12
 
-Comment = BC_12NDL76 - 53.0g Mms, 20.1Tm BL, 1.00mH Le, 5.3ohm Re
+Comment = Qtc=0.707 alignment - Butterworth (maximally flat) ✓
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.0 x Pi
+Ang = 0.5 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -13,12 +13,12 @@ Cir = 0.00
 
 S1 = 0.00
 S2 = 0.00
-Exp = 0.00
+L12 = 0.00
 F12 = 0.00
 S2 = 0.00
 S3 = 0.00
-Exp = 0.00
-AT = 0.00
+L23 = 0.00
+F23 = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 522.00
-Bl = 20.10
-Cms = 1.90E-04
-Rms = 4.00
-Mmd = 53.000
-Le = 1.000
-Re = 5.30
+Sd = 220.00
+Bl = 7.30
+Cms = 1.50E-04
+Rms = 2.44
+Mmd = 26.286
+Le = 0.150
+Re = 2.60
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,8 +58,8 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.00
-Lrc = 0.00
+Vrc = 31.65
+Lrc = 31.63
 Fr = 0.00
 Tal = 0.00
 Vtc = 0.00
@@ -84,10 +84,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 100
-Tal2 = 100
-Tal3 = -0
-Tal4 = -0
+Tal1 = 0.00
+Tal2 = 0.00
+Tal3 = 0.00
+Tal4 = 0.00
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 

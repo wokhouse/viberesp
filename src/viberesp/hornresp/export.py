@@ -86,7 +86,7 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
 
     Converts SI units to Hornresp conventions:
     - Area: m² → cm² (multiply by 10000)
-    - Mass: kg → g (multiply by 1000)
+    - Mass: kg → g (multiply by 1000) - CRITICAL: Exports M_md only
     - Inductance: H → mH (multiply by 1000)
     - Compliance, resistance, BL: SI (no change)
 
@@ -100,16 +100,21 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
     Returns:
         HornrespRecord with units converted for Hornresp import
 
+    Important Notes:
+        M_md vs M_ms: This function exports M_md (driver mass only, without
+        radiation mass). Hornresp calculates its own radiation mass loading.
+        Exporting M_ms would cause Hornresp to double-count radiation mass.
+
     Examples:
         >>> driver = ThieleSmallParameters(
-        ...     M_ms=0.054, C_ms=0.00019, R_ms=5.2,
+        ...     M_md=0.050, C_ms=0.00019, R_ms=5.2,
         ...     R_e=3.1, L_e=0.72e-3, BL=16.5, S_d=0.0522
         ... )
         >>> record = driver_to_hornresp_record(driver, "12NDL76")
         >>> record.Sd  # cm²
         522.0
-        >>> record.Mmd  # g (converted from 0.054 kg)
-        54.0
+        >>> record.Mmd  # g (converted from 0.050 kg M_md, NOT M_ms)
+        50.0
         >>> record.Le  # mH (converted from 0.72e-3 H)
         0.72
     """
@@ -117,7 +122,11 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
     sd_cm2 = driver.S_d * 10000.0
 
     # Convert mass from kg to g (Hornresp uses grams)
-    mmd_g = driver.M_ms * 1000.0
+    # CRITICAL: Export M_md (driver mass only, NOT M_ms)
+    # Hornresp calculates its own radiation mass, so we must provide
+    # the driver mass without any radiation loading.
+    # M_ms includes radiation mass and should NOT be exported to Hornresp.
+    mmd_g = driver.M_md * 1000.0
 
     # Convert inductance from H to mH (Hornresp uses millihenries)
     le_mh = driver.L_e * 1000.0
@@ -139,7 +148,10 @@ def export_to_hornresp(
     driver: ThieleSmallParameters,
     driver_name: str,
     output_path: str,
-    comment: Optional[str] = None
+    comment: Optional[str] = None,
+    enclosure_type: str = "infinite_baffle",
+    Vb_liters: Optional[float] = None,
+    Lrc_cm: Optional[float] = None,
 ) -> None:
     """
     Export driver parameters to Hornresp input file format.
@@ -149,13 +161,21 @@ def export_to_hornresp(
 
     Literature:
         - Hornresp User Manual - File format specification
-        - hornresp_example.txt - Reference format
+        - Hornresp uses Ang = 0.5 x Pi for sealed box (hemisphere radiation)
+        - Hornresp uses Ang = 2.0 x Pi for infinite baffle (full sphere radiation)
+        - https://www.diyaudio.com/community/threads/hornresp.119854/ - Lrc parameter
+        - https://www.hometheatershack.com/threads/hornresp-for-dum-hmm-everyone.36532/ - Lrc usage
 
     Args:
         driver: ThieleSmallParameters instance in SI units
         driver_name: Name/identifier for the driver
         output_path: Path to output .txt file
         comment: Optional comment/description for the file
+        enclosure_type: "infinite_baffle" or "sealed_box"
+        Vb_liters: Box volume in liters (required for sealed_box)
+        Lrc_cm: Rear chamber depth in cm (optional, auto-calculated if None)
+                If not provided, calculated from Vb assuming cube shape: Lrc = (Vb)^(1/3)
+                Hornresp requires Lrc > 0 for sealed boxes (cannot be zero)
 
     Raises:
         ValueError: If parameters are outside Hornresp valid ranges
@@ -166,8 +186,14 @@ def export_to_hornresp(
         ...     M_ms=0.054, C_ms=0.00019, R_ms=5.2,
         ...     R_e=3.1, L_e=0.72e-3, BL=16.5, S_d=0.0522
         ... )
-        >>> export_to_hornresp(driver, "BC_12NDL76", "bc_12ndl76.txt")
-        # Creates bc_12ndl76.txt ready for Hornresp import
+        >>> # Infinite baffle export
+        >>> export_to_hornresp(driver, "BC_12NDL76", "bc_12ndl76_inf.txt")
+        >>>
+        >>> # Sealed box export
+        >>> export_to_hornresp(
+        ...     driver, "BC_12NDL76", "bc_12ndl76_sealed_50L.txt",
+        ...     enclosure_type="sealed_box", Vb_liters=50.0
+        ... )
 
     Validation:
         Exported files should be directly importable into Hornresp.
@@ -177,8 +203,65 @@ def export_to_hornresp(
     # Convert driver to Hornresp format
     record = driver_to_hornresp_record(driver, driver_name)
 
+    # Set radiation angle based on enclosure type
+    if enclosure_type == "sealed_box":
+        ang_value = "0.5"  # Hemisphere (front radiation only)
+        if Vb_liters is None:
+            raise ValueError("Vb_liters must be specified for sealed_box enclosure")
+        vrc_value = Vb_liters
+
+        # Calculate or use provided Lrc (rear chamber depth in cm)
+        # Hornresp requires Lrc > 0 for sealed boxes (cannot be zero)
+        # If not provided, calculate from Vb with physical realizability constraints
+        if Lrc_cm is None:
+            # Vb is in liters, convert to cm³
+            vb_cm3 = Vb_liters * 1000.0
+
+            # Calculate physical constraints
+            piston_radius_cm = math.sqrt(driver.S_d / math.pi) * 100.0
+            piston_area_cm2 = driver.S_d * 10000.0
+
+            # Constraint 1: Minimum depth for magnet structure clearance
+            # Depth must be at least 2× piston radius to accommodate magnet
+            lrc_min = 2.0 * piston_radius_cm
+
+            # Constraint 2: Maximum depth for driver to fit through opening
+            # Chamber cross-sectional area = Vb / Lrc must be >= piston area
+            # Therefore: Lrc <= Vb / S_piston
+            lrc_max = vb_cm3 / piston_area_cm2
+
+            # Check if box is physically realizable
+            # Use small tolerance (1mm) for floating point comparison
+            if lrc_min > lrc_max + 0.1:
+                min_vb_liters = (lrc_min * piston_area_cm2) / 1000.0
+                raise ValueError(
+                    f"Box volume {Vb_liters:.1f}L is too small for driver. "
+                    f"Minimum volume to fit driver: {min_vb_liters:.1f}L\n"
+                    f"  - Piston diameter: {2*piston_radius_cm:.1f} cm\n"
+                    f"  - Piston area: {piston_area_cm2:.0f} cm²\n"
+                    f"  - Min depth for magnet: {lrc_min:.1f} cm\n"
+                    f"  - Max depth for fit: {lrc_max:.1f} cm"
+                )
+
+            # Method 1: Cube-shaped chamber (ideal proportions)
+            lrc_cube = vb_cm3 ** (1.0/3.0)
+
+            # Use cube depth, but clamp to valid range [lrc_min, lrc_max]
+            # This ensures physical realizability while maintaining reasonable proportions
+            lrc_value = max(lrc_min, min(lrc_cube, lrc_max))
+        else:
+            lrc_value = Lrc_cm
+
+        if lrc_value <= 0:
+            raise ValueError(f"Lrc must be > 0 for sealed boxes, got {lrc_value}")
+    elif enclosure_type == "infinite_baffle":
+        ang_value = "2.0"  # Full sphere (both sides radiate)
+        vrc_value = 0.0
+        lrc_value = 0.0
+    else:
+        raise ValueError(f"Unknown enclosure_type: {enclosure_type}. Use 'infinite_baffle' or 'sealed_box'")
+
     # Generate Hornresp file content
-    # Use template format matching hornresp_example.txt
     comment_text = comment or f"{driver_name} driver parameters exported from viberesp"
 
     # Generate unique ID (use hash of driver name)
@@ -191,7 +274,7 @@ Comment = {comment_text}
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.0 x Pi
+Ang = {ang_value} x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -200,12 +283,12 @@ Cir = 0.00
 
 S1 = 0.00
 S2 = 0.00
-Exp = 0.00
+L12 = 0.00
 F12 = 0.00
 S2 = 0.00
 S3 = 0.00
-Exp = 0.00
-AT = 0.00
+L23 = 0.00
+F23 = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -236,8 +319,8 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.00
-Lrc = 0.00
+Vrc = {vrc_value:.2f}
+Lrc = {lrc_value:.2f}
 Fr = 0.00
 Tal = 0.00
 Vtc = 0.00
@@ -262,10 +345,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 100
-Tal2 = 100
-Tal3 = -0
-Tal4 = -0
+Tal1 = 0.00
+Tal2 = 0.00
+Tal3 = 0.00
+Tal4 = 0.00
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 

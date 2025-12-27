@@ -20,7 +20,7 @@ class TestThieleSmallParameters:
     def test_initialization_with_valid_parameters(self):
         """Test creating ThieleSmallParameters with valid values."""
         driver = ThieleSmallParameters(
-            M_ms=0.054,    # 54g moving mass
+            M_md=0.054,    # 54g moving mass
             C_ms=0.00019,  # Compliance (m/N)
             R_ms=5.2,      # Mechanical resistance (N·s/m)
             R_e=3.1,       # DC resistance (Ω)
@@ -29,7 +29,7 @@ class TestThieleSmallParameters:
             S_d=0.0522     # 522 cm² effective area
         )
 
-        assert driver.M_ms == 0.054
+        assert driver.M_ms > driver.M_md  # M_ms includes radiation mass
         assert driver.C_ms == 0.00019
         assert driver.R_ms == 5.2
         assert driver.R_e == 3.1
@@ -41,7 +41,7 @@ class TestThieleSmallParameters:
         """Test calculation of derived T/S parameters."""
         # COMSOL example driver (Table 2)
         driver = ThieleSmallParameters(
-            M_ms=0.0334,   # 33.4g from COMSOL example
+            M_md=0.0334,   # 33.4g from COMSOL example
             C_ms=0.00118,  # 1.18e-3 from COMSOL example
             R_ms=1.85,     # N·s/m from COMSOL example
             R_e=6.4,       # Ω from COMSOL example
@@ -74,7 +74,7 @@ class TestThieleSmallParameters:
     def test_vas_calculation(self):
         """Test equivalent volume of compliance calculation."""
         driver = ThieleSmallParameters(
-            M_ms=0.054,
+            M_md=0.054,
             C_ms=0.00019,
             R_ms=5.2,
             R_e=3.1,
@@ -96,7 +96,7 @@ class TestThieleSmallParameters:
         """Test piston radius calculation from effective area."""
         S_d = 0.05  # 50 cm²
         driver = ThieleSmallParameters(
-            M_ms=0.05,
+            M_md=0.05,
             C_ms=0.0002,
             R_ms=5.0,
             R_e=8.0,
@@ -112,7 +112,7 @@ class TestThieleSmallParameters:
         """Test that negative moving mass raises ValueError."""
         with pytest.raises(ValueError, match="M_ms must be > 0"):
             ThieleSmallParameters(
-                M_ms=-0.05,
+                M_md=-0.05,
                 C_ms=0.0002,
                 R_ms=5.0,
                 R_e=8.0,
@@ -125,7 +125,7 @@ class TestThieleSmallParameters:
         """Test that zero compliance raises ValueError."""
         with pytest.raises(ValueError, match="C_ms must be > 0"):
             ThieleSmallParameters(
-                M_ms=0.05,
+                M_md=0.05,
                 C_ms=0.0,
                 R_ms=5.0,
                 R_e=8.0,
@@ -138,7 +138,7 @@ class TestThieleSmallParameters:
         """Test that negative DC resistance raises ValueError."""
         with pytest.raises(ValueError, match="R_e must be > 0"):
             ThieleSmallParameters(
-                M_ms=0.05,
+                M_md=0.05,
                 C_ms=0.0002,
                 R_ms=5.0,
                 R_e=-8.0,
@@ -151,7 +151,7 @@ class TestThieleSmallParameters:
         """Test that negative BL raises ValueError."""
         with pytest.raises(ValueError, match="BL must be > 0"):
             ThieleSmallParameters(
-                M_ms=0.05,
+                M_md=0.05,
                 C_ms=0.0002,
                 R_ms=5.0,
                 R_e=8.0,
@@ -164,7 +164,7 @@ class TestThieleSmallParameters:
         """Test that negative effective area raises ValueError."""
         with pytest.raises(ValueError, match="S_d must be > 0"):
             ThieleSmallParameters(
-                M_ms=0.05,
+                M_md=0.05,
                 C_ms=0.0002,
                 R_ms=5.0,
                 R_e=8.0,
@@ -176,7 +176,7 @@ class TestThieleSmallParameters:
     def test_validation_allows_zero_mechanical_resistance(self):
         """Test that zero mechanical resistance is allowed (ideal driver)."""
         driver = ThieleSmallParameters(
-            M_ms=0.05,
+            M_md=0.05,
             C_ms=0.0002,
             R_ms=0.0,  # No mechanical losses
             R_e=8.0,
@@ -193,7 +193,7 @@ class TestThieleSmallParameters:
     def test_validation_allows_zero_inductance(self):
         """Test that zero inductance is allowed (resistive voice coil)."""
         driver = ThieleSmallParameters(
-            M_ms=0.05,
+            M_md=0.05,
             C_ms=0.0002,
             R_ms=5.0,
             R_e=8.0,
@@ -206,7 +206,7 @@ class TestThieleSmallParameters:
     def test_repr_includes_key_parameters(self):
         """Test that __repr__ includes key parameters."""
         driver = ThieleSmallParameters(
-            M_ms=0.054,
+            M_md=0.054,
             C_ms=0.00019,
             R_ms=5.2,
             R_e=3.1,
@@ -225,7 +225,7 @@ class TestThieleSmallParameters:
     def test_q_factors_relationship(self):
         """Test that Q_ts < Q_es and Q_ts < Q_ms."""
         driver = ThieleSmallParameters(
-            M_ms=0.054,
+            M_md=0.054,
             C_ms=0.00019,
             R_ms=5.2,
             R_e=3.1,
@@ -242,7 +242,7 @@ class TestThieleSmallParameters:
         """Test that F_s is in typical range for loudspeakers (10-200 Hz)."""
         # Typical 12" woofer parameters
         driver = ThieleSmallParameters(
-            M_ms=0.054,
+            M_md=0.054,
             C_ms=0.00019,
             R_ms=5.2,
             R_e=3.1,
@@ -263,7 +263,7 @@ class TestThieleSmallParameters:
         """
         # COMSOL Lumped Loudspeaker Driver example
         driver = ThieleSmallParameters(
-            M_ms=0.0334,   # 33.4 g
+            M_md=0.0334,   # 33.4 g
             C_ms=0.00118,  # 1.18e-3 m/N
             R_ms=1.85,     # 1.85 N·s/m
             R_e=6.4,       # 6.4 Ω

@@ -142,9 +142,11 @@ class ThieleSmallParameters:
         )
 
         # Calculate electrical Q factor
-        # COMSOL (2020), Table 3: Q_es = 2πF_s·M_ms / R_E
+        # COMSOL (2020), Table 3: Q_es = 2πF_s·M_ms·R_E / (BL)²
+        # The electrical damping is determined by the force factor BL
+        # and the reflected mechanical resistance seen from electrical side
         omega_s = 2.0 * math.pi * self.F_s
-        self.Q_es = (omega_s * self.M_ms) / self.R_e
+        self.Q_es = (omega_s * self.M_ms * self.R_e) / (self.BL ** 2)
 
         # Calculate mechanical Q factor
         # COMSOL (2020), Table 3: Q_ms = 2πF_s·M_ms / R_ms
