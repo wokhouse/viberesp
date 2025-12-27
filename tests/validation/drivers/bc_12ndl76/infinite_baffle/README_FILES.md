@@ -1,11 +1,11 @@
-# BC 8NDL51 Hornresp Validation Files
+# BC 12NDL76 Hornresp Validation Files
 
 ## ✅ Validation Complete
 
 ### Driver Information
 **Manufacturer**: B&C Speakers
-**Model**: BC 8NDL51
-**Type**: 8 inch mid-woofer
+**Model**: BC 12NDL76
+**Type**: 12 inch mid-woofer
 **Configuration**: Infinite baffle (bare driver)
 
 ---
@@ -14,8 +14,8 @@
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `BC_8NDL51_input.txt` | Hornresp input parameters (167 lines) | ✅ Complete |
-| `8ndl51_sim.txt` | Hornresp simulation results (535 lines) | ✅ Complete |
+| `BC_12NDL76_input.txt` | Hornresp input parameters (167 lines) | ✅ Complete |
+| `bc_12ndl76_sim.txt` | Hornresp simulation results (535 lines) | ✅ Complete |
 | `metadata.json` | Validation metadata | ✅ Complete |
 
 ---
@@ -23,12 +23,12 @@
 ## Driver Parameters
 
 ### Thiele-Small Parameters
-- **Sd** = 220.0 cm² (diaphragm area)
-- **BL** = 12.4 T·m (force factor)
-- **Mmd** = 26.77 g (moving mass)
-- **Cms** = 0.203 mm/N (compliance)
-- **Rms** = 3.30 N·s/m (mechanical resistance)
-- **Le** = 0.5 mH (voice coil inductance)
+- **Sd** = 522.0 cm² (diaphragm area)
+- **BL** = 20.1 T·m (force factor)
+- **Mmd** = 53.0 g (moving mass)
+- **Cms** = 0.19 mm/N (compliance)
+- **Rms** = 4.0 N·s/m (mechanical resistance)
+- **Le** = 1.0 mH (voice coil inductance)
 - **Re** = 5.3 Ω (DC resistance)
 
 ### Hornresp Configuration
@@ -74,19 +74,19 @@
 
 ### Run Validation Test
 ```bash
-pytest tests/validation/test_infinite_baffle.py -k bc_8ndl51 -v
+pytest tests/validation/test_infinite_baffle.py -k bc_12ndl76 -v
 ```
 
 ### Load Results in Python
 ```python
 from viberesp.hornresp.results_parser import load_hornresp_sim_file
-from viberesp.driver.bc_drivers import get_bc_8ndl51
+from viberesp.driver.bc_drivers import get_bc_12ndl76
 
 # Load Hornresp results
-sim = load_hornresp_sim_file('tests/validation/drivers/bc_8ndl51/infinite_baffle/8ndl51_sim.txt')
+sim = load_hornresp_sim_file('tests/validation/drivers/bc_12ndl76/infinite_baffle/bc_12ndl76_sim.txt')
 
 # Get driver parameters
-driver = get_bc_8ndl51()
+driver = get_bc_12ndl76()
 ```
 
 ---

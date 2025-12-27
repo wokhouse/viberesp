@@ -1,11 +1,11 @@
-# BC 8NDL51 Hornresp Validation Files
+# BC 18PZW100 Hornresp Validation Files
 
 ## ✅ Validation Complete
 
 ### Driver Information
 **Manufacturer**: B&C Speakers
-**Model**: BC 8NDL51
-**Type**: 8 inch mid-woofer
+**Model**: BC 18PZW100
+**Type**: 18 inch woofer
 **Configuration**: Infinite baffle (bare driver)
 
 ---
@@ -14,8 +14,8 @@
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `BC_8NDL51_input.txt` | Hornresp input parameters (167 lines) | ✅ Complete |
-| `8ndl51_sim.txt` | Hornresp simulation results (535 lines) | ✅ Complete |
+| `BC_18PZW100_input.txt` | Hornresp input parameters (167 lines) | ✅ Complete |
+| `bc_18pzw100_sim.txt` | Hornresp simulation results (535 lines) | ✅ Complete |
 | `metadata.json` | Validation metadata | ✅ Complete |
 
 ---
@@ -23,13 +23,13 @@
 ## Driver Parameters
 
 ### Thiele-Small Parameters
-- **Sd** = 220.0 cm² (diaphragm area)
-- **BL** = 12.4 T·m (force factor)
-- **Mmd** = 26.77 g (moving mass)
-- **Cms** = 0.203 mm/N (compliance)
-- **Rms** = 3.30 N·s/m (mechanical resistance)
-- **Le** = 0.5 mH (voice coil inductance)
-- **Re** = 5.3 Ω (DC resistance)
+- **Sd** = 855.0 cm² (diaphragm area)
+- **BL** = 38.7 T·m (force factor)
+- **Mmd** = 153.0 g (moving mass)
+- **Cms** = 0.25 mm/N (compliance)
+- **Rms** = 10.15 N·s/m (mechanical resistance)
+- **Le** = 2.2 mH (voice coil inductance)
+- **Re** = 10.15 Ω (DC resistance)
 
 ### Hornresp Configuration
 - **Voice coil model**: Simple (jωL inductor)
@@ -74,19 +74,19 @@
 
 ### Run Validation Test
 ```bash
-pytest tests/validation/test_infinite_baffle.py -k bc_8ndl51 -v
+pytest tests/validation/test_infinite_baffle.py -k bc_18pzw100 -v
 ```
 
 ### Load Results in Python
 ```python
 from viberesp.hornresp.results_parser import load_hornresp_sim_file
-from viberesp.driver.bc_drivers import get_bc_8ndl51
+from viberesp.driver.bc_drivers import get_bc_18pzw100
 
 # Load Hornresp results
-sim = load_hornresp_sim_file('tests/validation/drivers/bc_8ndl51/infinite_baffle/8ndl51_sim.txt')
+sim = load_hornresp_sim_file('tests/validation/drivers/bc_18pzw100/infinite_baffle/bc_18pzw100_sim.txt')
 
 # Get driver parameters
-driver = get_bc_8ndl51()
+driver = get_bc_18pzw100()
 ```
 
 ---
