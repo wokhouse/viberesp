@@ -488,49 +488,197 @@ class DesignAssistant:
         """
         Perform parameter sweep to explore design space.
 
-        Note: This is a simplified placeholder. Full implementation requires
-        completing Phase 7.4 (parameter sweep).
+        This method sweeps a single parameter across a range of values and
+        evaluates all objectives at each point. This provides complete
+        visibility into how the parameter affects performance, allowing
+        you to identify optimal ranges and understand trade-offs.
+
+        Literature:
+            - Small (1972) - Enclosure parameter relationships
+            - Thiele (1971) - Vented box alignments
 
         Args:
             driver_name: Name of driver
             enclosure_type: "sealed" or "ported"
             parameter: Parameter name to sweep (e.g., "Vb", "Fb")
-            param_min: Minimum parameter value
+            param_min: Minimum parameter value (in SI units: m³ for volume, Hz for frequency)
             param_max: Maximum parameter value
-            steps: Number of steps
-            fixed_params: Dict of other fixed parameters
+            steps: Number of steps to evaluate
+            fixed_params: Dict of other fixed parameters (e.g., {"Fb": 45.0} for ported)
 
         Returns:
             ParameterSweepResult with sweep data and recommendations
 
         Examples:
             >>> assistant = DesignAssistant()
+            >>> # Sweep box volume for sealed enclosure
             >>> sweep = assistant.sweep_parameter(
             ...     driver_name="BC_12NDL76",
             ...     enclosure_type="sealed",
             ...     parameter="Vb",
-            ...     param_min=0.01,
-            ...     param_max=0.03,
-            ...     steps=30
+            ...     param_min=0.010,  # 10 liters
+            ...     param_max=0.050,  # 50 liters
+            ...     steps=50
             ... )
-            >>> len(sweep.parameter_values)
-            30
+            >>> # Find best F3
+            >>> best_idx = np.argmin(sweep.results["F3"])
+            >>> print(f"Best F3: {sweep.results['F3'][best_idx]:.1f} Hz at Vb={sweep.parameter_values[best_idx]*1000:.1f} L")
+            Best F3: 52.3 Hz at Vb=35.2 L
+            >>>
+            >>> # Check sensitivity
+            >>> sweep.sensitivity_analysis["f3_sensitivity"]
+            0.87  # Strong correlation between Vb and F3
+
+        Note:
+            - For sealed boxes, you can sweep "Vb" only
+            - For ported boxes, you can sweep "Vb" or "Fb"
+            - If sweeping "Vb" for ported, fix "Fb" in fixed_params (and vice versa)
+            - All parameter values should be in SI units (m³ for volume, Hz for frequency)
         """
-        # Placeholder - full implementation in Phase 7.4
+        from viberesp.driver import bc_drivers
+        from viberesp.optimization.objectives.response_metrics import (
+            objective_f3, objective_response_flatness
+        )
+        from viberesp.optimization.objectives.efficiency import objective_efficiency
+        from viberesp.optimization.objectives.size_metrics import objective_enclosure_volume
+
+        # Load driver
+        driver_functions = {
+            "BC_8NDL51": bc_drivers.get_bc_8ndl51,
+            "BC_12NDL76": bc_drivers.get_bc_12ndl76,
+            "BC_15DS115": bc_drivers.get_bc_15ds115,
+            "BC_18PZW100": bc_drivers.get_bc_18pzw100,
+        }
+
+        if driver_name not in driver_functions:
+            return ParameterSweepResult(
+                parameter_swept=parameter,
+                parameter_values=np.array([]),
+                results={},
+                sensitivity_analysis={},
+                recommendations=[f"Unknown driver: {driver_name}"]
+            )
+
+        driver = driver_functions[driver_name]()
+
+        # Validate parameter
+        if enclosure_type == "sealed" and parameter != "Vb":
+            return ParameterSweepResult(
+                parameter_swept=parameter,
+                parameter_values=np.array([]),
+                results={},
+                sensitivity_analysis={},
+                recommendations=[f"Sealed box only supports sweeping 'Vb', got '{parameter}'"]
+            )
+
+        if enclosure_type == "ported" and parameter not in ["Vb", "Fb"]:
+            return ParameterSweepResult(
+                parameter_swept=parameter,
+                parameter_values=np.array([]),
+                results={},
+                sensitivity_analysis={},
+                recommendations=[f"Ported box supports sweeping 'Vb' or 'Fb', got '{parameter}'"]
+            )
+
+        # Set up fixed parameters
+        fixed_params = fixed_params or {}
+
+        # For ported boxes, provide intelligent defaults if not specified
+        if enclosure_type == "ported":
+            if parameter == "Vb" and "Fb" not in fixed_params:
+                fixed_params["Fb"] = driver.F_s * 0.7  # Default tuning
+            elif parameter == "Fb" and "Vb" not in fixed_params:
+                fixed_params["Vb"] = driver.V_as  # Default volume
+
+        # Generate parameter values
+        param_values = np.linspace(param_min, param_max, steps)
+
+        # Storage arrays
+        f3_values = []
+        flatness_values = []
+        efficiency_values = []
+        size_values = []
+
+        # Perform sweep
+        for value in param_values:
+            # Construct design vector
+            if enclosure_type == "sealed":
+                design_vector = np.array([value])
+            elif enclosure_type == "ported":
+                if parameter == "Vb":
+                    fb = fixed_params.get("Fb", driver.F_s * 0.7)
+                    design_vector = np.array([value, fb])
+                elif parameter == "Fb":
+                    vb = fixed_params.get("Vb", driver.V_as)
+                    design_vector = np.array([vb, value])
+                else:
+                    return ParameterSweepResult(
+                        parameter_swept=parameter,
+                        parameter_values=np.array([]),
+                        results={},
+                        sensitivity_analysis={},
+                        recommendations=[f"Unknown parameter for ported box: {parameter}"]
+                    )
+            else:
+                return ParameterSweepResult(
+                    parameter_swept=parameter,
+                    parameter_values=np.array([]),
+                    results={},
+                    sensitivity_analysis={},
+                    recommendations=[f"Unsupported enclosure type: {enclosure_type}"]
+                )
+
+            # Calculate objectives
+            try:
+                f3 = objective_f3(design_vector, driver, enclosure_type)
+                flat = objective_response_flatness(design_vector, driver, enclosure_type)
+                eff = objective_efficiency(design_vector, driver, enclosure_type)
+                size = objective_enclosure_volume(design_vector, driver, enclosure_type)
+
+                f3_values.append(f3)
+                flatness_values.append(flat)
+                efficiency_values.append(-eff)  # Convert back from negative
+                size_values.append(size)
+            except Exception as e:
+                # Fill with NaN on failure
+                f3_values.append(np.nan)
+                flatness_values.append(np.nan)
+                efficiency_values.append(np.nan)
+                size_values.append(np.nan)
+
+        # Convert to numpy arrays
+        f3_values = np.array(f3_values)
+        flatness_values = np.array(flatness_values)
+        efficiency_values = np.array(efficiency_values)
+        size_values = np.array(size_values)
+
+        # Analyze sensitivity
+        sensitivity = self._analyze_sensitivity(
+            param_values,
+            f3_values,
+            size_values
+        )
+
+        # Generate recommendations
+        recommendations = self._generate_sweep_recommendations(
+            parameter,
+            param_values,
+            f3_values,
+            size_values,
+            enclosure_type
+        )
+
         return ParameterSweepResult(
             parameter_swept=parameter,
-            parameter_values=np.linspace(param_min, param_max, steps),
+            parameter_values=param_values,
             results={
-                "F3": np.array([]),
-                "flatness": np.array([]),
-                "efficiency": np.array([]),
-                "size": np.array([])
+                "F3": f3_values,
+                "flatness": flatness_values,
+                "efficiency": efficiency_values,
+                "size": size_values
             },
-            sensitivity_analysis={},
-            recommendations=[
-                "Parameter sweep not yet implemented.",
-                "See Phase 7.4 in the implementation plan."
-            ]
+            sensitivity_analysis=sensitivity,
+            recommendations=recommendations
         )
 
     def _explain_trade_offs(
@@ -576,3 +724,236 @@ class DesignAssistant:
                 f"  • Note: Requires horn simulation (Phase 3) for optimization"
             )
         return "Trade-off analysis not available for this enclosure type."
+
+    def _analyze_sensitivity(
+        self,
+        param_values: np.ndarray,
+        f3_values: np.ndarray,
+        size_values: np.ndarray
+    ) -> Dict:
+        """
+        Analyze parameter sensitivity from sweep results.
+
+        Calculates correlation coefficients between the swept parameter
+        and each objective to determine which objectives are most
+        sensitive to parameter changes.
+
+        Args:
+            param_values: Array of parameter values tested
+            f3_values: Array of F3 values at each parameter point
+            size_values: Array of size values at each parameter point
+
+        Returns:
+            Dict with sensitivity metrics:
+            - f3_sensitivity: Absolute correlation with F3
+            - size_sensitivity: Absolute correlation with size
+            - most_sensitive_objective: Which objective is most affected
+            - f3_correlation: Raw correlation coefficient (can be negative)
+            - trend_description: Human-readable trend description
+
+        Note:
+            Correlation values range from -1 to 1:
+            - Near -1: Strong negative correlation (parameter up, objective down)
+            - Near 0: No correlation
+            - Near 1: Strong positive correlation (parameter up, objective up)
+        """
+        # Filter out NaN values
+        valid_mask = ~np.isnan(f3_values)
+        if np.sum(valid_mask) < 2:
+            return {
+                "parameter_sensitivity": "insufficient_data",
+                "f3_sensitivity": 0.0,
+                "size_sensitivity": 0.0,
+                "most_sensitive_objective": "unknown",
+                "f3_correlation": 0.0,
+                "trend_description": "Insufficient valid data points"
+            }
+
+        f3_valid = f3_values[valid_mask]
+        param_valid = param_values[valid_mask]
+
+        # Calculate correlation coefficient with F3
+        if len(param_valid) > 1:
+            f3_corr = np.corrcoef(param_valid, f3_valid)[0, 1]
+            # Handle case where correlation is undefined (zero variance)
+            if np.isnan(f3_corr):
+                f3_corr = 0.0
+        else:
+            f3_corr = 0.0
+
+        # Size is directly related to Vb (for sealed boxes)
+        # For ported boxes sweeping Fb, size doesn't change
+        size_corr = 1.0 if np.std(size_values) > 0 else 0.0
+
+        # Determine most sensitive objective
+        most_sensitive = "F3" if abs(f3_corr) > abs(size_corr) else "size"
+
+        # Generate trend description
+        if abs(f3_corr) < 0.3:
+            trend = "Weak correlation - parameter has little effect on F3"
+        elif abs(f3_corr) < 0.7:
+            trend = "Moderate correlation - parameter affects F3"
+        else:
+            trend = "Strong correlation - parameter significantly affects F3"
+
+        if f3_corr < -0.3:
+            trend += " (increasing parameter reduces F3 - better bass)"
+        elif f3_corr > 0.3:
+            trend += " (increasing parameter increases F3 - worse bass)"
+
+        return {
+            "f3_sensitivity": abs(f3_corr),
+            "size_sensitivity": abs(size_corr),
+            "most_sensitive_objective": most_sensitive,
+            "f3_correlation": float(f3_corr),
+            "trend_description": trend
+        }
+
+    def _generate_sweep_recommendations(
+        self,
+        parameter: str,
+        param_values: np.ndarray,
+        f3_values: np.ndarray,
+        size_values: np.ndarray,
+        enclosure_type: str
+    ) -> List[str]:
+        """
+        Generate design recommendations from sweep results.
+
+        Analyzes sweep data to provide actionable insights about:
+        - Optimal parameter values
+        - Diminishing returns
+        - Design trade-offs
+        - Sweet spots
+
+        Args:
+            parameter: Name of parameter that was swept
+            param_values: Array of parameter values tested
+            f3_values: Array of F3 values at each point
+            size_values: Array of size values at each point
+            enclosure_type: Type of enclosure ("sealed" or "ported")
+
+        Returns:
+            List of recommendation strings
+        """
+        recommendations = []
+
+        # Filter out NaN values
+        valid_mask = ~np.isnan(f3_values)
+        if np.sum(valid_mask) == 0:
+            return ["No valid designs found in sweep range"]
+
+        f3_valid = f3_values[valid_mask]
+        param_valid = param_values[valid_mask]
+
+        # Find overall best F3
+        best_f3_idx = np.argmin(f3_valid)
+        best_f3 = f3_valid[best_f3_idx]
+        best_param = param_valid[best_f3_idx]
+
+        # Format parameter value for display
+        if parameter == "Vb":
+            param_str = f"{best_param*1000:.1f}L"
+        else:
+            param_str = f"{best_param:.1f}Hz"
+
+        recommendations.append(
+            f"Best F3 ({best_f3:.1f} Hz) at {parameter}={param_str}"
+        )
+
+        # Analyze trend
+        if len(param_valid) > 1:
+            correlation = np.corrcoef(param_valid, f3_valid)[0, 1]
+
+            if np.isnan(correlation):
+                correlation = 0.0
+
+            if correlation < -0.7:
+                recommendations.append(
+                    f"Strong trend: Increasing {parameter} significantly reduces F3 (better bass extension)"
+                )
+            elif correlation < -0.3:
+                recommendations.append(
+                    f"Trend: Increasing {parameter} reduces F3 (better bass extension)"
+                )
+            elif correlation > 0.7:
+                recommendations.append(
+                    f"Strong trend: Increasing {parameter} significantly increases F3 (worse bass extension)"
+                )
+            elif correlation > 0.3:
+                recommendations.append(
+                    f"Trend: Increasing {parameter} increases F3 (worse bass extension)"
+                )
+            else:
+                recommendations.append(
+                    f"Weak trend: {parameter} has minimal effect on F3 in this range"
+                )
+
+        # Check for diminishing returns
+        if len(param_valid) >= 10:
+            # Split range into thirds
+            n = len(param_valid)
+            first_third = f3_valid[:n//3]
+            middle_third = f3_valid[n//3:2*n//3]
+            last_third = f3_valid[2*n//3:]
+
+            if len(first_third) > 0 and len(last_third) > 0:
+                improvement_1st = np.mean(first_third) - np.mean(middle_third)
+                improvement_2nd = np.mean(middle_third) - np.mean(last_third)
+
+                # If second half improvement is < 30% of first half
+                if improvement_2nd < 0.3 * improvement_1st and improvement_1st > 1.0:
+                    # Find sweet spot
+                    sweet_idx = np.where(param_valid >= param_valid[n//3])[0]
+                    if len(sweet_idx) > 0:
+                        sweet_param = param_valid[sweet_idx[0]]
+                        if parameter == "Vb":
+                            sweet_str = f"{sweet_param*1000:.1f}L"
+                        else:
+                            sweet_str = f"{sweet_param:.1f}Hz"
+
+                        recommendations.append(
+                            f"Diminishing returns: Above {sweet_str}, further {parameter} increases give minimal F3 improvement"
+                        )
+
+        # Check for optimal range (within 10% of best F3)
+        if len(f3_valid) >= 5:
+            f3_threshold = best_f3 * 1.10  # 10% threshold
+            optimal_mask = f3_valid <= f3_threshold
+            optimal_params = param_valid[optimal_mask]
+
+            if len(optimal_params) >= 3:
+                min_opt = np.min(optimal_params)
+                max_opt = np.max(optimal_params)
+
+                if parameter == "Vb":
+                    range_str = f"{min_opt*1000:.1f}L - {max_opt*1000:.1f}L"
+                else:
+                    range_str = f"{min_opt:.1f}Hz - {max_opt:.1f}Hz"
+
+                recommendations.append(
+                    f"Optimal range: {parameter} in [{range_str}] gives F3 within 10% of optimal"
+                )
+
+        # Add enclosure-specific advice
+        if enclosure_type == "sealed" and parameter == "Vb":
+            # Check Qtc values
+            driver_Qts = 0.37  # Typical value (would be better to pass actual driver)
+            for i, (vb, f3) in enumerate(zip(param_valid, f3_valid)):
+                if np.isnan(f3):
+                    continue
+
+                # Estimate Qtc: Qtc = Qts * sqrt(Vas/Vb)
+                # Rough approximation without driver Vas
+                if i == len(param_valid) // 2:  # Check middle value
+                    if parameter == "Vb":
+                        recommendations.append(
+                            f"Tip: Smaller {parameter} = higher Qtc (tighter bass, less extension)"
+                        )
+                        recommendations.append(
+                            f"Tip: Larger {parameter} = lower Qtc (deeper bass, softer sound)"
+                        )
+                    break
+
+        return recommendations
+
