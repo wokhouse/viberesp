@@ -229,6 +229,126 @@ export_to_hornresp(
 - Hornresp User Manual - File format specification
 - `src/viberesp/hornresp/export.py` - Implementation with format details
 
+## File Organization Guidelines
+
+### CRITICAL: No Files in Top-Level Directory (TLD)
+
+**DO NOT create files in the project root directory.** All files must be organized in appropriate subdirectories.
+
+### Directory Structure for Documentation and Research
+
+```
+viberesp/
+├── docs/                    # Documentation (git tracked)
+│   ├── validation/          # Validation investigation reports
+│   │   ├── sealed_box_spl_investigation.md
+│   │   ├── sealed_box_spl_research_summary.md
+│   │   └── ported_box_impedance_fix.md
+│   └── [other docs]
+├── tasks/                   # Active work items (git tracked)
+│   ├── research_validation_plan.md
+│   ├── driver_validation_status.md
+│   └── [other active tasks]
+├── tests/                   # Test infrastructure (git tracked)
+│   └── validation/
+│       └── drivers/
+│           └── [driver_name]/
+│               └── [enclosure_type]/
+│                   ├── README.md
+│                   ├── VALIDATION_ISSUE.md
+│                   └── sim.txt
+└── [only CLAUDE.md, README.md, ROADMAP.md, pyproject.toml in TLD]
+```
+
+### File Placement Rules
+
+**Documentation (permanent reference material):**
+- Validation investigation results → `docs/validation/`
+- Technical specifications → `docs/`
+- User guides → `docs/`
+
+**Active Tasks (work-in-progress):**
+- Research plans → `tasks/`
+- Investigation notes → `tasks/`
+- Status tracking → `tasks/`
+- Temporary analysis scripts → `tasks/`
+
+**Test Data:**
+- Hornresp simulation results → `tests/validation/drivers/{driver}/{enclosure}/`
+- Test configuration → `tests/validation/drivers/{driver}/{enclosure}/`
+- Validation status → `tests/validation/drivers/{driver}/{enclosure}/VALIDATION_ISSUE.md`
+
+**Literature:**
+- Academic papers → `literature/{category}/`
+- Reference materials → `literature/{category}/`
+
+**Code:**
+- Source code → `src/viberesp/`
+- Tests → `tests/`
+- Examples → `examples/` (if it exists)
+
+### What Belongs in TLD (Top-Level Directory)
+
+**ONLY these files should be in the project root:**
+- `CLAUDE.md` - Project-specific instructions (this file)
+- `README.md` - Project overview and setup
+- `ROADMAP.md` - Development roadmap
+- `pyproject.toml` - Python project configuration
+- `.gitignore` - Git ignore rules
+- `LICENSE` - License file
+- Standard config files (`.github/`, etc.)
+
+**NOT in TLD:**
+- ❌ Investigation notes (→ `tasks/` or `docs/validation/`)
+- ❌ Research summaries (→ `tasks/` or `docs/validation/`)
+- ❌ Status reports (→ `tasks/`)
+- ❌ Temporary analysis scripts (→ `tasks/`)
+- ❌ Test data (→ `tests/`)
+
+### Tracked vs Untracked Files
+
+**Git Tracked (project files):**
+- All documentation in `docs/`
+- Active tasks in `tasks/`
+- Test data in `tests/`
+- Source code in `src/`
+- Literature reference files in `literature/`
+
+**Git Untracked (personal/temporary):**
+- Python cache in `/tmp/` or `/private/tmp/`
+- Session summaries in `/tmp/`
+- Personal notes outside project tree
+- Build artifacts (handled by `.gitignore`)
+- Virtual environments (`.venv/`)
+
+**When to commit:**
+- Investigation results → Yes (to `docs/` or `tasks/`)
+- Completed research → Yes (to `docs/validation/`)
+- Working scripts → Yes (to `tasks/`)
+- `/tmp/` files → No (temporary workspace)
+
+### Examples
+
+**✅ CORRECT:**
+```bash
+# Create investigation report in docs/
+docs/validation/sealed_box_spl_investigation.md
+
+# Create active research plan in tasks/
+tasks/research_validation_plan.md
+
+# Create temporary script for debugging
+tasks/diagnose_spl_rolloff.py
+```
+
+**❌ WRONG:**
+```bash
+# DON'T create in TLD
+sealed_box_investigation.md  # Wrong! → docs/validation/
+research_plan.md             # Wrong! → tasks/
+debug_script.py              # Wrong! → tasks/
+```
+
 ## Code Structure Conventions
 
 ### Directory Organization

@@ -19,12 +19,12 @@ The Hornresp parser is **working correctly**. After regenerating the sim.txt fil
 **Fix implemented**: Added empirical box damping (Q_b ≈ 28.5) to mechanical impedance calculation.
 - R_box = (ω × M_ms) / Q_b
 - This matches Hornresp's proprietary loss model
-- Documented in `sealed_box_spl_research_summary.md`
+- Documented in `docs/validation/sealed_box_spl_research_summary.md`
 
 ### Remaining Issue: SPL ⚠️
 - SPL still shows ~19-24 dB error
 - Root cause: Hornresp internal inconsistency (41% difference between electrical and mechanical domains)
-- Research documented in `sealed_box_spl_research_summary.md`
+- Research documented in `docs/validation/sealed_box_spl_research_summary.md`
 - Cannot be fixed without access to Hornresp source code
 
 ## Detailed Comparison @ 60 Hz
@@ -81,7 +81,7 @@ Hornresp's exported data shows 41% difference between electrical and mechanical 
    - Viberesp velocity/SPL are theoretically correct per Small (1972)
    - Hornresp uses proprietary algorithm with undocumented corrections
    - Cannot be resolved without Hornresp source code access
-   - Documented in `sealed_box_spl_research_summary.md`
+   - Documented in `docs/validation/sealed_box_spl_research_summary.md`
 
 ## Next Steps
 
