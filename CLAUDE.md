@@ -606,7 +606,12 @@ For difficult questions requiring external research, you can delegate to an onli
 
 ### Research Agent Workflow
 
-**Critical constraint:** The online research agent **does NOT have access to the local codebase**. You must provide relevant context.
+**Important:** The online research agent **does NOT have access to the local codebase**, but it **CAN access the public GitHub repository** at:
+```
+https://github.com/wokhouse/viberesp
+```
+
+When delegating to the research agent, provide relevant context or reference specific files/paths in the repo.
 
 **Step 1: Prepare the research prompt**
 
