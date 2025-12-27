@@ -65,7 +65,7 @@ class TestInfiniteBaffleValidationBC8NDL51:
             / "drivers"
             / "bc_8ndl51"
             / "infinite_baffle"
-            / "8ndl51_sim.txt"
+            / "sim.txt"
         )
         return load_hornresp_sim_file(data_path)
 
@@ -333,18 +333,18 @@ class TestInfiniteBaffleValidationBC8NDL51:
 # Driver configuration for parametrized tests
 # Maps driver name to (getter_function, hornresp_filename)
 DRIVER_CONFIG = {
-    "bc_8ndl51": (get_bc_8ndl51, "8ndl51_sim.txt"),
-    "bc_12ndl76": (get_bc_12ndl76, "bc_12ndl76_sim.txt"),
-    "bc_15ds115": (get_bc_15ds115, "bc_15ds115_sim.txt"),
-    "bc_18pzw100": (get_bc_18pzw100, "bc_18pzw100_sim.txt"),
+    "bc_8ndl51": (get_bc_8ndl51, "sim.txt"),
+    "bc_12ndl76": (get_bc_12ndl76, "sim.txt"),
+    "bc_15ds115": (get_bc_15ds115, "sim.txt"),
+    "bc_18pzw100": (get_bc_18pzw100, "sim.txt"),
 }
 
 
 @pytest.mark.parametrize("driver_name,driver_getter,hornresp_file", [
-    ("bc_8ndl51", get_bc_8ndl51, "8ndl51_sim.txt"),
-    ("bc_12ndl76", get_bc_12ndl76, "bc_12ndl76_sim.txt"),
-    ("bc_15ds115", get_bc_15ds115, "bc_15ds115_sim.txt"),
-    ("bc_18pzw100", get_bc_18pzw100, "bc_18pzw100_sim.txt"),
+    ("bc_8ndl51", get_bc_8ndl51, "sim.txt"),
+    ("bc_12ndl76", get_bc_12ndl76, "sim.txt"),
+    ("bc_15ds115", get_bc_15ds115, "sim.txt"),
+    ("bc_18pzw100", get_bc_18pzw100, "sim.txt"),
 ])
 class TestInfiniteBaffleValidationAllDrivers:
     """Parametrized validation tests for all B&C drivers in infinite baffle."""
