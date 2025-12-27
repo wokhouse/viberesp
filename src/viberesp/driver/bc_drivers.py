@@ -30,17 +30,22 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
     - Le: 0.15 mH
     - Cms: 150 mm/N (calculated from Vas)
     - Rms: 2.44 N·s/m (calculated from Qms)
-    - Mmd: 25.16 g (driver mass only, excludes radiation mass)
     - EBP: 117 Hz
 
     Literature: B&C 8NDL51 datasheet
     Source: https://www.bcspeakers.com/
 
-    Note: M_md is driver mass only. Radiation mass is calculated internally
-    using Beranek (1954) theory to match Hornresp methodology.
+    Note: M_md is driver mass only (excludes radiation mass).
+    The datasheet reports Mms = 27g, but this is not entirely consistent with
+    the datasheet Fs (75 Hz) and Cms (0.150 mm/N). Using the datasheet Fs and
+    Cms values, the theoretical M_ms should be 30.0g, giving M_md = 26.29g
+    (driver mass only) after subtracting radiation mass (~3.7g at 75 Hz).
+
+    Radiation mass is calculated internally using Beranek (1954) theory
+    to match Hornresp methodology (2× radiation mass for infinite baffle).
     """
     return ThieleSmallParameters(
-        M_md=0.02516,   # 25.16g driver mass only (calculated from Mms - radiation mass)
+        M_md=0.026286,  # 26.29g driver mass only (calculated to match datasheet Fs)
         C_ms=1.503e-4, # 150.3E-04 m/N compliance (calculated from Vas)
         R_ms=2.44,     # 2.44 N·s/m mechanical resistance (calculated from Qms)
         R_e=2.6,       # 2.6 Ω DC resistance (datasheet)
@@ -63,7 +68,6 @@ def get_bc_12ndl76() -> ThieleSmallParameters:
     - Vas: 73 dm³ (73 L)
     - Sd: 522 cm²
     - BL: 20.1 T·m
-    - Mmd: 53 g (driver mass only, excludes radiation mass)
     - Cms: 0.19 mm/N
     - Rms: 4.0 N·s/m (calculated from Qms)
     - Le: 1.0 mH
@@ -71,11 +75,16 @@ def get_bc_12ndl76() -> ThieleSmallParameters:
 
     Literature: B&C 12NDL76 datasheet
 
-    Note: M_md is driver mass only. Radiation mass is calculated internally
-    using Beranek (1954) theory to match Hornresp methodology.
+    Note: M_md is driver mass only (excludes radiation mass).
+    The datasheet reports Mms = 53g (total mass including radiation), which
+    is consistent with Fs and Cms. Radiation mass at resonance is ~13.4g,
+    so M_md = 53g - 13.4g = 39.9g driver mass only.
+
+    Radiation mass is calculated internally using Beranek (1954) theory
+    to match Hornresp methodology (2× radiation mass for infinite baffle).
     """
     return ThieleSmallParameters(
-        M_md=0.053,    # 53g driver mass only (datasheet)
+        M_md=0.039898, # 39.90g driver mass only (calculated from Mms - radiation mass)
         C_ms=0.00019,  # 0.19 mm/N compliance (datasheet)
         R_ms=4.0,      # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=5.3,       # 5.3 Ω DC resistance (datasheet)
@@ -98,7 +107,6 @@ def get_bc_15ds115() -> ThieleSmallParameters:
     - Vas: 94 dm³ (94 L)
     - Sd: 855 cm²
     - BL: 38.7 T·m
-    - Mmd: 254 g (driver mass only, excludes radiation mass)
     - Cms: 0.25 mm/N
     - Rms: 10.15 N·s/m (calculated from Qms)
     - Le: 4.5 mH
@@ -106,11 +114,20 @@ def get_bc_15ds115() -> ThieleSmallParameters:
 
     Literature: B&C 15DS115 datasheet
 
-    Note: M_md is driver mass only. Radiation mass is calculated internally
-    using Beranek (1954) theory to match Hornresp methodology.
+    Note: M_md is driver mass only (excludes radiation mass).
+    WARNING: The datasheet Mms value (254g) is NOT consistent with the
+    datasheet Fs (33 Hz) and Cms (0.25 mm/N). Using the datasheet Fs and Cms,
+    the theoretical M_ms should be 93g, not 254g (63% error in datasheet).
+
+    This implementation uses the datasheet Cms and Fs values, calculating
+    M_md = 64.86g (driver mass only) to produce the correct resonance.
+    Radiation mass at 33 Hz is ~28.2g, giving M_ms = 93g total.
+
+    Radiation mass is calculated internally using Beranek (1954) theory
+    to match Hornresp methodology (2× radiation mass for infinite baffle).
     """
     return ThieleSmallParameters(
-        M_md=0.254,    # 254g driver mass only
+        M_md=0.064860, # 64.86g driver mass only (calculated to match datasheet Fs)
         C_ms=0.00025,  # 0.25 mm/N compliance (datasheet)
         R_ms=10.15,    # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=4.9,       # 4.9 Ω DC resistance (datasheet)
@@ -133,7 +150,6 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
     - Vas: 186 dm³ (186 L)
     - Sd: 1210 cm²
     - BL: 25.5 T·m
-    - Mmd: 209 g (driver mass only, excludes radiation mass)
     - Cms: 0.17 mm/N
     - Rms: 6.15 N·s/m (calculated from Qms)
     - Le: 1.58 mH
@@ -141,11 +157,20 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
 
     Literature: B&C 18PZW100 datasheet
 
-    Note: M_md is driver mass only. Radiation mass is calculated internally
-    using Beranek (1954) theory to match Hornresp methodology.
+    Note: M_md is driver mass only (excludes radiation mass).
+    WARNING: The datasheet Mms value (209g) is NOT consistent with the
+    datasheet Fs (37 Hz) and Cms (0.17 mm/N). Using the datasheet Fs and Cms,
+    the theoretical M_ms should be 109g, not 209g (48% error in datasheet).
+
+    This implementation uses the datasheet Cms and Fs values, calculating
+    M_md = 61.49g (driver mass only) to produce the correct resonance.
+    Radiation mass at 37 Hz is ~47.4g, giving M_ms = 109g total.
+
+    Radiation mass is calculated internally using Beranek (1954) theory
+    to match Hornresp methodology (2× radiation mass for infinite baffle).
     """
     return ThieleSmallParameters(
-        M_md=0.209,    # 209g driver mass only
+        M_md=0.061494, # 61.49g driver mass only (calculated to match datasheet Fs)
         C_ms=0.00017,  # 0.17 mm/N compliance (datasheet)
         R_ms=6.15,     # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=5.1,       # 5.1 Ω DC resistance (datasheet)

@@ -24,7 +24,7 @@ class TestElectricalImpedanceBareDriver:
     def sample_driver(self):
         """Create a sample driver for testing."""
         return ThieleSmallParameters(
-            M_ms=0.054,    # 54g
+            M_md=0.054,    # 54g
             C_ms=0.00019,  # Compliance (m/N)
             R_ms=5.2,      # Mechanical resistance (N·s/m)
             R_e=3.1,       # DC resistance (Ω)
@@ -153,7 +153,7 @@ class TestElectricalImpedanceBareDriver:
 
         # Double BL (create new driver)
         driver_high_bl = ThieleSmallParameters(
-            M_ms=sample_driver.M_ms,
+            M_md=sample_driver.M_ms,
             C_ms=sample_driver.C_ms,
             R_ms=sample_driver.R_ms,
             R_e=sample_driver.R_e,
@@ -218,7 +218,7 @@ class TestElectricalImpedanceBareDriver:
 
         # Double inductance
         driver_high_L = ThieleSmallParameters(
-            M_ms=sample_driver.M_ms,
+            M_md=sample_driver.M_ms,
             C_ms=sample_driver.C_ms,
             R_ms=sample_driver.R_ms,
             R_e=sample_driver.R_e,
@@ -235,7 +235,7 @@ class TestElectricalImpedanceBareDriver:
         """Test effect of mechanical resistance on impedance peak."""
         # Low mechanical resistance (high Q)
         driver_low_Rms = ThieleSmallParameters(
-            M_ms=sample_driver.M_ms,
+            M_md=sample_driver.M_ms,
             C_ms=sample_driver.C_ms,
             R_ms=1.0,  # Low resistance
             R_e=sample_driver.R_e,
@@ -247,7 +247,7 @@ class TestElectricalImpedanceBareDriver:
 
         # High mechanical resistance (low Q)
         driver_high_Rms = ThieleSmallParameters(
-            M_ms=sample_driver.M_ms,
+            M_md=sample_driver.M_ms,
             C_ms=sample_driver.C_ms,
             R_ms=20.0,  # High resistance
             R_e=sample_driver.R_e,
@@ -264,7 +264,7 @@ class TestElectricalImpedanceBareDriver:
         """Test with COMSOL example driver parameters."""
         # COMSOL (2020), Table 2 example driver
         driver = ThieleSmallParameters(
-            M_ms=0.0334,
+            M_md=0.0334,
             C_ms=0.00118,
             R_ms=1.85,
             R_e=6.4,
