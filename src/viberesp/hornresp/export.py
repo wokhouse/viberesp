@@ -345,10 +345,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = -0
-Tal2 = -0
-Tal3 = -0
-Tal4 = -0
+Tal1 = 0.00
+Tal2 = 0.00
+Tal3 = 0.00
+Tal4 = 0.00
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 

@@ -168,6 +168,12 @@ def validate_list(driver):
 
             # Collect configurations within this enclosure type
             config_list = []
+
+            # Check for flat structure (files directly in enclosure_dir, e.g., infinite_baffle)
+            if (enclosure_dir / "metadata.json").exists() and (enclosure_dir / "sim.txt").exists():
+                config_list.append("default")
+
+            # Also check for subdirectories (e.g., sealed/Vb31.6L)
             for config_dir in sorted(enclosure_dir.iterdir()):
                 if config_dir.is_dir():
                     # Check if it has metadata.json and sim.txt
@@ -200,33 +206,50 @@ def validate_list(driver):
             click.echo(f"{display_name}")
 
         for enclosure_type, config_list in sorted(configs.items()):
+            # Filter out "default" - used for infinite_baffle which has only one config
+            filtered_configs = [c for c in config_list if c != "default"]
+
+            # Check if this is a leaf node (only "default" config)
+            is_leaf = len(config_list) == 1 and config_list[0] == "default"
+
             # Format enclosure type nicely
             if len(drivers_data) > 1:
-                click.echo(f"├── {enclosure_type}")
-                prefix = "│   └── "
+                if is_leaf:
+                    # Leaf node, no sub-configurations to show
+                    click.echo(f"├── {enclosure_type}")
+                else:
+                    click.echo(f"├── {enclosure_type}")
+                    prefix = "│   └── "
             else:
                 # Single driver, no driver prefix
                 if list(configs.keys()).index(enclosure_type) < len(configs) - 1:
-                    click.echo(f"├── {enclosure_type}")
-                    prefix = "│   ├── "
+                    if is_leaf:
+                        click.echo(f"├── {enclosure_type}")
+                    else:
+                        click.echo(f"├── {enclosure_type}")
+                        prefix = "│   ├── "
                 else:
-                    click.echo(f"└── {enclosure_type}")
-                    prefix = "    └── "
+                    if is_leaf:
+                        click.echo(f"└── {enclosure_type}")
+                    else:
+                        click.echo(f"└── {enclosure_type}")
+                        prefix = "    └── "
 
-            # List configurations
-            config_list_sorted = sorted(config_list)
-            for i, config_name in enumerate(config_list_sorted):
-                if i < len(config_list_sorted) - 1:
-                    if len(drivers_data) == 1:
-                        # Single driver, show nested tree properly
-                        if list(configs.keys()).index(enclosure_type) < len(configs) - 1:
-                            click.echo(f"{prefix}{config_name}")
+            # List configurations (skip "default" as it's already shown)
+            if not is_leaf:
+                config_list_sorted = sorted(filtered_configs)
+                for i, config_name in enumerate(config_list_sorted):
+                    if i < len(config_list_sorted) - 1:
+                        if len(drivers_data) == 1:
+                            # Single driver, show nested tree properly
+                            if list(configs.keys()).index(enclosure_type) < len(configs) - 1:
+                                click.echo(f"{prefix}{config_name}")
+                            else:
+                                click.echo(f"{prefix}{config_name}")
                         else:
                             click.echo(f"{prefix}{config_name}")
                     else:
                         click.echo(f"{prefix}{config_name}")
-                else:
-                    click.echo(f"{prefix}{config_name}")
 
         click.echo()
 
