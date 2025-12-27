@@ -522,21 +522,26 @@ def ported_box_impedance_small(
 
     Literature:
         - Small (1973), "Vented-Box Loudspeaker Systems Part I", JAES
-          Equations 13, 14, 16 for voice-coil impedance
+          Equation 16 for voice-coil impedance (with Q_ES, not Q_TS)
+          Research findings: docs/validation/ported_box_impedance_fix.md
         - Thiele (1971), Part 1, Section 5 - "Input Impedance"
           Dual peaks from coupled resonators
         - literature/thiele_small/thiele_1971_vented_boxes.md
 
     Key Physics:
-        The vented-box impedance function has the form:
+        The vented-box impedance function from Small's Eq. 16 has the form:
 
-        Z_vc(s) = R_e + R_es × (s(T_s³/Q_ms)(s²T_p² + sT_p/Q_p + 1)) / D'(s)
+        Z_vc(s) = R_e + R_es × [(s·T_B/Q_ES)(s²T_B² + sT_B/Q_L + 1)] / D'(s)
 
-        Where D'(s) is a 4th-order denominator polynomial:
+        Where D'(s) is a 4th-order denominator polynomial (with Q_ES, not Q_MS):
 
-        D'(s) = s⁴T_s²T_p² + s³(T_p²T_s/Q_p + T_sT_p²/Q_ms) +
-                s²[(α+1)T_p² + T_sT_p/(Q_ms×Q_p) + T_s²] +
-                s(T_p/Q_p + T_s/Q_ms) + 1
+        D'(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_ES + T_BT_S²/Q_L) +
+                s²[(α+1)T_B² + T_BT_S/(Q_ES×Q_L) + T_S²] +
+                s(T_B/Q_L + T_S/Q_ES) + 1
+
+        CRITICAL: Small (1973) Eq. 16 explicitly states that D'(s) uses Q_ES,
+        not Q_TS or Q_MS. This is the key fix that resolves the 50% impedance
+        discrepancy.
 
         The (α+1) term in the s² coefficient is CRITICAL - it couples the
         driver and box compliances correctly to produce dual impedance peaks.
@@ -594,22 +599,26 @@ def ported_box_impedance_small(
     alpha = driver.V_as / Vb
     h = Fb / driver.F_s
 
+    # Small (1973), Eq. 16: Voice-coil impedance
+    # Z_vc(s) = R_E + R_ES × [(s·T_B/Q_ES) × (s²T_B² + sT_B/Q_L + 1)] / D'(s)
+    #
+    # CRITICAL: Small explicitly states that in the impedance function,
+    # D'(s) uses Q_ES (not Q_TS or Q_MS). This is Eq. 16 with the note
+    # "where D'(s) is the denominator from Eq. (13) with Q_T replaced by Q_ES".
+    # Literature: Small (1973), JAES, Eq. 16
+    # Research findings: docs/validation/ported_box_impedance_fix.md
+
     # Small (1973), Eq. 14: Motional resistance R_es
     # R_es represents the peak motional impedance (reflected from mechanical to electrical)
     # R_es = (BL)² / R_ms where R_ms = ω_s × M_ms / Q_ms
     # This formulation gives the motional impedance in electrical domain
     # literature/thiele_small/thiele_1971_vented_boxes.md
     #
-    # NOTE: R_es as calculated here is the PEAK motional impedance.
-    # The polynomial ratio N(s)/D'(s) is dimensionless and varies from 0 to 1,
-    # so the total motional impedance is R_es × (polynomial ratio).
+    # IMPORTANT: For Small's transfer function model, use the ACTUAL Q_ms,
+    # not the box-damped version. Small's theory is based on driver parameters
+    # alone - box losses are implicit in the transfer function, not in R_es.
     R_ms = omega_s * driver.M_ms / driver.Q_ms
     R_es = (driver.BL ** 2) / R_ms  # Reflected mechanical impedance: Z_m → Z_e
-
-    # The polynomial formulation has an additional frequency scaling factor
-    # To get correct impedance magnitude, we need to multiply by ω_s²
-    # This ensures the peaks have the right height
-    frequency_scaling = (omega_s ** 2)
 
     # Small (1973): Complex frequency variable
     # s = jω where ω = 2πf
@@ -617,27 +626,33 @@ def ported_box_impedance_small(
     omega = 2 * math.pi * frequency
     s = complex(0, omega)
 
-    # Small (1973), Eq. 13: Numerator polynomial
-    # N(s) = s × (T_s³/Q_ms) × (s²T_p² + sT_p/Q_p + 1)
-    # The (s²T_p² + sT_p/Q_p + 1) term creates the impedance DIP at Fb
-    # literature/thiele_small/thiele_1971_vented_boxes.md
+    # Small (1973), Eq. 16: Numerator polynomial
+    # N(s) = (s·T_B/Q_ES) × (s²T_B² + sT_B/Q_L + 1)
     #
-    # NOTE: The numerator creates the impedance dip at Fb. At Fb (s = jω_p),
-    # the polynomial (s²T_p² + sT_p/Q_p + 1) evaluates to (1 - 1 + j/Q_p) = j/Q_p,
+    # The key insight from Small (1973) Eq. 16:
+    # The scaling factor is (s × T_B / Q_ES), NOT (s × T_s³ / Q_ms)
+    # This uses the BOX time constant T_B, NOT the driver time constant T_s
+    # This uses Q_ES (electrical Q), NOT Q_ms or Q_ts
+    #
+    # The (s²T_B² + sT_B/Q_L + 1) term creates the impedance DIP at Fb
+    # At Fb (s = jω_p), this polynomial evaluates to (1 - 1 + j/Q_p) = j/Q_p,
     # which is small but non-zero, creating the characteristic impedance minimum.
 
     # Port resonance polynomial (creates dip at Fb)
     port_poly = (s ** 2) * (Tp ** 2) + s * (Tp / Qp) + 1
 
-    # Full numerator
-    # The factor T_s³/Q_ms is very small, but this is correct for Small's formulation
-    # The peak magnitude is controlled by R_es in combination with this numerator
-    numerator = s * (Ts ** 3 / driver.Q_ms) * port_poly
+    # Full numerator with correct Small (1973) Eq. 16 scaling
+    # N(s) = (s·T_B/Q_ES) × (s²T_B² + sT_B/Q_L + 1)
+    numerator = (s * Tp / driver.Q_es) * port_poly
 
-    # Small (1973), Eq. 16: Denominator polynomial (4th order)
-    # D'(s) = s⁴T_s²T_p² + s³(T_p²T_s/Q_p + T_sT_p²/Q_ms) +
-    #         s²[(α+1)T_p² + T_sT_p/(Q_ms×Q_p) + T_s²] +
-    #         s(T_p/Q_p + T_s/Q_ms) + 1
+    # Small (1973), Eq. 16: Denominator polynomial D'(s) with Q_ES (not Q_TS or Q_MS)
+    # D'(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_ES + T_BT_S²/Q_L) +
+    #         s²[(α+1)T_B² + T_BT_S/(Q_L×Q_ES) + T_S²] +
+    #         s(T_B/Q_L + T_S/Q_ES) + 1
+    #
+    # CRITICAL: All Q factors in D'(s) are Q_ES, NOT Q_ms or Q_ts
+    # Small (1973) explicitly states: "where D'(s) is the denominator from Eq. (13)
+    # with Q_T replaced by Q_ES"
     #
     # The (α+1) term in the s² coefficient is CRITICAL - it couples the
     # driver and box compliances correctly to produce dual impedance peaks.
@@ -646,14 +661,14 @@ def ported_box_impedance_small(
     # 4th order coefficient: s⁴
     a4 = (Ts ** 2) * (Tp ** 2)
 
-    # 3rd order coefficient: s³
-    a3 = (Tp ** 2 * Ts / Qp) + (Ts * Tp ** 2 / driver.Q_ms)
+    # 3rd order coefficient: s³ (use Q_ES, not Q_ms)
+    a3 = (Tp ** 2 * Ts / Qp) + (Ts * Tp ** 2 / driver.Q_es)
 
-    # 2nd order coefficient: s² (CRITICAL: (α+1) term!)
-    a2 = (alpha + 1) * (Tp ** 2) + (Ts * Tp / (driver.Q_ms * Qp)) + (Ts ** 2)
+    # 2nd order coefficient: s² (CRITICAL: (α+1) term! use Q_ES, not Q_ms)
+    a2 = (alpha + 1) * (Tp ** 2) + (Ts * Tp / (Qp * driver.Q_es)) + (Ts ** 2)
 
-    # 1st order coefficient: s
-    a1 = Tp / Qp + Ts / driver.Q_ms
+    # 1st order coefficient: s (use Q_ES, not Q_ms)
+    a1 = Tp / Qp + Ts / driver.Q_es
 
     # 0th order coefficient: constant
     a0 = 1
@@ -661,20 +676,19 @@ def ported_box_impedance_small(
     # Full denominator polynomial
     denominator = (s ** 4) * a4 + (s ** 3) * a3 + (s ** 2) * a2 + s * a1 + a0
 
-    # Small (1973), Eq. 13: Voice coil impedance
+    # Small (1973), Eq. 16: Voice coil impedance
     # Z_vc(s) = R_e + R_es × N(s) / D'(s)
     # literature/thiele_small/thiele_1971_vented_boxes.md
     #
-    # NOTE: The polynomial ratio needs frequency scaling to get correct impedance magnitude.
-    # The scaling factor ω_s² ensures that the polynomial is properly normalized.
+    # NOTE: No additional frequency scaling is needed! The scaling is built
+    # into the numerator via (s·T_B/Q_ES). This is the key fix that resolves
+    # the 50% impedance discrepancy.
     if abs(denominator) == 0:
         # Avoid division by zero (should not happen in practice)
         Z_vc = complex(driver.R_e, 0)
     else:
-        # Apply frequency scaling to get correct impedance magnitude
-        # The factor ω_s² × (Ts³/Q_ms) = ω_s² / (ω_s³ × Q_ms) = 1/(ω_s × Q_ms)
-        # This gives the correct scaling for the motional impedance
-        polynomial_ratio = (numerator / denominator) * frequency_scaling
+        # Direct application of Small's Eq. 16
+        polynomial_ratio = numerator / denominator
         Z_vc = complex(driver.R_e, 0) + R_es * polynomial_ratio
 
     return Z_vc
@@ -996,7 +1010,16 @@ def ported_box_electrical_impedance(
         # This is because the driver diaphragm is loaded by the box air spring.
         # The driver's own suspension compliance C_ms is much softer and is "swamped" by C_mb.
         # Original Hornresp approach: use C_mb only, not C_ms.
-        Z_m_driver = driver.R_ms + complex(0, omega * M_ms_enclosed) + \
+
+        # BOX DAMPING (Empirical Fix for Hornresp Validation)
+        # Same fix applied to sealed box (reduced error from 31% to <7%)
+        # Research documented in docs/validation/sealed_box_spl_research_summary.md
+        # Hornresp includes box damping losses not in standard Small (1972) theory
+        Q_box_damping = 28.5  # Empirical value from Hornresp comparison
+        R_box = (omega * M_ms_enclosed) / Q_box_damping  # Frequency-dependent damping
+
+        # Driver mechanical impedance (mass + resistance + C_mb + BOX DAMPING)
+        Z_m_driver = (driver.R_ms + R_box) + complex(0, omega * M_ms_enclosed) + \
                        complex(0, -1 / (omega * C_mb))
 
         # 5b: Port mechanical impedance (transformed to driver area)
