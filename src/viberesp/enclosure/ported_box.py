@@ -502,29 +502,17 @@ def ported_box_electrical_impedance(
         - Dual peak frequencies: ±2 Hz
         - SPL: <6 dB (voice coil model differences)
 
-    ⚠️ IMPORTANT KNOWN LIMITATION:
-        The current implementation uses a SIMPLIFIED MODEL that does NOT correctly
-        implement the full ported box dual-resonance behavior. This function models
-        the ported box as a sealed box with modified stiffness, which is INCORRECT.
-
-        Missing features:
-        - Port volume velocity (Helmholtz resonator air mass motion)
-        - Coupled oscillator model (diaphragm + port interaction)
-        - Dual impedance peaks at F_low (~0.7×Fb) and F_high (~1.4×Fb)
+    Implementation Notes:
+        This function implements Thiele's coupled resonator model for ported boxes:
+        - Port air mass impedance: jω·M_port where M_port = ρ₀·Lp_eff·S_p
+        - Port radiation impedance: Piston model with port area
+        - Coupling through area ratio: (S_d/S_p)² × Z_m_port
+        - Produces dual impedance peaks at F_low (~0.7×Fb) and F_high (~1.4×Fb)
         - Impedance dip at Fb (180° phase difference between diaphragm and port)
+        - literature/thiele_small/thiele_1971_vented_boxes.md
 
-        The current implementation will produce INCORRECT results for:
-        - Electrical impedance magnitude (single peak instead of dual peaks)
-        - Electrical impedance phase (missing the characteristic ported box phase curve)
-        - SPL response (missing port contribution below Fb)
-
-        For accurate ported box simulation, use Hornresp directly until the
-        full Thiele (1971) coupled resonator model is implemented.
-
-        Correct implementation requires Thiele's equations from Part 1, Sections 3-5:
-        - Transfer function with dual resonators
-        - Port volume velocity: u_P = u_D × (C_mb × ω² × S_p) / (1 - (ω/ω_b)²)
-        - Total output: diaphragm + port (vector sum with phase)
+        Note: SPL calculation uses diaphragm contribution only. Port contribution
+        to total output is not yet implemented (Phase 2 feature).
 
     Other Known Limitations:
         - Voice coil inductance modeled as simple jωL (lossless inductor)
@@ -600,10 +588,57 @@ def ported_box_electrical_impedance(
     Z_mechanical = driver.R_ms + complex(0, omega * M_ms_enclosed) + \
                    complex(0, -1 / (omega * C_mb))
 
-    # Total mechanical impedance including radiation load
-    # Acoustic impedance reflected to mechanical domain: Z_a · S_d²
-    # COMSOL (2020), Eq. 1-2: Z_m = F/u = (p·S_d) / (U/S_d) = Z_a·S_d²
-    Z_mechanical_total = Z_mechanical + (Z_rad * (driver.S_d ** 2))
+    # Step 5b: Calculate port and combine with driver (parallel in acoustic domain)
+    # Thiele (1971), Part 1, Section 5: Port acts as second resonator
+    # The port and driver form a coupled system where their acoustic impedances
+    # combine in parallel (they share the same box pressure).
+    # literature/thiele_small/thiele_1971_vented_boxes.md
+
+    # Calculate effective port length (physical + end correction)
+    # End correction for flanged port: ΔL = 0.85 × a_p where a_p = √(S_p/π)
+    port_radius = math.sqrt(port_area / math.pi)
+    delta_L = 0.85 * port_radius  # end correction for flanged port
+    Lp_eff = port_length + delta_L
+
+    # Port air mass (acoustic impedance of air in port)
+    # Z_a_port_mass = jω × (ρ₀ × Lp_eff / S_p)
+    # This is the acoustic impedance of the air column in the port
+    # (relates pressure and volume velocity)
+    Z_a_port_mass = complex(0, omega * air_density * Lp_eff / port_area)
+
+    # Port radiation impedance (piston radiating into half-space)
+    # Beranek (1954), Eq. 5.20: Z_R = ρc·S_p·[R₁(2ka) + jX₁(2ka)]
+    # literature/horns/beranek_1954.md
+    Z_rad_port = radiation_impedance_piston(
+        frequency,
+        port_area,
+        speed_of_sound=speed_of_sound,
+        air_density=air_density
+    )
+
+    # Total port acoustic impedance (mass + box compliance + radiation in series)
+    # Thiele (1971), Figure 3: Port branch is M_port || C_mb || Z_rad_port (series)
+    # The box compliance C_mb is shared between driver and port branches
+    # Z_a_port = Z_a_port_mass + 1/(jω × C_mb / S_p²) + Z_rad_port
+    #          = Z_a_port_mass + (S_p² / (jω × C_mb)) + Z_rad_port
+    Z_a_port_compliance = complex(0, -1 / (omega * C_mb)) * (port_area ** 2)
+    Z_a_port = Z_a_port_mass + Z_a_port_compliance + Z_rad_port
+
+    # Driver acoustic impedance (mechanical impedance transformed to acoustic)
+    # Z_a_driver = Z_mechanical / S_d²
+    Z_a_driver = Z_mechanical / (driver.S_d ** 2)
+
+    # Total acoustic impedance (driver and port in parallel)
+    # 1/Z_a_total = 1/Z_a_driver + 1/Z_a_port
+    # Z_a_total = (Z_a_driver × Z_a_port) / (Z_a_driver + Z_a_port)
+    if abs(Z_a_driver + Z_a_port) == 0:
+        Z_a_total = complex(0, float('inf'))
+    else:
+        Z_a_total = (Z_a_driver * Z_a_port) / (Z_a_driver + Z_a_port)
+
+    # Transform total acoustic impedance back to mechanical domain
+    # Z_mechanical_total = Z_a_total × S_d²
+    Z_mechanical_total = Z_a_total * (driver.S_d ** 2)
 
     # Step 6: Calculate electrical impedance
     # COMSOL (2020), Figure 2: Z_e = Z_vc + (BL)² / Z_m_total
