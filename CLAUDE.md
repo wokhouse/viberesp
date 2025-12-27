@@ -321,6 +321,42 @@ Be explicit about which model you're implementing:
 - Infinite horn: Olson (1947) analytical solutions
 - Finite horn: Beranek (1954) with mouth corrections, Kinsler (1982) transmission line approach
 
+### M_md vs M_ms: Driver Mass Parameters
+
+**CRITICAL**: Understand the distinction between driver mass parameters:
+
+- **M_md** (Driver Mass): Physical mass of voice coil + diaphragm only (kg)
+  - This is what you specify when creating a driver
+  - Sourced from datasheet as "Mmd" or "Mms" (note: datasheet naming is inconsistent)
+  - Does NOT include radiation mass loading
+
+- **M_ms** (Total Moving Mass): M_md + radiation mass (kg)
+  - This is calculated automatically in `ThieleSmallParameters.__post_init__()`
+  - Includes frequency-dependent radiation mass from the air load
+  - Used for resonance frequency and Q factor calculations
+
+**Why this matters:**
+Radiation mass loading significantly affects resonance frequency:
+```
+F_s = 1 / (2π√(M_ms·C_ms))
+
+where M_ms = M_md + 2×M_rad(F_s)
+```
+
+The 2× multiplier on radiation mass matches Hornresp's empirical methodology
+(see `src/viberesp/driver/radiation_mass.py` for implementation).
+
+**Example: BC_8NDL51**
+- M_md = 26.77 g (driver mass only, from datasheet)
+- M_rad ≈ 3.7 g (radiation mass at resonance, from Beranek theory)
+- M_ms ≈ 30.5 g (total mass = 26.77 + 2×3.7)
+- Resonance shift: 68.3 Hz (driver only) → 64.0 Hz (with radiation) = 6.7% lower
+
+**Literature:**
+- Beranek (1954), Eq. 5.20 - Radiation impedance and mass loading
+- `literature/horns/beranek_1954.md`
+- `src/viberesp/driver/radiation_mass.py` - Implementation with iterative solver
+
 ## When in Doubt
 
 1. **Read the literature** - Check `literature/horns/` for relevant equations

@@ -31,7 +31,12 @@ from viberesp.validation.compare import (
     compare_electrical_impedance_phase,
     generate_validation_report,
 )
-from viberesp.driver.bc_drivers import get_bc_8ndl51
+from viberesp.driver.bc_drivers import (
+    get_bc_8ndl51,
+    get_bc_12ndl76,
+    get_bc_15ds115,
+    get_bc_18pzw100,
+)
 
 # Leach (2002) model parameters for BC 8NDL51
 # These values account for eddy current losses in the voice coil former
@@ -323,3 +328,142 @@ class TestInfiniteBaffleValidationBC8NDL51:
         print(f"Ze magnitude - Max error: {ze_mag_result.max_percent_error:.2f}%, RMS: {ze_mag_result.rms_error:.3f} Ω")
         print(f"Ze phase - Max error: {ze_phase_result.max_absolute_error:.1f}°, RMS: {ze_phase_result.rms_error:.1f}°")
         print(f"SPL - Max error: {spl_result.max_absolute_error:.2f} dB, RMS: {spl_result.rms_error:.2f} dB")
+
+
+# Driver configuration for parametrized tests
+# Maps driver name to (getter_function, hornresp_filename)
+DRIVER_CONFIG = {
+    "bc_8ndl51": (get_bc_8ndl51, "8ndl51_sim.txt"),
+    "bc_12ndl76": (get_bc_12ndl76, "bc_12ndl76_sim.txt"),
+    "bc_15ds115": (get_bc_15ds115, "bc_15ds115_sim.txt"),
+    "bc_18pzw100": (get_bc_18pzw100, "bc_18pzw100_sim.txt"),
+}
+
+
+@pytest.mark.parametrize("driver_name,driver_getter,hornresp_file", [
+    ("bc_8ndl51", get_bc_8ndl51, "8ndl51_sim.txt"),
+    ("bc_12ndl76", get_bc_12ndl76, "bc_12ndl76_sim.txt"),
+    ("bc_15ds115", get_bc_15ds115, "bc_15ds115_sim.txt"),
+    ("bc_18pzw100", get_bc_18pzw100, "bc_18pzw100_sim.txt"),
+])
+class TestInfiniteBaffleValidationAllDrivers:
+    """Parametrized validation tests for all B&C drivers in infinite baffle."""
+
+    @pytest.fixture
+    def driver(self, driver_getter):
+        """Get driver parameters."""
+        return driver_getter()
+
+    @pytest.fixture
+    def hornresp_data(self, driver_name, hornresp_file):
+        """Load Hornresp reference data."""
+        data_path = (
+            Path(__file__).parent
+            / "drivers"
+            / driver_name
+            / "infinite_baffle"
+            / hornresp_file
+        )
+        return load_hornresp_sim_file(data_path)
+
+    def test_electrical_impedance_magnitude(self, driver, hornresp_data, driver_name):
+        """
+        Validate electrical impedance magnitude.
+
+        Uses simple voice coil model (jωL inductor) to match Hornresp
+        configuration (Leb=0, Ke=0, Rss=0).
+
+        Tolerance: <35% (accounts for resonance shift, <1% above 200 Hz).
+        """
+        # Calculate viberesp response
+        ze_viberesp = np.array(
+            [
+                direct_radiator_electrical_impedance(
+                    f, driver,
+                    voice_coil_model="simple",
+                )["Ze_magnitude"]
+                for f in hornresp_data.frequency
+            ]
+        )
+
+        # Compare with Hornresp
+        result = compare_electrical_impedance(
+            hornresp_data.frequency,
+            ze_viberesp,
+            hornresp_data,
+            tolerance_percent=35.0,
+        )
+
+        print(f"\n[{driver_name.upper()}] {result.summary}")
+
+        assert result.passed, f"[{driver_name}] ELECTRICAL IMPEDANCE MAGNITUDE validation failed: {result.summary}"
+
+    def test_electrical_impedance_phase(self, driver, hornresp_data, driver_name):
+        """
+        Validate electrical impedance phase.
+
+        Uses simple voice coil model (jωL inductor) to match Hornresp
+        configuration (Leb=0, Ke=0, Rss=0).
+
+        Tolerance: <90° (accounts for resonance shift, <2° above 200 Hz).
+        """
+        # Calculate viberesp response
+        ze_viberesp_complex = np.array(
+            [
+                complex(
+                    direct_radiator_electrical_impedance(
+                        f, driver,
+                        voice_coil_model="simple",
+                    )["Ze_real"],
+                    direct_radiator_electrical_impedance(
+                        f, driver,
+                        voice_coil_model="simple",
+                    )["Ze_imag"],
+                )
+                for f in hornresp_data.frequency
+            ]
+        )
+
+        # Compare with Hornresp
+        result = compare_electrical_impedance_phase(
+            hornresp_data.frequency,
+            ze_viberesp_complex,
+            hornresp_data,
+            tolerance_degrees=90.0,
+        )
+
+        print(f"\n[{driver_name.upper()}] {result.summary}")
+
+        assert result.passed, f"[{driver_name}] ELECTRICAL IMPEDANCE PHASE validation failed: {result.summary}"
+
+    def test_spl(self, driver, hornresp_data, driver_name):
+        """
+        Validate sound pressure level.
+
+        Uses simple voice coil model with I_active force correction.
+        Tolerance: <6 dB max, <4 dB RMS.
+        """
+        # Calculate viberesp SPL
+        spl_viberesp = np.array(
+            [
+                direct_radiator_electrical_impedance(
+                    f, driver,
+                    voice_coil_model="simple",
+                )["SPL"]
+                for f in hornresp_data.frequency
+            ]
+        )
+
+        # Compare with Hornresp
+        result = compare_spl(
+            hornresp_data.frequency,
+            spl_viberesp,
+            hornresp_data.spl_db,
+            tolerance_db=6.0,
+        )
+
+        print(f"\n[{driver_name.upper()}] {result.summary}")
+
+        assert result.passed, f"[{driver_name}] SPL validation failed: {result.summary}"
+        assert result.max_absolute_error < 6.0, f"[{driver_name}] Max SPL error {result.max_absolute_error:.2f} dB exceeds 6 dB"
+        assert result.rms_error < 4.0, f"[{driver_name}] SPL RMS error {result.rms_error:.2f} dB too high"

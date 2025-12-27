@@ -25,7 +25,7 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
     - Sd: 220 cm²
     - η0: 1%
     - Xmax: 7 mm
-    - Mms: 26.77 g (corrected from datasheet 28g)
+    - Mmd: 26.77 g (driver mass only, excludes radiation mass)
     - Bl: 12.39 T·m (corrected)
     - Le: 0.5 mH
     - Cms: 2.03E-04 m/N (corrected)
@@ -34,9 +34,12 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
 
     Literature: B&C 8NDL51 datasheet
     Validation: tests/validation/drivers/bc_8ndl51/infinite_baffle/8ndl51_correct.txt
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.02677,   # 26.77g moving mass (CORRECTED)
+        M_md=0.02677,   # 26.77g driver mass only (CORRECTED)
         C_ms=2.03e-4,   # 2.03E-04 m/N compliance (CORRECTED)
         R_ms=3.30,      # 3.30 N·s/m mechanical resistance (CORRECTED)
         R_e=5.3,        # 5.3 Ω DC resistance (datasheet)
@@ -59,18 +62,21 @@ def get_bc_12ndl76() -> ThieleSmallParameters:
     - Vas: 73 dm³ (73 L)
     - Sd: 522 cm²
     - BL: 20.1 T·m
-    - Mms: 53 g
+    - Mmd: 53 g (driver mass only, excludes radiation mass)
     - Cms: 0.19 mm/N
     - Rms: 4.0 N·s/m (calculated from Qms)
     - Le: 1.0 mH
     - Xmax: 7 mm
 
     Literature: B&C 12NDL76 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.053,    # 53g moving mass (datasheet)
+        M_md=0.053,    # 53g driver mass only (datasheet)
         C_ms=0.00019,  # 0.19 mm/N compliance (datasheet)
-        R_ms=4.0,      # Calculated from Qms: Rms = (2π·Fs·Mms) / Qms
+        R_ms=4.0,      # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=5.3,       # 5.3 Ω DC resistance (datasheet)
         L_e=1.0e-3,    # 1.0 mH voice coil inductance (datasheet)
         BL=20.1,       # 20.1 T·m force factor (datasheet)
@@ -91,18 +97,21 @@ def get_bc_15ds115() -> ThieleSmallParameters:
     - Vas: 94 dm³ (94 L)
     - Sd: 855 cm²
     - BL: 38.7 T·m
-    - Mms: 254 g
+    - Mmd: 254 g (driver mass only, excludes radiation mass)
     - Cms: 0.25 mm/N
     - Rms: 10.15 N·s/m (calculated from Qms)
     - Le: 4.5 mH
     - Xmax: 16.5 mm
 
     Literature: B&C 15DS115 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.254,    # 254g moving mass (datasheet)
+        M_md=0.254,    # 254g driver mass only
         C_ms=0.00025,  # 0.25 mm/N compliance (datasheet)
-        R_ms=10.15,    # Calculated from Qms: Rms = (2π·Fs·Mms) / Qms
+        R_ms=10.15,    # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=4.9,       # 4.9 Ω DC resistance (datasheet)
         L_e=4.5e-3,    # 4.5 mH voice coil inductance (datasheet)
         BL=38.7,       # 38.7 T·m force factor (datasheet)
@@ -123,18 +132,21 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
     - Vas: 186 dm³ (186 L)
     - Sd: 1210 cm²
     - BL: 25.5 T·m
-    - Mms: 209 g
+    - Mmd: 209 g (driver mass only, excludes radiation mass)
     - Cms: 0.17 mm/N
     - Rms: 6.15 N·s/m (calculated from Qms)
     - Le: 1.58 mH
     - Xmax: 8 mm
 
     Literature: B&C 18PZW100 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.209,    # 209g moving mass (datasheet)
+        M_md=0.209,    # 209g driver mass only
         C_ms=0.00017,  # 0.17 mm/N compliance (datasheet)
-        R_ms=6.15,     # Calculated from Qms: Rms = (2π·Fs·Mms) / Qms
+        R_ms=6.15,     # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
         R_e=5.1,       # 5.1 Ω DC resistance (datasheet)
         L_e=1.58e-3,   # 1.58 mH voice coil inductance (datasheet)
         BL=25.5,       # 25.5 T·m force factor (datasheet)
