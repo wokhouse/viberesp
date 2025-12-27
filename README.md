@@ -6,17 +6,38 @@ Viberesp is a CLI tool for simulating horn-loaded loudspeaker enclosures using a
 
 ## Features
 
-- **Literature-based simulation** - All algorithms cite established acoustic theory
-- **Hornresp validation** - Results validated against Hornresp at every stage
-- **Interactive design** - Explore enclosure parameters and see effects instantly
-- **Multiple horn types** - Exponential, hyperbolic, and conical profiles
-- **Driver modeling** - Thiele-Small parameter support
-- **Optimization tools** - Multi-objective optimization for design goals
-- **Export workflow** - Export designs to Hornresp format for cross-checking
+- **Automated optimization** - Multi-objective optimization using NSGA-II algorithm
+- **Agent-friendly API** - Python API optimized for AI agent interaction
+- **Enclosure recommendations** - Qts-based enclosure type suggestions
+- **Sealed box support** - Complete sealed box simulation and optimization
+- **Ported box support** - Bass reflex design with tuning optimization
+- **Literature-based** - All algorithms cite established acoustic theory
+- **Hornresp validation** - Results validated against Hornresp (in development)
+- **Pareto analysis** - Explore trade-offs between competing objectives
 
 ## Project Status
 
-⚠️ **Early Development** - Viberesp is in the initial development phase. The literature review and foundational documentation are complete. Implementation of the simulation engine is in progress.
+**Phase 7.2 Complete** - Viberesp has a fully functional optimization system for sealed and ported enclosures. Horn simulation is in development.
+
+### ✅ Implemented (Phase 7)
+- Multi-objective optimization (NSGA-II)
+- Sealed box design and optimization
+- Ported box design and optimization
+- Enclosure type recommendations
+- Agent-friendly Python API
+- Constraint handling (physical and performance)
+- Pareto front analysis
+
+### 🔄 In Development
+- Horn simulation engine (exponential, hyperbolic, conical)
+- Hornresp validation integration
+- CLI interface for human users
+- Parameter sweep tools
+
+### ⏳ Planned
+- Folded horn support
+- Multi-segment horn optimization
+- Advanced visualizations
 
 See [ROADMAP.md](ROADMAP.md) for detailed development phases.
 
@@ -125,6 +146,287 @@ viberesp validate eminence-delta-15-exp-horn --reference hornresp_results.txt
 ```
 
 Generates a comparison report showing agreement between Viberesp and Hornresp.
+
+## AI/Agent Usage
+
+Viberesp provides a **Python API optimized for AI agents** (like Claude Code). All functions return structured data (dataclasses, not text) for easy programmatic processing.
+
+### Quick Start for Agents
+
+```python
+from viberesp.optimization import DesignAssistant
+
+# Create design assistant
+assistant = DesignAssistant()
+```
+
+### Available Drivers
+
+```python
+# Pre-configured B&C drivers
+drivers = ["BC_8NDL51", "BC_12NDL76", "BC_15DS115", "BC_18PZW100"]
+
+# You can also import custom drivers using Thiele-Small parameters
+```
+
+### 1. Get Enclosure Recommendation
+
+```python
+# Get recommended enclosure type based on driver characteristics
+rec = assistant.recommend_design(
+    driver_name="BC_12NDL76",
+    max_volume_liters=50,      # Maximum enclosure size
+    target_f3=60,               # Target cutoff frequency (Hz)
+    enclosure_preference="auto"  # "auto", "sealed", "ported", or "horn"
+)
+
+# Returns DesignRecommendation dataclass:
+print(f"Recommended: {rec.enclosure_type}")        # "sealed" or "ported"
+print(f"Confidence: {rec.confidence:.0%}")         # 0.0 to 1.0
+print(f"Reasoning: {rec.reasoning}")               # Explanation with citations
+print(f"Parameters: {rec.suggested_parameters}")   # Dict of Vb, Fb, etc.
+print(f"Performance: {rec.expected_performance}")  # Dict of F3, Qtc, etc.
+print(f"Trade-offs: {rec.trade_offs}")             # Explanation of design choices
+
+# Recommendation logic (from Small 1972):
+# - Qts < 0.35  → Horn (high efficiency)
+# - 0.35 ≤ Qts < 0.45 → Sealed box (transient response)
+# - 0.45 ≤ Qts < 0.55 → Ported box (bass extension)
+# - Qts ≥ 0.55  → Sealed box (high Qts)
+```
+
+### 2. Optimize Design (Multi-Objective)
+
+```python
+# Run automated optimization to find best designs
+result = assistant.optimize_design(
+    driver_name="BC_12NDL76",
+    enclosure_type="sealed",           # "sealed" or "ported"
+    objectives=["f3", "size"],         # Minimize F3 and enclosure size
+    population_size=50,                # Population size (default: 100)
+    generations=30,                    # Generations (default: 100)
+    top_n=5                            # Return top 5 designs
+)
+
+# Returns OptimizationResult dataclass:
+print(f"Success: {result.success}")                    # True if optimization completed
+print(f"Found {result.n_designs_found} designs")       # Number on Pareto front
+print(f"Algorithm: {result.optimization_metadata['algorithm']}")  # "NSGA-II"
+
+# Access best designs
+for i, design in enumerate(result.best_designs, 1):
+    params = design['parameters']
+    objs = design['objectives']
+
+    if 'Fb' in params:  # Ported box has Fb parameter
+        Vb_liters = params['Vb'] * 1000
+        Fb_hz = params['Fb']
+        F3_hz = objs['f3']
+        print(f"Design #{i}: Vb={Vb_liters:.1f}L, Fb={Fb_hz:.1f}Hz, F3={F3_hz:.1f}Hz")
+    else:  # Sealed box
+        Vb_liters = params['Vb'] * 1000
+        F3_hz = objs['f3']
+        print(f"Design #{i}: Vb={Vb_liters:.1f}L, F3={F3_hz:.1f}Hz")
+```
+
+### Available Objectives
+
+```python
+# All objectives are minimized (lower is better)
+objectives = [
+    "f3",         # Cutoff frequency (-3dB point) in Hz
+    "flatness",   # Response flatness (deviation from perfect flat)
+    "efficiency", # Reference efficiency (negated for minimization)
+    "size"        # Enclosure volume in m³
+]
+
+# Common combinations:
+# - ["f3", "size"]          → Trade bass extension vs box size
+# - ["f3", "flatness"]      → Best bass response with flat response
+# - ["f3"]                  → Single-objective: minimize F3 only
+# - ["f3", "flatness", "size"] → Three-objective optimization
+```
+
+### 3. Explore Design Space
+
+```python
+# Example: Find smallest sealed box that achieves F3 ≤ 60 Hz
+result = assistant.optimize_design(
+    driver_name="BC_12NDL76",
+    enclosure_type="sealed",
+    objectives=["f3", "size"],
+    population_size=50,
+    generations=30,
+    top_n=10
+)
+
+# Filter results for F3 ≤ 60 Hz
+for design in result.best_designs:
+    if design['objectives']['f3'] <= 60:
+        Vb = design['parameters']['Vb'] * 1000
+        print(f"Vb={Vb:.1f}L gives F3={design['objectives']['f3']:.1f}Hz")
+```
+
+### 4. Ported Box Optimization
+
+```python
+# Ported box optimization includes tuning frequency (Fb)
+result = assistant.optimize_design(
+    driver_name="BC_12NDL76",
+    enclosure_type="ported",
+    objectives=["f3", "size"],
+    population_size=80,        # Ported boxes need larger populations
+    generations=50,
+    top_n=5
+)
+
+# Ported box parameters include:
+# - Vb: Box volume (m³)
+# - Fb: Tuning frequency (Hz)
+# - port_area: Port cross-sectional area (m²)
+# - port_length: Port length (m)
+
+for design in result.best_designs:
+    Vb = design['parameters']['Vb'] * 1000
+    Fb = design['parameters']['Fb']
+    F3 = design['objectives']['f3']
+    print(f"Vb={Vb:.1f}L, Fb={Fb:.1f}Hz → F3={F3:.1f}Hz")
+```
+
+### Complete Example: Design Subwoofer
+
+```python
+from viberesp.optimization import DesignAssistant
+
+# Goal: Design a subwoofer with BC_12NDL76
+# Constraints: Max 50L volume, target F3 ≤ 55 Hz
+
+assistant = DesignAssistant()
+
+# Step 1: Get recommendation
+rec = assistant.recommend_design(
+    driver_name="BC_12NDL76",
+    max_volume_liters=50,
+    target_f3=55
+)
+
+print(f"Recommended: {rec.enclosure_type}")
+print(f"Reasoning: {rec.reasoning}")
+
+# Step 2: Optimize for best performance within constraints
+result = assistant.optimize_design(
+    driver_name="BC_12NDL76",
+    enclosure_type=rec.enclosure_type,
+    objectives=["f3", "size"],
+    population_size=60,
+    generations=40,
+    top_n=3
+)
+
+# Step 3: Select best design meeting constraints
+best_design = None
+for design in result.best_designs:
+    Vb_liters = design['parameters']['Vb'] * 1000
+    F3 = design['objectives']['f3']
+
+    if Vb_liters <= 50 and F3 <= 55:
+        best_design = design
+        break
+
+if best_design:
+    print(f"\n✓ Found optimal design:")
+    print(f"  Vb = {best_design['parameters']['Vb']*1000:.1f} L")
+    print(f"  F3 = {best_design['objectives']['f3']:.1f} Hz")
+    if 'Fb' in best_design['parameters']:
+        print(f"  Fb = {best_design['parameters']['Fb']:.1f} Hz")
+else:
+    print("\n✗ No design meets constraints. Try relaxing requirements.")
+```
+
+### API Reference
+
+#### DesignAssistant
+
+```python
+class DesignAssistant:
+    """High-level API for enclosure design optimization."""
+
+    def recommend_design(
+        self,
+        driver_name: str,
+        objectives: List[str] = None,
+        max_volume_liters: float = None,
+        target_f3: float = None,
+        enclosure_preference: str = "auto",
+        efficiency_priority: bool = False
+    ) -> DesignRecommendation:
+        """Recommend enclosure type and initial design."""
+
+    def optimize_design(
+        self,
+        driver_name: str,
+        enclosure_type: str,
+        objectives: List[str],
+        constraints: Dict[str, float] = None,
+        population_size: int = 100,
+        generations: int = 100,
+        top_n: int = 10
+    ) -> OptimizationResult:
+        """Run multi-objective optimization using NSGA-II."""
+```
+
+#### Data Structures
+
+```python
+@dataclass
+class DesignRecommendation:
+    enclosure_type: str              # "sealed", "ported", or "horn"
+    confidence: float                # 0.0 to 1.0
+    reasoning: str                   # Explanation with literature citations
+    suggested_parameters: Dict[str, float]  # Vb, Fb, etc.
+    expected_performance: Dict[str, float]   # F3, Qtc, Fc, etc.
+    alternatives: List[Dict]         # Other enclosure types considered
+    trade_offs: str                  # Design trade-off explanation
+    validation_notes: List[str]      # Any validation warnings
+
+@dataclass
+class OptimizationResult:
+    success: bool                    # True if optimization completed
+    pareto_front: List[Dict]         # All Pareto-optimal designs
+    n_designs_found: int             # Number on Pareto front
+    best_designs: List[Dict]         # Top N designs ranked
+    parameter_names: List[str]       # ["Vb", "Fb", ...]
+    objective_names: List[str]       # ["f3", "size", ...]
+    optimization_metadata: Dict      # Algorithm, population, etc.
+    warnings: List[str]              # Any optimization warnings
+```
+
+### Theory Behind Optimization
+
+Viberesp uses **NSGA-II** (Non-dominated Sorting Genetic Algorithm II) for multi-objective optimization:
+
+- **Literature**: Deb et al. (2002) - "A fast and elitist multiobjective genetic algorithm: NSGA-II"
+- **Pareto Front**: Set of optimal designs where no objective can be improved without degrading another
+- **Trade-offs**: Explore the design space to understand trade-offs between objectives (e.g., F3 vs size)
+
+### Supported Enclosure Types
+
+| Type | Status | Parameters | Use Case |
+|------|--------|------------|----------|
+| Sealed | ✅ Implemented | Vb | Transient response, moderate bass |
+| Ported | ✅ Implemented | Vb, Fb, port_area, port_length | Extended bass, lower F3 |
+| Horn | ⏳ Planned | Throat area, mouth area, length, flare | High efficiency, controlled directivity |
+
+### Literature Citations
+
+All optimization algorithms cite established literature:
+
+- **Enclosure parameters**: Small (1972) - Closed-box system parameters
+- **Alignments**: Thiele (1971) - Vented box alignments (B4, QB3, BB4)
+- **Objectives**: Beranek (1954) - Frequency response and efficiency
+- **Optimization**: Deb (2002) - NSGA-II multi-objective algorithm
+
+See individual function docstrings for specific citations.
 
 ## Workflow
 
@@ -394,7 +696,7 @@ Existing libraries often lack proper documentation of theoretical foundations.
 
 ### Can I use Viberesp for sealed or ported enclosures?
 
-Not yet. Viberesp currently focuses on horn-loaded enclosures. Sealed (acoustic suspension) and ported (bass reflex) enclosures are planned for future development. See ROADMAP.md for details.
+**Yes!** Viberesp supports sealed and ported enclosures with automated optimization. Use the Python API for design assistance and optimization. See the "AI/Agent Usage" section below.
 
 ### What horn types are supported?
 
