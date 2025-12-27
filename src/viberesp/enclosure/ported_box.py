@@ -595,8 +595,8 @@ def ported_box_impedance_small(
     h = Fb / driver.F_s
 
     # Small (1973), Eq. 14: Motional resistance R_es
-    # R_es represents the peak impedance above Re at resonance
-    # R_es = (BL)² / (R_e × R_ms) where R_ms = ω_s × M_ms / Q_ms
+    # R_es represents the peak motional impedance (reflected from mechanical to electrical)
+    # R_es = (BL)² / R_ms where R_ms = ω_s × M_ms / Q_ms
     # This formulation gives the motional impedance in electrical domain
     # literature/thiele_small/thiele_1971_vented_boxes.md
     #
@@ -604,7 +604,7 @@ def ported_box_impedance_small(
     # The polynomial ratio N(s)/D'(s) is dimensionless and varies from 0 to 1,
     # so the total motional impedance is R_es × (polynomial ratio).
     R_ms = omega_s * driver.M_ms / driver.Q_ms
-    R_es = (driver.BL ** 2) / (driver.R_e * R_ms)
+    R_es = (driver.BL ** 2) / R_ms  # Reflected mechanical impedance: Z_m → Z_e
 
     # The polynomial formulation has an additional frequency scaling factor
     # To get correct impedance magnitude, we need to multiply by ω_s²
@@ -955,14 +955,14 @@ def ported_box_electrical_impedance(
             else:
                 Z_mechanical_total = (driver.BL ** 2) / Z_reflected
 
-                # Calculate diaphragm velocity using I_active force model
-                # Same as sealed box
-                # literature/thiele_small/comsol_lumped_loudspeaker_driver_2020.md
+                # Calculate diaphragm velocity from force and mechanical impedance
+                # F = BL × I (use current magnitude, not just in-phase component)
+                # u = F / |Z_m|
+                # COMSOL (2020), Figure 2 - Force and velocity relationship
                 I_complex = voltage / Ze
-                I_phase = cmath.phase(I_complex)
-                I_active = abs(I_complex) * math.cos(I_phase)
-                F_active = driver.BL * I_active
-                u_diaphragm_mag = F_active / abs(Z_mechanical_total)
+                I_mag = abs(I_complex)
+                F_mag = driver.BL * I_mag
+                u_diaphragm_mag = F_mag / abs(Z_mechanical_total)
                 u_diaphragm = complex(u_diaphragm_mag, 0)
 
     else:  # impedance_model == "circuit"
@@ -1102,18 +1102,13 @@ def ported_box_electrical_impedance(
             # Voice coil current
             I_complex = voltage / Ze
 
-            # Extract active (in-phase) component of current
-            # I_active = |I| × cos(phase(I))
-            I_phase = cmath.phase(I_complex)
-            I_active = abs(I_complex) * math.cos(I_phase)
-
-            # Calculate force using active current
-            # F_active = BL × I_active
-            F_active = driver.BL * I_active
-
-            # Diaphragm velocity from active force and mechanical impedance
-            # u_D = F_active / |Z_m_total|
-            u_diaphragm_mag = F_active / abs(Z_mechanical_total)
+            # Calculate diaphragm velocity from force and mechanical impedance
+            # F = BL × |I| (use current magnitude)
+            # u = F / |Z_m|
+            # COMSOL (2020), Figure 2 - Force and velocity relationship
+            I_mag = abs(I_complex)
+            F_mag = driver.BL * I_mag
+            u_diaphragm_mag = F_mag / abs(Z_mechanical_total)
             u_diaphragm = complex(u_diaphragm_mag, 0)
 
     # Step 8: Calculate sound pressure level
