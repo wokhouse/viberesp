@@ -233,3 +233,93 @@ Generated: 2025-12-27
 Investigation: Sealed box SPL validation failure
 Root cause: Mechanical impedance calculation discrepancy (4.43 vs 6.26 N·s/m)
 Impact: -15.29 dB SPL error @ 100 Hz
+
+---
+
+## Update 2025-12-27: Complex Current Fix
+
+### Root Cause Identified (via Research Agent)
+
+**Primary Issue**: Using `I_active` instead of full complex current for force calculation.
+
+**Correct Model**:
+```python
+# WRONG (old approach):
+I_active = |I| × cos(phase(I))
+F = BL × I_active
+u = F / |Z_mech|
+
+# CORRECT (standard loudspeaker model):
+F_complex = BL × I_complex  # Full complex current
+v_complex = F_complex / Z_mech  # Complex phasor division
+u = |v_complex|  # Use magnitude for SPL
+```
+
+### Results After Fix
+
+**At 100 Hz**:
+- **Before**: I_active model
+  - Velocity: 0.214 m/s
+  - Ze: 13.56 Ω @ -47.2°
+  - SPL: 88.89 dB
+  
+- **After**: Complex current model
+  - Velocity: 0.341 m/s (+59% improvement!)
+  - Ze: 11.14 Ω @ -51.1° ✓ (matches Hornresp 11.11 Ω)
+  - SPL: 92.92 dB (+4 dB improvement)
+  
+- **Target (Hornresp)**:
+  - Velocity: 0.474 m/s
+  - SPL: 104.93 dB
+
+### Progress Summary
+
+**Fixed:**
+1. ✓ Electrical impedance now matches Hornresp (11.14 vs 11.11 Ω)
+2. ✓ Velocity improved by 59%
+3. ✓ SPL improved by 4 dB
+4. ✓ Complex current model implemented correctly
+
+**Remaining Issue:**
+- Velocity still 27% low (0.341 vs 0.474 m/s)
+- SPL error: -12 dB at 100 Hz, ~11 dB RMS overall
+- Root cause: Mechanical impedance too high (5.44 vs ~3.9 N·s/m needed)
+
+### Analysis of Remaining Issue
+
+To achieve Hornresp's velocity of 0.474 m/s:
+- Required Z_mech: ~3.91 N·s/m  
+- Current Z_mech: 5.44 N·s/m
+- Reduction needed: 28%
+
+**Mass Analysis:**
+- Target mass to match Hornresp: M ≈ 27.09 g
+- Current driver.M_ms: 29.961 g (2× radiation)
+- Difference: -2.87 g (-9.6%)
+
+**Possible Solutions:**
+1. Use frequency-dependent radiation mass (varies with frequency)
+2. Include box damping (Q_b) in resistance calculation
+3. Different compliance model for sealed boxes
+4. Investigate Hornresp's exact algorithm for Z_mech
+
+### Code Changes
+
+**Commit 46a903b**: Fixed sealed box mechanical impedance
+- Changed from M_ms_enclosed to driver.M_ms
+- Simplified Fc calculation
+
+**Commit 6671b6b**: Fixed force calculation to use complex current
+- Changed from I_active to full complex I_complex
+- Changed from magnitude division to complex phasor division
+- Updated documentation
+
+---
+
+## Status (2025-12-27)
+
+**IN PROGRESS** - Major improvement achieved, ~27% velocity discrepancy remains.
+
+The complex current fix was a breakthrough, but the mechanical impedance model
+still needs refinement to match Hornresp exactly.
+
