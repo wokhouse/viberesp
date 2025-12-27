@@ -9,7 +9,9 @@ Literature:
 - COMSOL (2020), Lumped Loudspeaker Driver - Complete T/S parameter definitions
 - Thiele (1971) - Original T/S parameter papers
 - Small (1972) - Closed-box and vented-box systems
+- Beranek (1954), Eq. 5.20 - Radiation impedance and mass loading
 - literature/thiele_small/comsol_lumped_loudspeaker_driver_2020.md
+- literature/horns/beranek_1954.md
 """
 
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from viberesp.simulation.constants import (
     SPEED_OF_SOUND,
     CHARACTERISTIC_IMPEDANCE_AIR,
 )
+from viberesp.driver.radiation_mass import calculate_resonance_with_radiation_mass
 
 
 @dataclass
@@ -35,10 +38,12 @@ class ThieleSmallParameters:
         - COMSOL (2020), Tables 2-3 - Fundamental and derived parameters
         - Thiele (1971) - T/S parameter definitions
         - Small (1972) - Loudspeaker system analysis
+        - Beranek (1954), Eq. 5.20 - Radiation impedance and mass loading
         - literature/thiele_small/comsol_lumped_loudspeaker_driver_2020.md
+        - literature/horns/beranek_1954.md
 
     Attributes:
-        M_ms: Moving mass (kg) - voice coil + diaphragm
+        M_md: Driver mass only (kg) - voice coil + diaphragm, excludes radiation mass
         C_ms: Suspension compliance (m/N) - spider + surround
         R_ms: Mechanical resistance (N·s/m) - damping losses
         R_e: Voice coil DC resistance (Ω)
@@ -47,7 +52,8 @@ class ThieleSmallParameters:
         S_d: Effective piston area (m²)
 
     Derived Properties (calculated in __post_init__):
-        F_s: Resonance frequency (Hz)
+        M_ms: Total moving mass (kg) = M_md + radiation mass
+        F_s: Resonance frequency (Hz) - includes radiation mass loading
         Q_es: Electrical Q factor at F_s
         Q_ms: Mechanical Q factor at F_s
         Q_ts: Total Q factor at F_s
@@ -55,7 +61,7 @@ class ThieleSmallParameters:
 
     Examples:
         >>> driver = ThieleSmallParameters(
-        ...     M_ms=0.054,    # 54g moving mass
+        ...     M_md=0.054,    # 54g driver mass only (excludes radiation mass)
         ...     C_ms=0.00019,  # Compliance
         ...     R_ms=5.2,      # Mechanical resistance
         ...     R_e=3.1,       # DC resistance
@@ -64,13 +70,30 @@ class ThieleSmallParameters:
         ...     S_d=0.0522     # 522cm² effective area
         ... )
         >>> driver.F_s
-        49.78...  # Hz resonance frequency
+        49.78...  # Hz resonance frequency (with radiation mass)
+        >>> driver.M_ms * 1000  # Total mass including radiation
+        57.2...  # g (M_md + radiation mass)
         >>> driver.Q_ts
         0.19...  # Total Q factor
+
+    Note on M_md vs M_ms:
+        M_md is the driver's physical mass (voice coil + diaphragm) only,
+        excluding any air load. This is the value you specify when creating
+        a driver.
+
+        M_ms includes radiation mass loading from the air mass that moves
+        with the piston. This is calculated automatically using Beranek's
+        radiation impedance theory.
+
+        Datasheet note: Many manufacturers provide "Mms" which already includes
+        radiation mass. When using datasheet values, you may need to subtract
+        the radiation component (typically 2-4g for 8" drivers, more for larger
+        cones) to obtain M_md. Alternatively, use M_md directly if the datasheet
+        provides "Mmd" or specifies the moving mass without air load.
     """
 
     # Fundamental physical parameters
-    M_ms: float  # Moving mass (kg)
+    M_md: float  # Driver mass only (voice coil + diaphragm, kg)
     C_ms: float  # Suspension compliance (m/N)
     R_ms: float  # Mechanical resistance (N·s/m)
     R_e: float   # Voice coil DC resistance (Ω)
@@ -79,7 +102,8 @@ class ThieleSmallParameters:
     S_d: float   # Effective piston area (m²)
 
     # Derived properties (calculated in __post_init__)
-    F_s: float = None  # Resonance frequency (Hz)
+    M_ms: float = None  # Total moving mass including radiation (kg)
+    F_s: float = None   # Resonance frequency (Hz)
     Q_es: float = None  # Electrical Q factor
     Q_ms: float = None  # Mechanical Q factor
     Q_ts: float = None  # Total Q factor
@@ -92,9 +116,11 @@ class ThieleSmallParameters:
         Literature:
             - COMSOL (2020), Table 3 - Small-signal parameter formulas
             - Small (1972) - T/S parameter relationships
+            - Beranek (1954), Eq. 5.20 - Radiation impedance and mass loading
 
         Equations:
-            F_s = 1 / (2π√(M_ms·C_ms))
+            F_s = 1 / (2π√(M_ms·C_ms)) where M_ms includes radiation mass
+            M_ms = M_md + 2×M_rad(F_s) (iterative solution)
             Q_es = (2π·F_s·M_ms) / R_e
             Q_ms = (2π·F_s·M_ms) / R_ms
             Q_ts = (Q_es·Q_ms) / (Q_es + Q_ms)
@@ -103,17 +129,25 @@ class ThieleSmallParameters:
         # Validate fundamental parameters
         self._validate_parameters()
 
-        # Calculate resonance frequency
-        # COMSOL (2020), Table 3: F_s = 1/(2π√(M_md·C_ms))
-        self.F_s = 1.0 / (2.0 * math.pi * math.sqrt(self.M_ms * self.C_ms))
+        # Calculate resonance frequency including radiation mass loading
+        # Uses iterative solver to handle frequency-dependent radiation mass
+        # Beranek (1954), Eq. 5.20 - Radiation impedance
+        # Hornresp methodology: 2× radiation mass multiplier
+        self.F_s, self.M_ms = calculate_resonance_with_radiation_mass(
+            self.M_md,
+            self.C_ms,
+            self.S_d,
+            AIR_DENSITY,
+            SPEED_OF_SOUND
+        )
 
         # Calculate electrical Q factor
-        # COMSOL (2020), Table 3: Q_es = 2πF_s·M_md / R_E
+        # COMSOL (2020), Table 3: Q_es = 2πF_s·M_ms / R_E
         omega_s = 2.0 * math.pi * self.F_s
         self.Q_es = (omega_s * self.M_ms) / self.R_e
 
         # Calculate mechanical Q factor
-        # COMSOL (2020), Table 3: Q_ms = 2πF_s·M_md / R_ms
+        # COMSOL (2020), Table 3: Q_ms = 2πF_s·M_ms / R_ms
         if self.R_ms == 0:
             # Ideal driver with no mechanical losses has infinite Q_ms
             self.Q_ms = float('inf')
@@ -141,8 +175,8 @@ class ThieleSmallParameters:
         Raises:
             ValueError: If any parameter is outside valid range
         """
-        if self.M_ms <= 0:
-            raise ValueError(f"Moving mass M_ms must be > 0, got {self.M_ms} kg")
+        if self.M_md <= 0:
+            raise ValueError(f"Driver mass M_md must be > 0, got {self.M_md} kg")
 
         if self.C_ms <= 0:
             raise ValueError(

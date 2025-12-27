@@ -31,8 +31,8 @@ class HornrespRecord:
         Bl: Force factor (T·m)
         Cms: Suspension compliance (m/N)
         Rms: Mechanical resistance (N·s/m)
-        Mmd: Moving mass (kg)
-        Le: Voice coil inductance (H)
+        Mmd: Moving mass (g) - Hornresp uses grams, not kg
+        Le: Voice coil inductance (mH) - Hornresp uses millihenries, not henries
         Re: Voice coil DC resistance (Ω)
         Nd: Number of drivers (default: 1)
     """
@@ -41,8 +41,8 @@ class HornrespRecord:
     Bl: float  # T·m
     Cms: float  # m/N
     Rms: float  # N·s/m
-    Mmd: float  # kg
-    Le: float  # H
+    Mmd: float  # g (Hornresp uses grams for mass)
+    Le: float  # mH (Hornresp uses millihenries for inductance)
     Re: float  # Ω
     Nd: int = 1  # Number of drivers
 
@@ -86,7 +86,9 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
 
     Converts SI units to Hornresp conventions:
     - Area: m² → cm² (multiply by 10000)
-    - Mass, compliance, resistance, inductance, BL: SI (no change)
+    - Mass: kg → g (multiply by 1000)
+    - Inductance: H → mH (multiply by 1000)
+    - Compliance, resistance, BL: SI (no change)
 
     Literature:
         - Hornresp User Manual - Parameter units and format
@@ -106,11 +108,19 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
         >>> record = driver_to_hornresp_record(driver, "12NDL76")
         >>> record.Sd  # cm²
         522.0
-        >>> record.Mmd  # kg (same)
-        0.054
+        >>> record.Mmd  # g (converted from 0.054 kg)
+        54.0
+        >>> record.Le  # mH (converted from 0.72e-3 H)
+        0.72
     """
     # Convert area from m² to cm² (Hornresp uses cm²)
     sd_cm2 = driver.S_d * 10000.0
+
+    # Convert mass from kg to g (Hornresp uses grams)
+    mmd_g = driver.M_ms * 1000.0
+
+    # Convert inductance from H to mH (Hornresp uses millihenries)
+    le_mh = driver.L_e * 1000.0
 
     return HornrespRecord(
         driver_name=driver_name,
@@ -118,8 +128,8 @@ def driver_to_hornresp_record(driver: ThieleSmallParameters, driver_name: str) -
         Bl=driver.BL,
         Cms=driver.C_ms,
         Rms=driver.R_ms,
-        Mmd=driver.M_ms,
-        Le=driver.L_e,
+        Mmd=mmd_g,
+        Le=le_mh,
         Re=driver.R_e,
         Nd=1  # Single driver
     )
@@ -181,7 +191,7 @@ Comment = {comment_text}
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -195,7 +205,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -241,7 +251,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 

@@ -1,10 +1,10 @@
-ID = 478.63
+ID = 816.41
 
-Comment = BC_15DS115 driver parameters exported from viberesp
+Comment = BC_18PZW100 - 209.0g Mms, 25.5Tm BL, 1.58mH Le, 5.1ohm Re
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -18,7 +18,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 860.00
-Bl = 18.50
-Cms = 2.50E-04
-Rms = 4.70
-Mmd = 0.095
-Le = 0.001
-Re = 4.90
+Sd = 1210.00
+Bl = 25.50
+Cms = 1.70E-04
+Rms = 6.15
+Mmd = 209.000
+Le = 1.580
+Re = 5.10
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -73,7 +73,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 

@@ -1,10 +1,10 @@
-ID = 310.87
+ID = 505.05
 
-Comment = BC_8NDL51 driver parameters exported from viberesp
+Comment = BC_15DS115 - 254.0g Mms, 38.7Tm BL, 4.50mH Le, 4.9ohm Re
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -18,7 +18,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 215.00
-Bl = 7.50
-Cms = 2.40E-04
-Rms = 2.30
-Mmd = 0.025
-Le = 0.001
-Re = 5.30
+Sd = 855.00
+Bl = 38.70
+Cms = 2.50E-04
+Rms = 10.15
+Mmd = 254.000
+Le = 4.500
+Re = 4.90
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -73,7 +73,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 

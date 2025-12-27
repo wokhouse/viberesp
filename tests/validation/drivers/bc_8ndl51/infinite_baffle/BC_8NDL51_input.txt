@@ -1,10 +1,10 @@
-ID = 588.50
+ID = 170.91
 
-Comment = BC_18PZW100 driver parameters exported from viberesp
+Comment = BC_8NDL51 - 26.8g Mms, 12.4Tm BL, 0.50mH Le, 5.3ohm Re
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -18,7 +18,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 1250.00
-Bl = 14.50
-Cms = 1.70E-04
-Rms = 5.50
-Mmd = 0.155
-Le = 0.002
-Re = 5.10
+Sd = 220.00
+Bl = 12.39
+Cms = 2.03E-04
+Rms = 3.30
+Mmd = 26.770
+Le = 0.500
+Re = 5.30
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -73,7 +73,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 

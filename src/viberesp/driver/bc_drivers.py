@@ -15,30 +15,37 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
     """
     B&C 8NDL51-8 8" Midrange driver.
 
-    Datasheet specifications:
+    CORRECTED DATASHEET PARAMETERS (validated against Hornresp):
     - Fs: 66 Hz
     - Re: 5.3 Ω
+    - Qes: 0.41
+    - Qms: 3.6
     - Qts: 0.37
-    - Qes: 0.39
-    - Qms: 4.5
-    - Vas: 15 L
-    - Sd: 215 cm²
-    - BL: 7.5 T·m
-    - Mms: 25 g
-    - Cms: 0.24 mm/N
-    - Rms: 2.3 N·s/m
+    - Vas: 14 dm³ (14 L)
+    - Sd: 220 cm²
+    - η0: 1%
+    - Xmax: 7 mm
+    - Mmd: 26.77 g (driver mass only, excludes radiation mass)
+    - Bl: 12.39 T·m (corrected)
     - Le: 0.5 mH
+    - Cms: 2.03E-04 m/N (corrected)
+    - Rms: 3.30 N·s/m (corrected)
+    - EBP: 161 Hz
 
     Literature: B&C 8NDL51 datasheet
+    Validation: tests/validation/drivers/bc_8ndl51/infinite_baffle/8ndl51_correct.txt
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.025,    # 25g moving mass
-        C_ms=0.00024,  # 0.24 mm/N compliance
-        R_ms=2.3,      # 2.3 N·s/m mechanical resistance
-        R_e=5.3,       # 5.3 Ω DC resistance
-        L_e=0.5e-3,    # 0.5 mH voice coil inductance
-        BL=7.5,        # 7.5 T·m force factor
-        S_d=0.0215     # 215 cm² effective area
+        M_md=0.02677,   # 26.77g driver mass only (CORRECTED)
+        C_ms=2.03e-4,   # 2.03E-04 m/N compliance (CORRECTED)
+        R_ms=3.30,      # 3.30 N·s/m mechanical resistance (CORRECTED)
+        R_e=5.3,        # 5.3 Ω DC resistance (datasheet)
+        L_e=0.5e-3,     # 0.5 mH voice coil inductance (datasheet)
+        BL=12.39,       # 12.39 T·m force factor (CORRECTED)
+        S_d=0.0220,     # 220 cm² effective area (datasheet)
     )
 
 
@@ -48,28 +55,32 @@ def get_bc_12ndl76() -> ThieleSmallParameters:
 
     Datasheet specifications:
     - Fs: 50 Hz
-    - Re: 3.1 Ω
-    - Qts: 0.19
-    - Qes: 0.20
-    - Qms: 3.25
-    - Vas: 67 L
+    - Re: 5.3 Ω
+    - Qts: 0.2
+    - Qes: 0.21
+    - Qms: 4.2
+    - Vas: 73 dm³ (73 L)
     - Sd: 522 cm²
-    - BL: 16.5 T·m
-    - Mms: 54 g
+    - BL: 20.1 T·m
+    - Mmd: 53 g (driver mass only, excludes radiation mass)
     - Cms: 0.19 mm/N
-    - Rms: 5.2 N·s/m
-    - Le: 0.72 mH
+    - Rms: 4.0 N·s/m (calculated from Qms)
+    - Le: 1.0 mH
+    - Xmax: 7 mm
 
     Literature: B&C 12NDL76 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.054,    # 54g moving mass
-        C_ms=0.00019,  # 0.19 mm/N compliance
-        R_ms=5.2,      # 5.2 N·s/m mechanical resistance
-        R_e=3.1,       # 3.1 Ω DC resistance
-        L_e=0.72e-3,   # 0.72 mH voice coil inductance
-        BL=16.5,       # 16.5 T·m force factor
-        S_d=0.0522     # 522 cm² effective area
+        M_md=0.053,    # 53g driver mass only (datasheet)
+        C_ms=0.00019,  # 0.19 mm/N compliance (datasheet)
+        R_ms=4.0,      # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
+        R_e=5.3,       # 5.3 Ω DC resistance (datasheet)
+        L_e=1.0e-3,    # 1.0 mH voice coil inductance (datasheet)
+        BL=20.1,       # 20.1 T·m force factor (datasheet)
+        S_d=0.0522     # 522 cm² effective area (datasheet)
     )
 
 
@@ -82,25 +93,29 @@ def get_bc_15ds115() -> ThieleSmallParameters:
     - Re: 4.9 Ω
     - Qts: 0.17
     - Qes: 0.18
-    - Qms: 4.2
-    - Vas: 132 L
-    - Sd: 860 cm²
-    - BL: 18.5 T·m
-    - Mms: 95 g
+    - Qms: 5.2
+    - Vas: 94 dm³ (94 L)
+    - Sd: 855 cm²
+    - BL: 38.7 T·m
+    - Mmd: 254 g (driver mass only, excludes radiation mass)
     - Cms: 0.25 mm/N
-    - Rms: 4.7 N·s/m
-    - Le: 1.2 mH
+    - Rms: 10.15 N·s/m (calculated from Qms)
+    - Le: 4.5 mH
+    - Xmax: 16.5 mm
 
     Literature: B&C 15DS115 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.095,    # 95g moving mass
-        C_ms=0.00025,  # 0.25 mm/N compliance
-        R_ms=4.7,      # 4.7 N·s/m mechanical resistance
-        R_e=4.9,       # 4.9 Ω DC resistance
-        L_e=1.2e-3,    # 1.2 mH voice coil inductance
-        BL=18.5,       # 18.5 T·m force factor
-        S_d=0.0860     # 860 cm² effective area
+        M_md=0.254,    # 254g driver mass only
+        C_ms=0.00025,  # 0.25 mm/N compliance (datasheet)
+        R_ms=10.15,    # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
+        R_e=4.9,       # 4.9 Ω DC resistance (datasheet)
+        L_e=4.5e-3,    # 4.5 mH voice coil inductance (datasheet)
+        BL=38.7,       # 38.7 T·m force factor (datasheet)
+        S_d=0.0855     # 855 cm² effective area (datasheet)
     )
 
 
@@ -113,25 +128,29 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
     - Re: 5.1 Ω
     - Qts: 0.36
     - Qes: 0.38
-    - Qms: 6.5
-    - Vas: 280 L
-    - Sd: 1250 cm²
-    - BL: 14.5 T·m
-    - Mms: 155 g
+    - Qms: 7.9
+    - Vas: 186 dm³ (186 L)
+    - Sd: 1210 cm²
+    - BL: 25.5 T·m
+    - Mmd: 209 g (driver mass only, excludes radiation mass)
     - Cms: 0.17 mm/N
-    - Rms: 5.5 N·s/m
-    - Le: 2.1 mH
+    - Rms: 6.15 N·s/m (calculated from Qms)
+    - Le: 1.58 mH
+    - Xmax: 8 mm
 
     Literature: B&C 18PZW100 datasheet
+
+    Note: M_md is driver mass only. Radiation mass is calculated internally
+    using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_ms=0.155,    # 155g moving mass
-        C_ms=0.00017,  # 0.17 mm/N compliance
-        R_ms=5.5,      # 5.5 N·s/m mechanical resistance
-        R_e=5.1,       # 5.1 Ω DC resistance
-        L_e=2.1e-3,    # 2.1 mH voice coil inductance
-        BL=14.5,       # 14.5 T·m force factor
-        S_d=0.1250     # 1250 cm² effective area
+        M_md=0.209,    # 209g driver mass only
+        C_ms=0.00017,  # 0.17 mm/N compliance (datasheet)
+        R_ms=6.15,     # Calculated from Qms: Rms = (2π·Fs·Mmd) / Qms
+        R_e=5.1,       # 5.1 Ω DC resistance (datasheet)
+        L_e=1.58e-3,   # 1.58 mH voice coil inductance (datasheet)
+        BL=25.5,       # 25.5 T·m force factor (datasheet)
+        S_d=0.1210     # 1210 cm² effective area (datasheet)
     )
 
 

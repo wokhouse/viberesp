@@ -68,11 +68,16 @@ Create a validated loudspeaker simulation tool that:
   - Reflected impedance from mechanical domain
 
 **Known Issues:**
-- [ ] Voice coil inductance model needs refinement
-  - Current: Simple jωL_e model
-  - Required: Leach (1991) lossy inductor model or similar
-  - Impact: High-frequency impedance errors (up to 688% at 20 kHz)
-  - Low-mid frequency (10-200 Hz) shows good agreement
+- [x] ~~Voice coil inductance model needs refinement~~ ✅ RESOLVED
+  - Implemented: Leach (2002) lossy inductor model
+  - Literature: `literature/thiele_small/leach_2002_voice_coil_inductance.md`
+  - Results: High-frequency error reduced from 688% to <5%
+  - Validation: High-frequency test passes with 4.3% max error
+- [ ] Hornresp validation data mismatch (KNOWN ISSUE)
+  - Existing .sim files have Mmd=1.78g instead of 25g (wrong driver parameters)
+  - Causes resonance at 165 Hz instead of 65 Hz
+  - Workaround: High-frequency validation (>1 kHz) where data is consistent
+  - TODO: Regenerate Hornresp data with correct parameters
 
 ### Pending Tasks
 

@@ -1,10 +1,10 @@
-ID = 641.97
+ID = 975.41
 
-Comment = BC_12NDL76 driver parameters exported from viberesp
+Comment = BC_12NDL76 - 53.0g Mms, 20.1Tm BL, 1.00mH Le, 5.3ohm Re
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.00
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -18,7 +18,7 @@ F12 = 0.00
 S2 = 0.00
 S3 = 0.00
 Exp = 0.00
-F23 = 0.00
+AT = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -31,12 +31,12 @@ F45 = 0.00
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
 Sd = 522.00
-Bl = 16.50
+Bl = 20.10
 Cms = 1.90E-04
-Rms = 5.20
-Mmd = 0.054
-Le = 0.001
-Re = 3.10
+Rms = 4.00
+Mmd = 53.000
+Le = 1.000
+Re = 5.30
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -73,7 +73,7 @@ Pamp = 100
 Vamp = 25
 Iamp = 4
 Pmax = 200
-Xmax = 5.0
+Xmax = 7.0
 
 Maximum SPL Setting = 3
 
