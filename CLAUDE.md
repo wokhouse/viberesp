@@ -130,6 +130,105 @@ Acceptable tolerances:
 - Close to cutoff (f ≈ f_c): <5% deviation (numerical sensitivity)
 - Below cutoff (f < f_c): qualitative agreement only
 
+### Exporting to Hornresp Format
+
+Viberesp can export driver and enclosure parameters to Hornresp's native `.txt` file format for direct import and validation.
+
+**Using the export function:**
+
+```python
+from viberesp.hornresp.export import export_to_hornresp
+from viberesp.driver.bc_drivers import get_bc_15ps100
+
+# Get driver
+driver = get_bc_15ps100()
+
+# Export ported box design
+export_to_hornresp(
+    driver=driver,
+    driver_name="15PS100 Ported B4",
+    output_path="15ps100_ported.txt",
+    comment="B4 Butterworth alignment",
+    enclosure_type="ported_box",
+    Vb_liters=105.5,
+    Fb_hz=37.3,
+    port_area_cm2=140.2,
+    port_length_cm=22.8
+)
+```
+
+**Supported enclosure types:**
+- `"infinite_baffle"` - No enclosure parameters needed
+- `"sealed_box"` - Requires `Vb_liters` (box volume in liters)
+- `"ported_box"` - Requires `Vb_liters`, `Fb_hz`, `port_area_cm2`, `port_length_cm`
+
+**Critical differences between viberesp and Hornresp:**
+
+1. **M_md vs M_ms**: Hornresp expects **M_md** (driver mass only, without radiation mass)
+   - Viberesp exports `M_md` automatically via `driver_to_hornresp_record()`
+   - Hornresp calculates its own radiation mass loading
+   - **Never export M_ms** to Hornresp (would double-count radiation mass)
+
+2. **Unit conversions** (handled automatically by export function):
+   - Area: m² → cm² (multiply by 10000)
+   - Mass: kg → g (multiply by 1000)
+   - Inductance: H → mH (multiply by 1000)
+   - Compliance: m/N (scientific notation format: X.XXE-XX)
+
+3. **File format requirements**:
+   - CRLF line endings (`\r\n`) - not Unix LF (`\n`)
+   - Section headers with `|` prefix (e.g., `|TRADITIONAL DRIVER PARAMETER VALUES:`)
+   - Cms in scientific notation with exactly 2 decimal places
+   - All required sections must be present
+
+4. **Chamber depth (Lrc)**: Auto-calculated if not provided
+   - Must be > 0 for sealed/ported boxes (Hornresp requirement)
+   - Calculated as cube root of Vb, clamped to physical constraints
+   - Constraints: `2×piston_radius ≤ Lrc ≤ Vb/S_piston`
+
+**Example: Exporting a complete design**
+
+```python
+# Calculate optimal design
+from viberesp.enclosure.ported_box import (
+    calculate_ported_box_system_parameters,
+    calculate_optimal_port_dimensions
+)
+
+# Design parameters
+Vb = driver.V_as  # Use Vas for B4 alignment
+Fb = driver.F_s   # Use Fs for B4 alignment
+
+# Get system parameters
+params = calculate_ported_box_system_parameters(driver, Vb, Fb)
+port_area_m2, port_length_m, _ = calculate_optimal_port_dimensions(driver, Vb, Fb)
+
+# Export to Hornresp
+export_to_hornresp(
+    driver=driver,
+    driver_name="15PS100_B4",
+    output_path="designs/15ps100_b4.txt",
+    comment="B4 Butterworth: Vb=Vas, Fb=Fs",
+    enclosure_type="ported_box",
+    Vb_liters=Vb * 1000,
+    Fb_hz=Fb,
+    port_area_cm2=port_area_m2 * 10000,
+    port_length_cm=port_length_m * 100
+)
+```
+
+**Validation workflow:**
+
+1. Export design from viberesp
+2. Import into Hornresp (File → Import)
+3. Run simulations in both tools
+4. Compare frequency responses, impedance curves
+5. Document any discrepancies
+
+**Literature:**
+- Hornresp User Manual - File format specification
+- `src/viberesp/hornresp/export.py` - Implementation with format details
+
 ## Code Structure Conventions
 
 ### Directory Organization

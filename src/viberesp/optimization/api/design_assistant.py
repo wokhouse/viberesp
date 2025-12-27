@@ -111,6 +111,7 @@ class DesignAssistant:
             "BC_8NDL51": bc_drivers.get_bc_8ndl51,
             "BC_12NDL76": bc_drivers.get_bc_12ndl76,
             "BC_15DS115": bc_drivers.get_bc_15ds115,
+            "BC_15PS100": bc_drivers.get_bc_15ps100,
             "BC_18PZW100": bc_drivers.get_bc_18pzw100,
         }
 
@@ -310,6 +311,7 @@ class DesignAssistant:
             "BC_8NDL51": bc_drivers.get_bc_8ndl51,
             "BC_12NDL76": bc_drivers.get_bc_12ndl76,
             "BC_15DS115": bc_drivers.get_bc_15ds115,
+            "BC_15PS100": bc_drivers.get_bc_15ps100,
             "BC_18PZW100": bc_drivers.get_bc_18pzw100,
         }
 
@@ -415,6 +417,18 @@ class DesignAssistant:
                 n_generations=generations,
                 verbose=False  # Don't print progress
             )
+            # Check if optimization succeeded
+            if result.F is None or len(result.F) == 0:
+                return OptimizationResult(
+                    success=False,
+                    pareto_front=[],
+                    n_designs_found=0,
+                    best_designs=[],
+                    parameter_names=param_space.get_parameter_names(),
+                    objective_names=objectives,
+                    optimization_metadata={},
+                    warnings=["Optimization completed but found no valid designs. This may indicate all designs violated constraints."]
+                )
         except Exception as e:
             return OptimizationResult(
                 success=False,
@@ -547,6 +561,7 @@ class DesignAssistant:
             "BC_8NDL51": bc_drivers.get_bc_8ndl51,
             "BC_12NDL76": bc_drivers.get_bc_12ndl76,
             "BC_15DS115": bc_drivers.get_bc_15ds115,
+            "BC_15PS100": bc_drivers.get_bc_15ps100,
             "BC_18PZW100": bc_drivers.get_bc_18pzw100,
         }
 

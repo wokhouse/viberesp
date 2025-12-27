@@ -67,14 +67,19 @@ def objective_enclosure_volume(
     elif enclosure_type == "ported":
         # Box volume + port volume displacement
         Vb = design_vector[0]
-        port_area = design_vector[2]
-        port_length = design_vector[3]
 
-        # Port volume = port_area × port_length
-        # Add 20% safety factor for bracing and internal displacement
-        port_volume = port_area * port_length * 1.2
+        # If port dimensions are provided (design_vector has 4 elements)
+        if len(design_vector) >= 4:
+            port_area = design_vector[2]
+            port_length = design_vector[3]
 
-        return Vb + port_volume
+            # Port volume = port_area × port_length
+            # Add 20% safety factor for bracing and internal displacement
+            port_volume = port_area * port_length * 1.2
+            return Vb + port_volume
+        else:
+            # Port dimensions not provided, just return box volume
+            return Vb
 
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")

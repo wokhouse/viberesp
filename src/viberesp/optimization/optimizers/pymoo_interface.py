@@ -103,9 +103,9 @@ def run_nsga2(
 
     # Extract convergence metrics if history was saved
     convergence_info = {}
-    if hasattr(result, 'history') and result.history:
+    if verbose and hasattr(result, 'history') and result.history:
         # Extract objective values over generations
-        convergence_info['n_evals'] = result.algorithm.evaluator.n_evals
+        convergence_info['n_evals'] = result.algorithm.evaluator.n_eval
         convergence_info['final_pop_size'] = len(result.F)
 
     # Metadata
@@ -114,7 +114,7 @@ def run_nsga2(
         "pop_size": pop_size,
         "n_generations": n_generations,
         "n_evaluations": result.algorithm.evaluator.n_eval,
-        "n_pareto_designs": len(result.F),
+        "n_pareto_designs": len(result.F) if result.F is not None else 0,
         "convergence": convergence_info
     }
 

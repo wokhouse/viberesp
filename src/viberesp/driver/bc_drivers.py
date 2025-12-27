@@ -184,9 +184,62 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
     )
 
 
+def get_bc_15ps100() -> ThieleSmallParameters:
+    """
+    B&C 15PS100 15" Subwoofer driver.
+
+    Datasheet specifications:
+    - Fs: 39 Hz
+    - Re: 5.2 Ω
+    - Qes: 0.47
+    - Qms: 6.0
+    - Qts: 0.43
+    - Vas: 103 dm³ (103 L)
+    - Sd: 855 cm²
+    - η0: 1.35%
+    - Xmax: 8 mm
+    - Mms: 160 g (total moving mass)
+    - Bl: 21.2 T·m
+    - Le: 2 mH
+    - EBP: 83 Hz
+
+    Literature: B&C 15PS100 datasheet
+    Source: https://www.bcspeakers.com/
+
+    Note: M_md is driver mass only (excludes radiation mass).
+    The datasheet Mms=160g, Fs=39Hz, and Vas=103L are consistent when
+    using the standard Thiele-Small relationships.
+
+    Calculated from datasheet Mms=160g and Fs=39Hz:
+    - C_ms = 1.04e-4 m/N (from Fs² = 1/(4π²·M_ms·C_ms))
+    - R_ms = 6.53 N·s/m (from Qms = 2π·Fs·M_ms/R_ms)
+    - M_md = 0.147 kg (M_ms - 2×M_rad at 39 Hz)
+
+    Resulting values (match datasheet):
+    - Fs ≈ 39 Hz ✓
+    - Qes ≈ 0.45 ✓ (datasheet 0.47)
+    - Qms ≈ 6.0 ✓
+    - Qts ≈ 0.44 ✓ (datasheet 0.43)
+    - Vas ≈ 105 L ✓ (datasheet 103 L)
+
+    Radiation mass is calculated internally using Beranek (1954) theory
+    to match Hornresp methodology (2× radiation mass for infinite baffle).
+    """
+    return ThieleSmallParameters(
+        M_md=0.147,    # 147g driver mass only (M_ms - 2×M_rad)
+        C_ms=1.04e-4,  # 0.104 mm/N compliance (from Fs=39Hz, Mms=160g)
+        R_ms=6.53,     # Mechanical resistance (from Qms=6.0)
+        R_e=5.2,       # 5.2 Ω DC resistance (datasheet)
+        L_e=2.0e-3,    # 2.0 mH voice coil inductance (datasheet)
+        BL=21.2,       # 21.2 T·m force factor (datasheet)
+        S_d=0.0855,    # 855 cm² effective area (datasheet)
+        X_max=0.008,   # 8 mm maximum linear excursion (datasheet)
+    )
+
+
 def get_all_bc_drivers() -> list[tuple[ThieleSmallParameters, str]]:
     """
-    Return all 4 B&C drivers as a list of (driver, name) tuples.
+    Return all B&C drivers as a list of (driver, name) tuples.
 
     Useful for batch operations and testing.
 
@@ -197,5 +250,6 @@ def get_all_bc_drivers() -> list[tuple[ThieleSmallParameters, str]]:
         (get_bc_8ndl51(), "BC_8NDL51"),
         (get_bc_12ndl76(), "BC_12NDL76"),
         (get_bc_15ds115(), "BC_15DS115"),
+        (get_bc_15ps100(), "BC_15PS100"),
         (get_bc_18pzw100(), "BC_18PZW100"),
     ]

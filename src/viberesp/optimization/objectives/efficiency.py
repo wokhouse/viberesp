@@ -112,7 +112,7 @@ def objective_efficiency(
                     port_area = design_vector[2]
                     port_length = design_vector[3]
                 else:
-                    port_area, port_length = calculate_optimal_port_dimensions(
+                    port_area, port_length, _ = calculate_optimal_port_dimensions(
                         driver, Vb, Fb
                     )
 

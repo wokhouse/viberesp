@@ -180,7 +180,7 @@ def objective_response_flatness(
                 else:
                     # Simplified calculation without port detail
                     from viberesp.enclosure.ported_box import calculate_optimal_port_dimensions
-                    port_area, port_length = calculate_optimal_port_dimensions(
+                    port_area, port_length, _ = calculate_optimal_port_dimensions(
                         driver, Vb, Fb
                     )
                     result = ported_box_electrical_impedance(
