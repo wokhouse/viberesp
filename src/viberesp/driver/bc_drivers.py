@@ -52,6 +52,7 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
         L_e=0.15e-3,   # 0.15 mH voice coil inductance (datasheet)
         BL=7.3,        # 7.3 T·m force factor (datasheet)
         S_d=0.0220,    # 220 cm² effective area (datasheet)
+        X_max=0.007,   # 7 mm maximum linear excursion (datasheet)
     )
 
 
@@ -90,7 +91,8 @@ def get_bc_12ndl76() -> ThieleSmallParameters:
         R_e=5.3,       # 5.3 Ω DC resistance (datasheet)
         L_e=1.0e-3,    # 1.0 mH voice coil inductance (datasheet)
         BL=20.1,       # 20.1 T·m force factor (datasheet)
-        S_d=0.0522     # 522 cm² effective area (datasheet)
+        S_d=0.0522,    # 522 cm² effective area (datasheet)
+        X_max=0.007,   # 7 mm maximum linear excursion (datasheet)
     )
 
 
@@ -133,7 +135,8 @@ def get_bc_15ds115() -> ThieleSmallParameters:
         R_e=4.9,       # 4.9 Ω DC resistance (datasheet)
         L_e=4.5e-3,    # 4.5 mH voice coil inductance (datasheet)
         BL=38.7,       # 38.7 T·m force factor (datasheet)
-        S_d=0.0855     # 855 cm² effective area (datasheet)
+        S_d=0.0855,    # 855 cm² effective area (datasheet)
+        X_max=0.0165,  # 16.5 mm maximum linear excursion (datasheet)
     )
 
 
@@ -176,7 +179,8 @@ def get_bc_18pzw100() -> ThieleSmallParameters:
         R_e=5.1,       # 5.1 Ω DC resistance (datasheet)
         L_e=1.58e-3,   # 1.58 mH voice coil inductance (datasheet)
         BL=25.5,       # 25.5 T·m force factor (datasheet)
-        S_d=0.1210     # 1210 cm² effective area (datasheet)
+        S_d=0.1210,    # 1210 cm² effective area (datasheet)
+        X_max=0.008,   # 8 mm maximum linear excursion (datasheet)
     )
 
 

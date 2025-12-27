@@ -342,9 +342,14 @@ These are not currently planned but may be considered later:
 
 ### Additional Enclosure Types
 - [ ] Transmission line enclosures
-- [ ] Sealed (acoustic suspension) boxes
-- [ ] Ported (bass reflex) enclosures
+- [x] Sealed (acoustic suspension) boxes ✅ (Implemented in Phase 1)
+- [x] Ported (bass reflex) enclosures ✅ (Implemented Dec 2025)
 - [ ] Bandpass enclosures
+
+**Implementation Status:**
+- Sealed boxes: Full simulation + Hornresp validation + B4 alignments
+- Ported boxes: Helmholtz tuning, port sizing, electrical impedance, Hornresp export
+- See `src/viberesp/enclosure/` for implementation details
 
 ### Advanced Horn Features
 - [ ] Folded horns (folding geometry)

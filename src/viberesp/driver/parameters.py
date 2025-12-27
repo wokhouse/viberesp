@@ -50,6 +50,7 @@ class ThieleSmallParameters:
         L_e: Voice coil inductance (H)
         BL: Force factor (T·m) - magnetic field × coil length
         S_d: Effective piston area (m²)
+        X_max: Maximum linear excursion (m) - optional, for port sizing calculations
 
     Derived Properties (calculated in __post_init__):
         M_ms: Total moving mass (kg) = M_md + radiation mass
@@ -100,6 +101,7 @@ class ThieleSmallParameters:
     L_e: float   # Voice coil inductance (H)
     BL: float    # Force factor (T·m)
     S_d: float   # Effective piston area (m²)
+    X_max: float = None  # Maximum linear excursion (m), optional parameter for port sizing
 
     # Derived properties (calculated in __post_init__)
     M_ms: float = None  # Total moving mass including radiation (kg)
