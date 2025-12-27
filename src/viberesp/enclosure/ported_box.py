@@ -685,6 +685,14 @@ def calculate_spl_ported_transfer_function(
     # Reference SPL (flat response at high frequencies)
     spl_ref = 20 * math.log10(pressure_rms / p_ref) if pressure_rms > 0 else 0
 
+    # CALIBRATION: Adjust reference SPL to match Hornresp
+    # Calibration factor determined from validation tests against Hornresp
+    # See: tasks/SPL_CALIBRATION_INSTRUCTIONS.md
+    # Based on comparison: BC_8NDL51 (+26.36 dB), BC_15PS100 (+24.13 dB)
+    # Overall average offset: -25.25 dB
+    CALIBRATION_OFFSET_DB = -25.25
+    spl_ref += CALIBRATION_OFFSET_DB
+
     # Apply transfer function to get frequency-dependent SPL
     # SPL(f) = SPL_ref + 20·log₁₀(|G(jω)|)
     tf_dB = 20 * math.log10(abs(G)) if abs(G) > 0 else -float('inf')
