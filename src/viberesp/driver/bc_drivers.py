@@ -15,37 +15,38 @@ def get_bc_8ndl51() -> ThieleSmallParameters:
     """
     B&C 8NDL51-8 8" Midrange driver.
 
-    CORRECTED DATASHEET PARAMETERS (validated against Hornresp):
-    - Fs: 66 Hz
-    - Re: 5.3 Ω
-    - Qes: 0.41
-    - Qms: 3.6
-    - Qts: 0.37
-    - Vas: 14 dm³ (14 L)
+    Datasheet specifications:
+    - Fs: 75 Hz
+    - Re: 2.6 Ω
+    - Qes: 0.64
+    - Qms: 5.22
+    - Qts: 0.57
+    - Vas: 10.1 dm³ (10.1 L)
     - Sd: 220 cm²
-    - η0: 1%
+    - η0: 0.73%
     - Xmax: 7 mm
-    - Mmd: 26.77 g (driver mass only, excludes radiation mass)
-    - Bl: 12.39 T·m (corrected)
-    - Le: 0.5 mH
-    - Cms: 2.03E-04 m/N (corrected)
-    - Rms: 3.30 N·s/m (corrected)
-    - EBP: 161 Hz
+    - Mms: 27 g (total moving mass, includes radiation mass)
+    - Bl: 7.3 T·m
+    - Le: 0.15 mH
+    - Cms: 150 mm/N (calculated from Vas)
+    - Rms: 2.44 N·s/m (calculated from Qms)
+    - Mmd: 25.16 g (driver mass only, excludes radiation mass)
+    - EBP: 117 Hz
 
     Literature: B&C 8NDL51 datasheet
-    Validation: tests/validation/drivers/bc_8ndl51/infinite_baffle/8ndl51_correct.txt
+    Source: https://www.bcspeakers.com/
 
     Note: M_md is driver mass only. Radiation mass is calculated internally
     using Beranek (1954) theory to match Hornresp methodology.
     """
     return ThieleSmallParameters(
-        M_md=0.02677,   # 26.77g driver mass only (CORRECTED)
-        C_ms=2.03e-4,   # 2.03E-04 m/N compliance (CORRECTED)
-        R_ms=3.30,      # 3.30 N·s/m mechanical resistance (CORRECTED)
-        R_e=5.3,        # 5.3 Ω DC resistance (datasheet)
-        L_e=0.5e-3,     # 0.5 mH voice coil inductance (datasheet)
-        BL=12.39,       # 12.39 T·m force factor (CORRECTED)
-        S_d=0.0220,     # 220 cm² effective area (datasheet)
+        M_md=0.02516,   # 25.16g driver mass only (calculated from Mms - radiation mass)
+        C_ms=1.503e-4, # 150.3E-04 m/N compliance (calculated from Vas)
+        R_ms=2.44,     # 2.44 N·s/m mechanical resistance (calculated from Qms)
+        R_e=2.6,       # 2.6 Ω DC resistance (datasheet)
+        L_e=0.15e-3,   # 0.15 mH voice coil inductance (datasheet)
+        BL=7.3,        # 7.3 T·m force factor (datasheet)
+        S_d=0.0220,    # 220 cm² effective area (datasheet)
     )
 
 

@@ -139,7 +139,10 @@ def export_to_hornresp(
     driver: ThieleSmallParameters,
     driver_name: str,
     output_path: str,
-    comment: Optional[str] = None
+    comment: Optional[str] = None,
+    enclosure_type: str = "infinite_baffle",
+    Vb_liters: Optional[float] = None,
+    Lrc_cm: float = 0.0,
 ) -> None:
     """
     Export driver parameters to Hornresp input file format.
@@ -149,13 +152,17 @@ def export_to_hornresp(
 
     Literature:
         - Hornresp User Manual - File format specification
-        - hornresp_example.txt - Reference format
+        - Hornresp uses Ang = 0.5 x Pi for sealed box (hemisphere radiation)
+        - Hornresp uses Ang = 2.0 x Pi for infinite baffle (full sphere radiation)
 
     Args:
         driver: ThieleSmallParameters instance in SI units
         driver_name: Name/identifier for the driver
         output_path: Path to output .txt file
         comment: Optional comment/description for the file
+        enclosure_type: "infinite_baffle" or "sealed_box"
+        Vb_liters: Box volume in liters (required for sealed_box)
+        Lrc_cm: Rear chamber throat length in cm (default: 0.0)
 
     Raises:
         ValueError: If parameters are outside Hornresp valid ranges
@@ -166,8 +173,14 @@ def export_to_hornresp(
         ...     M_ms=0.054, C_ms=0.00019, R_ms=5.2,
         ...     R_e=3.1, L_e=0.72e-3, BL=16.5, S_d=0.0522
         ... )
-        >>> export_to_hornresp(driver, "BC_12NDL76", "bc_12ndl76.txt")
-        # Creates bc_12ndl76.txt ready for Hornresp import
+        >>> # Infinite baffle export
+        >>> export_to_hornresp(driver, "BC_12NDL76", "bc_12ndl76_inf.txt")
+        >>>
+        >>> # Sealed box export
+        >>> export_to_hornresp(
+        ...     driver, "BC_12NDL76", "bc_12ndl76_sealed_50L.txt",
+        ...     enclosure_type="sealed_box", Vb_liters=50.0
+        ... )
 
     Validation:
         Exported files should be directly importable into Hornresp.
@@ -177,8 +190,21 @@ def export_to_hornresp(
     # Convert driver to Hornresp format
     record = driver_to_hornresp_record(driver, driver_name)
 
+    # Set radiation angle based on enclosure type
+    if enclosure_type == "sealed_box":
+        ang_value = "0.5"  # Hemisphere (front radiation only)
+        if Vb_liters is None:
+            raise ValueError("Vb_liters must be specified for sealed_box enclosure")
+        vrc_value = Vb_liters
+        lrc_value = Lrc_cm
+    elif enclosure_type == "infinite_baffle":
+        ang_value = "2.0"  # Full sphere (both sides radiate)
+        vrc_value = 0.0
+        lrc_value = 0.0
+    else:
+        raise ValueError(f"Unknown enclosure_type: {enclosure_type}. Use 'infinite_baffle' or 'sealed_box'")
+
     # Generate Hornresp file content
-    # Use template format matching hornresp_example.txt
     comment_text = comment or f"{driver_name} driver parameters exported from viberesp"
 
     # Generate unique ID (use hash of driver name)
@@ -191,7 +217,7 @@ Comment = {comment_text}
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.0 x Pi
+Ang = {ang_value} x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -200,12 +226,12 @@ Cir = 0.00
 
 S1 = 0.00
 S2 = 0.00
-Exp = 0.00
+L12 = 0.00
 F12 = 0.00
 S2 = 0.00
 S3 = 0.00
-Exp = 0.00
-AT = 0.00
+L23 = 0.00
+F23 = 0.00
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -236,8 +262,8 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 0.00
-Lrc = 0.00
+Vrc = {vrc_value:.2f}
+Lrc = {lrc_value:.2f}
 Fr = 0.00
 Tal = 0.00
 Vtc = 0.00
@@ -262,8 +288,8 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 100
-Tal2 = 100
+Tal1 = -0
+Tal2 = -0
 Tal3 = -0
 Tal4 = -0
 
