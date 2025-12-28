@@ -209,3 +209,194 @@ def constraint_volume_limit(
 
     except Exception:
         return 1000.0
+
+
+def constraint_horn_cutoff_frequency(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    target_fc: float = 60.0,
+    tolerance: float = 10.0
+) -> float:
+    """
+    Constrain horn cutoff frequency to target range.
+
+    The cutoff frequency is the frequency below which the horn acts as a
+    high-pass filter. This constraint ensures the horn is designed for a
+    specific frequency range.
+
+    Literature:
+        - Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
+        - literature/horns/olson_1947.md
+
+    Args:
+        design_vector: Horn parameters [throat_area, mouth_area, length, V_rc]
+        driver: ThieleSmallParameters instance (not used, kept for interface)
+        enclosure_type: Must be "exponential_horn"
+        target_fc: Target cutoff frequency in Hz (default 60 Hz)
+        tolerance: Allowed deviation from target in Hz (default 10 Hz)
+
+    Returns:
+        Maximum constraint violation (positive if outside tolerance range)
+        pymoo expects constraints to be ≤ 0 (negative = satisfied)
+
+    Examples:
+        >>> driver = get_tc2_compression_driver()
+        >>> # Target Fc = 400 Hz ± 20 Hz
+        >>> violation = constraint_horn_cutoff_frequency(
+        ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn",
+        ...     target_fc=400, tolerance=20
+        ... )
+        >>> # If violation <= 0, Fc is in [380, 420] Hz range
+    """
+    if enclosure_type != "exponential_horn":
+        return 0.0  # Not applicable for other enclosures
+
+    try:
+        from viberesp.optimization.parameters.exponential_horn_params import (
+            calculate_horn_cutoff_frequency
+        )
+        from viberesp.simulation.constants import SPEED_OF_SOUND
+
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+
+        fc = calculate_horn_cutoff_frequency(
+            throat_area, mouth_area, length, SPEED_OF_SOUND
+        )
+
+        # Two-sided constraint: target - tolerance <= Fc <= target + tolerance
+        violation_low = (target_fc - tolerance) - fc  # Positive if Fc too low
+        violation_high = fc - (target_fc + tolerance)  # Positive if Fc too high
+
+        # Return maximum violation (must be <= 0 for satisfaction)
+        return max(violation_low, violation_high, 0.0)
+
+    except Exception:
+        return 1000.0
+
+
+def constraint_mouth_size(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    min_mouth_radius_wavelengths: float = 0.5
+) -> float:
+    """
+    Constrain mouth size for effective radiation.
+
+    The mouth must be large enough to radiate sound efficiently. This constraint
+    ensures the mouth circumference is at least one wavelength at the cutoff
+    frequency (equivalent to radius >= λ/2).
+
+    Literature:
+        - Olson (1947), Chapter 5 - Mouth size requirements
+        - literature/horns/olson_1947.md
+
+    Args:
+        design_vector: Horn parameters [throat_area, mouth_area, length, V_rc]
+        driver: ThieleSmallParameters instance (not used, kept for interface)
+        enclosure_type: Must be "exponential_horn"
+        min_mouth_radius_wavelengths: Min mouth radius as fraction of wavelength
+            at cutoff (default 0.5, meaning mouth_radius >= 0.5 * λ_cutoff / 2)
+
+    Returns:
+        Constraint violation (positive if mouth too small)
+        pymoo expects constraints to be ≤ 0 (negative = satisfied)
+
+    Examples:
+        >>> driver = get_tc2_compression_driver()
+        >>> # Ensure mouth is at least λ/2 at cutoff
+        >>> violation = constraint_mouth_size(
+        ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn"
+        ... )
+        >>> # If violation <= 0, mouth is large enough
+    """
+    if enclosure_type != "exponential_horn":
+        return 0.0  # Not applicable for other enclosures
+
+    try:
+        from viberesp.optimization.parameters.exponential_horn_params import (
+            calculate_horn_cutoff_frequency
+        )
+        from viberesp.simulation.constants import SPEED_OF_SOUND
+
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+
+        fc = calculate_horn_cutoff_frequency(
+            throat_area, mouth_area, length, SPEED_OF_SOUND
+        )
+        wavelength_cutoff = SPEED_OF_SOUND / fc
+        mouth_radius = np.sqrt(mouth_area / np.pi)
+
+        # Constraint: mouth_radius >= 0.5 * wavelength_cutoff / 2
+        # This is equivalent to mouth_circumference >= wavelength_cutoff
+        min_radius = min_mouth_radius_wavelengths * wavelength_cutoff / 2
+
+        return max(min_radius - mouth_radius, 0.0)
+
+    except Exception:
+        return 1000.0
+
+
+def constraint_flare_constant_limits(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    min_m_length: float = 0.5,
+    max_m_length: float = 3.0
+) -> float:
+    """
+    Constrain flare rate for practical horns.
+
+    The product m·L determines how rapidly the horn flares. If m·L is too small,
+    the horn approaches a cylindrical pipe. If m·L is too large, the horn
+    approximates a rapid expansion which causes reflections.
+
+    Literature:
+        - Olson (1947), Chapter 5 - Practical horn design limits
+        - literature/horns/olson_1947.md
+
+    Args:
+        design_vector: Horn parameters [throat_area, mouth_area, length, V_rc]
+        driver: ThieleSmallParameters instance (not used, kept for interface)
+        enclosure_type: Must be "exponential_horn"
+        min_m_length: Minimum acceptable m·L product (default 0.5)
+        max_m_length: Maximum acceptable m·L product (default 3.0)
+
+    Returns:
+        Maximum constraint violation (positive if outside range)
+        pymoo expects constraints to be ≤ 0 (negative = satisfied)
+
+    Examples:
+        >>> driver = get_tc2_compression_driver()
+        >>> # Ensure practical horn geometry
+        >>> violation = constraint_flare_constant_limits(
+        ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn"
+        ... )
+        >>> # If violation <= 0, 0.5 <= m·L <= 3.0
+    """
+    if enclosure_type != "exponential_horn":
+        return 0.0  # Not applicable for other enclosures
+
+    try:
+        from viberesp.simulation.types import ExponentialHorn
+
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+
+        horn = ExponentialHorn(throat_area, mouth_area, length)
+        m_times_L = horn.flare_constant * horn.length
+
+        # Two-sided constraint
+        violation_low = min_m_length - m_times_L
+        violation_high = m_times_L - max_m_length
+
+        return max(violation_low, violation_high, 0.0)
+
+    except Exception:
+        return 1000.0

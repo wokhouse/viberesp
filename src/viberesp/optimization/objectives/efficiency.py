@@ -19,6 +19,8 @@ import numpy as np
 from typing import Tuple
 
 from viberesp.driver.parameters import ThieleSmallParameters
+from viberesp.simulation.types import ExponentialHorn
+from viberesp.enclosure.front_loaded_horn import FrontLoadedHorn
 
 
 def objective_efficiency(
@@ -125,6 +127,20 @@ def objective_efficiency(
                 result = direct_radiator_electrical_impedance(
                     freq, driver, voltage=voltage
                 )
+            elif enclosure_type == "exponential_horn":
+                throat_area = design_vector[0]
+                mouth_area = design_vector[1]
+                length = design_vector[2]
+                V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+
+                # Create horn system
+                # Olson (1947), Section 5.11 - Horn efficiency
+                horn = ExponentialHorn(throat_area, mouth_area, length)
+                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
             else:
                 raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
@@ -220,9 +236,23 @@ def objective_reference_sensitivity(
                 voltage=voltage
             )
         elif enclosure_type == "infinite_baffle":
-            result = infinite_baffle_electrical_impedance(
+            result = direct_radiator_electrical_impedance(
                 reference_frequency, driver, voltage=voltage
             )
+        elif enclosure_type == "exponential_horn":
+            throat_area = design_vector[0]
+            mouth_area = design_vector[1]
+            length = design_vector[2]
+            V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+
+            # Create horn system
+            # Olson (1947), Section 5.11 - Horn efficiency
+            horn = ExponentialHorn(throat_area, mouth_area, length)
+            flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+
+            # Calculate SPL at reference frequency
+            spl = flh.spl_response(reference_frequency, voltage=voltage)
+            result = {'SPL': spl}
         else:
             raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 

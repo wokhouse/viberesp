@@ -298,9 +298,13 @@ class DesignAssistant:
             10
         """
         from viberesp.driver import bc_drivers
+        from viberesp.driver.test_drivers import get_tc2_compression_driver
         from viberesp.optimization.parameters import (
             get_sealed_box_parameter_space,
             get_ported_box_parameter_space
+        )
+        from viberesp.optimization.parameters.exponential_horn_params import (
+            get_exponential_horn_parameter_space
         )
         from viberesp.optimization.objectives.composite import EnclosureOptimizationProblem
         from viberesp.optimization.optimizers.pymoo_interface import run_nsga2
@@ -313,6 +317,7 @@ class DesignAssistant:
             "BC_15DS115": bc_drivers.get_bc_15ds115,
             "BC_15PS100": bc_drivers.get_bc_15ps100,
             "BC_18PZW100": bc_drivers.get_bc_18pzw100,
+            "TC2": get_tc2_compression_driver,
         }
 
         # Validate driver
@@ -332,7 +337,7 @@ class DesignAssistant:
         driver = driver_functions[driver_name]()
 
         # Validate enclosure type
-        if enclosure_type not in ["sealed", "ported"]:
+        if enclosure_type not in ["sealed", "ported", "exponential_horn"]:
             return OptimizationResult(
                 success=False,
                 pareto_front=[],
@@ -343,7 +348,7 @@ class DesignAssistant:
                 optimization_metadata={},
                 warnings=[
                     f"Unsupported enclosure type: {enclosure_type}",
-                    "Currently supported: sealed, ported"
+                    "Currently supported: sealed, ported, exponential_horn"
                 ]
             )
 
@@ -352,6 +357,10 @@ class DesignAssistant:
             param_space = get_sealed_box_parameter_space(driver)
         elif enclosure_type == "ported":
             param_space = get_ported_box_parameter_space(driver)
+        elif enclosure_type == "exponential_horn":
+            # Get preset from constraints, default to midrange_horn
+            preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
+            param_space = get_exponential_horn_parameter_space(driver, preset=preset)
         else:
             return OptimizationResult(
                 success=False,
@@ -382,11 +391,21 @@ class DesignAssistant:
 
             if enclosure_type == "ported":
                 constraint_list.append("port_velocity")
+
+            if enclosure_type == "exponential_horn":
+                # Horn-specific constraints
+                constraint_list.extend(constraints.get(
+                    "constraint_list",
+                    ["mouth_size", "flare_constant_limits"]
+                ))
         else:
             # Default constraints
             constraint_list = ["max_displacement"]
             if enclosure_type == "ported":
                 constraint_list.append("port_velocity")
+            if enclosure_type == "exponential_horn":
+                # Default horn constraints
+                constraint_list = ["mouth_size", "flare_constant_limits"]
 
         # Setup problem
         try:

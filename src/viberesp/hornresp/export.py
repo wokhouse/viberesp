@@ -683,7 +683,12 @@ def export_front_loaded_horn_to_hornresp(
         atc_cm2 = A_tc_cm2
 
     # Calculate rear chamber depth if not provided
-    if V_rc_liters > 0 and L_rc_cm is None:
+    # Use tolerance to treat very small volumes as "no rear chamber"
+    # For compression drivers, <5 cm³ is negligible rear chamber volume
+    VRC_TOLERANCE = 0.005  # 5 mL or less is treated as no rear chamber
+    has_rear_chamber = V_rc_liters > VRC_TOLERANCE
+
+    if has_rear_chamber and L_rc_cm is None:
         # Vb is in liters, convert to cm³
         vrc_cm3 = V_rc_liters * 1000.0
 
@@ -715,10 +720,14 @@ def export_front_loaded_horn_to_hornresp(
         # Use cube depth, clamped to valid range
         lrc_value = max(lrc_min, min(lrc_cube, lrc_max))
     else:
+        # No rear chamber or Lrc provided
         lrc_value = L_rc_cm if L_rc_cm else 0.0
+        # If volume is below tolerance, treat it as zero
+        if not has_rear_chamber:
+            V_rc_liters = 0.0
 
     # Validate rear chamber parameters
-    if V_rc_liters > 0 and lrc_value <= 0:
+    if has_rear_chamber and lrc_value <= 0:
         raise ValueError(f"Lrc must be > 0 for rear chamber, got {lrc_value}")
 
     # Set radiation angle
