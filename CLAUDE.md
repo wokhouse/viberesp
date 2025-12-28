@@ -606,7 +606,12 @@ For difficult questions requiring external research, you can delegate to an onli
 
 ### Research Agent Workflow
 
-**Critical constraint:** The online research agent **does NOT have access to the local codebase**. You must provide relevant context.
+**Important:** The online research agent **does NOT have access to the local codebase**, but it **CAN access the public GitHub repository** at:
+```
+https://github.com/wokhouse/viberesp
+```
+
+When delegating to the research agent, provide relevant context or reference specific files/paths in the repo.
 
 **Step 1: Prepare the research prompt**
 
@@ -702,6 +707,45 @@ The research agent should provide:
 - **References** to literature or documentation
 - **Recommendations** with rationale
 - **Caveats or limitations** of the suggested approach
+
+### Research Agent Response Format for Implementation Tasks
+
+**IMPORTANT:** When delegating implementation research tasks, instruct the research agent to structure their response in two sections:
+
+1. **Section 1: Research Findings** (for human review)
+   - Theory explanation
+   - Equations and derivations
+   - Literature citations
+   - Implementation notes and caveats
+
+2. **Section 2: Implementation Instructions** (for Claude Code)
+   - Write as a direct task specification for a future Claude Code instance
+   - Include exact file paths and line numbers where possible
+   - Provide complete code snippets ready to copy-paste
+   - Specify validation steps and expected results
+
+Template for implementation tasks:
+```
+IMPORTANT - RESPONSE FORMAT:
+You are writing to BOTH (1) human researchers AND (2) a future Claude Code instance.
+Structure your response with two sections:
+
+## SECTION 1: RESEARCH FINDINGS (for human review)
+- Theory explanation
+- Equations and derivations
+- Literature citations
+- Implementation notes
+
+## SECTION 2: IMPLEMENTATION INSTRUCTIONS (for Claude Code)
+Write this as a direct task specification for Claude Code, including:
+- Files to modify (with exact paths)
+- Implementation steps (with line numbers)
+- Code changes (complete, ready to apply)
+- Validation approach
+- Expected results
+```
+
+This ensures the research agent's output can be directly used by Claude Code to implement the findings without needing additional interpretation.
 
 ## Resources
 

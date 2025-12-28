@@ -1,6 +1,6 @@
-ID = 845.85
+ID = 599.29
 
-Comment = BC_8NDL51 ported box B4 alignment Vb31.6L Fb65.3Hz 2.5in port
+Comment = QB3 alignment: Vb=84.4L, Fb=29.8Hz, Port=optimal"
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 220.00
-Bl = 7.30
-Cms = 1.50E-04
-Rms = 2.44
-Mmd = 26.29
-Le = 0.15
-Re = 2.60
+Sd = 855.00
+Bl = 21.20
+Cms = 1.04E-04
+Rms = 6.53
+Mmd = 147.00
+Le = 2.00
+Re = 5.20
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 31.65
-Lrc = 31.63
-Ap = 31.67
-Lpt = 4.29
+Vrc = 84.44
+Lrc = 43.87
+Ap = 112.13
+Lpt = 39.39
 Vtc = 0.00
 Atc = 0.00
 

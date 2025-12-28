@@ -1,13 +1,13 @@
-ID = 449.12
+ID = 599.29
 
-Comment = Qtc=1.000 alignment - Chebyshev-like (slight peak)
+Comment = B4 alignment: Vb=105.5L, Fb=37.3Hz, Port=optimal"
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 0.5 x Pi
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
-Cir = 0.00
+Cir = -200.00
 
 |HORN PARAMETER VALUES:
 
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 220.00
-Bl = 7.30
-Cms = 1.50E-04
-Rms = 2.44
-Mmd = 26.286
-Le = 0.150
-Re = 2.60
+Sd = 855.00
+Bl = 21.20
+Cms = 1.04E-04
+Rms = 6.53
+Mmd = 147.00
+Le = 2.00
+Re = 5.20
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 6.16
-Lrc = 18.33
-Fr = 0.00
-Tal = 0.00
+Vrc = 105.54
+Lrc = 47.26
+Ap = 140.17
+Lpt = 22.78
 Vtc = 0.00
 Atc = 0.00
 
@@ -84,10 +84,10 @@ Fr2 = 0.00
 Fr3 = 0.00
 Fr4 = 0.00
 
-Tal1 = 0.00
-Tal2 = 0.00
-Tal3 = 0.00
-Tal4 = 0.00
+Tal1 = -0
+Tal2 = -0
+Tal3 = -0
+Tal4 = -0
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 

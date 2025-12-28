@@ -1,6 +1,6 @@
-ID = 845.85
+ID = 779.65
 
-Comment = BC_8NDL51 ported box B4 alignment Vb31.6L Fb65.3Hz 3in port
+Comment = 180L ported box B4 alignment for SPL calibration. Fs=32.999966762471004Hz, Fb=32.999966762471004Hz. Port: 255.8cm² x 31.2cm
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 220.00
-Bl = 7.30
-Cms = 1.50E-04
-Rms = 2.44
-Mmd = 26.29
-Le = 0.15
-Re = 2.60
+Sd = 855.00
+Bl = 38.70
+Cms = 2.50E-04
+Rms = 10.15
+Mmd = 64.86
+Le = 4.50
+Re = 4.90
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,10 +58,10 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 31.65
-Lrc = 31.63
-Ap = 45.60
-Lpt = 6.83
+Vrc = 180.00
+Lrc = 56.46
+Ap = 255.84
+Lpt = 31.22
 Vtc = 0.00
 Atc = 0.00
 
