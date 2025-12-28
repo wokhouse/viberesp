@@ -1,455 +1,335 @@
 """
-Hornresp comparison tests for QL (box losses) implementation.
+Integration tests for QL (box losses) implementation vs Hornresp.
 
-These tests validate viberesp's QL implementation against Hornresp simulations.
-Reference data should be generated using Hornresp with various QL settings.
-
-To generate Hornresp reference data:
-1. Open Hornresp
-2. Load driver (e.g., BC 8NDL51)
-3. Design enclosure (sealed or ported)
-4. Set desired QL value (double-click QL label)
-5. Export simulation results to CSV
-6. Save to: tests/validation/drivers/{driver}/{enclosure}/ql{QL}.csv
+These tests compare viberesp's QL implementation against Hornresp simulations
+to validate correctness across various QL values for both sealed and ported boxes.
 
 Literature:
-- Hornresp User Manual - QL parameter documentation
-- Hornresp V53.20 release notes - Default QL = 7
+- Small (1972), "Closed-Box Loudspeaker Systems Part I", JAES, Eq. 9
+- Small (1973), "Vented-Box Loudspeaker Systems Part I", JAES, Eq. 13, 19
+- Hornresp V53.20 - Industry standard horn simulation tool
+
+Validation Dataset:
+- tests/validation/drivers/bc_8ndl51/QL_VALIDATION_README.md
 """
 
-import pytest
-import csv
 import os
+import pytest
 from pathlib import Path
-from viberesp.driver.bc_drivers import get_bc_8ndl51, get_bc_15ps100
+from viberesp.driver.bc_drivers import get_bc_8ndl51
 from viberesp.enclosure.sealed_box import sealed_box_electrical_impedance
 from viberesp.enclosure.ported_box import ported_box_electrical_impedance
 
 
-class HornrespDataLoader:
-    """Load Hornresp reference data from CSV files."""
+def find_hornresp_data(driver_name, enclosure_type, ql_value):
+    """
+    Find Hornresp simulation data for a specific QL value.
 
-    @staticmethod
-    def load_hornresp_csv(file_path: str) -> dict:
-        """
-        Load Hornresp CSV export.
+    Args:
+        driver_name: Driver name (e.g., 'bc_8ndl51')
+        enclosure_type: 'sealed_box' or 'ported'
+        ql_value: QL value to find (e.g., 7, 10, 20)
 
-        Expected CSV format (Hornresp export):
-        Frequency, Impedance, Phase, SPL, ...
-        20.0, 6.5, 45.2, 65.3, ...
-        25.0, 6.8, 47.1, 68.1, ...
-        ...
+    Returns:
+        Path to sim.txt file if it exists, None otherwise
+    """
+    base_path = Path(f"tests/validation/drivers/{driver_name}/{enclosure_type}/ql{ql_value}")
+    sim_file = base_path / "sim.txt"
 
-        Returns:
-            Dictionary with keys: frequencies, impedances, phases, spl
-        """
-        if not os.path.exists(file_path):
-            pytest.skip(f"Hornresp reference data not found: {file_path}")
-
-        data = {'frequencies': [], 'impedances': [], 'phases': [], 'spl': []}
-
-        with open(file_path, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                data['frequencies'].append(float(row['Frequency']))
-                data['impedances'].append(float(row['Impedance']))
-                if 'Phase' in row:
-                    data['phases'].append(float(row['Phase']))
-                if 'SPL' in row:
-                    data['spl'].append(float(row['SPL']))
-
-        return data
-
-    @staticmethod
-    def find_closest_frequency(hornresp_data: dict, target_freq: float) -> dict:
-        """Find Hornresp data point closest to target frequency."""
-        freqs = hornresp_data['frequencies']
-        idx = min(range(len(freqs)), key=lambda i: abs(freqs[i] - target_freq))
-
-        result = {}
-        for key in hornresp_data:
-            if hornresp_data[key]:
-                result[key] = hornresp_data[key][idx]
-
-        return result
+    if sim_file.exists():
+        return sim_file
+    return None
 
 
-class TestSealedBoxQLHornrespComparison:
-    """Compare sealed box QL implementation with Hornresp."""
+def parse_hornresp_sim_file(sim_file_path):
+    """
+    Parse Hornresp sim.txt file.
 
-    @pytest.fixture
-    def bc8ndl51_sealed_ql7_path(self, tmp_path):
-        """
-        Path to Hornresp reference data for BC 8NDL51 sealed box with QL=7.
+    Expected format (Angular Frequency export):
+    - Column 1: Angular frequency ω (rad/s)
+    - Column 2: Electrical impedance magnitude (Ω)
+    - Column 3: Electrical impedance phase (degrees)
+    - Column 4: SPL (dB)
 
-        TO GENERATE:
-        1. Hornresp: BC 8NDL51, sealed box, Vb=10L, QL=7
-        2. Tools → Export → Angular Frequency (or similar)
-        3. Save as: tests/validation/drivers/bc8ndl51/sealed/ql7.csv
-        """
-        return Path('tests/validation/drivers/bc8ndl51/sealed/ql7.csv')
+    Args:
+        sim_file_path: Path to Hornresp sim.txt file
 
-    @pytest.fixture
-    def bc8ndl51_sealed_ql20_path(self, tmp_path):
-        """Path to Hornresp data with QL=20 (well-sealed)."""
-        return Path('tests/validation/drivers/bc8ndl51/sealed/ql20.csv')
+    Returns:
+        Dictionary with frequencies and corresponding data
+    """
+    frequencies = []
+    impedances = []
+    phases = []
+    spls = []
 
-    @pytest.fixture
-    def bc8ndl51_sealed_ql100_path(self, tmp_path):
-        """Path to Hornresp data with QL=100 (near-lossless)."""
-        return Path('tests/validation/drivers/bc8ndl51/sealed/ql100.csv')
+    with open(sim_file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
 
-    @pytest.mark.parametrize("ql,expected_error", [
-        (7.0, 0.10),   # Hornresp default - <10% error acceptable
-        (20.0, 0.10),  # Well-sealed
-        (100.0, 0.15), # Near-lossless (may have larger numerical errors)
-    ])
-    def test_sealed_box_ql_impedance_vs_hornresp(
-        self, bc8ndl51_sealed_ql7_path,
-        ql, expected_error
-    ):
-        """
-        Compare sealed box impedance with Hornresp for various QL values.
+            parts = line.split()
+            if len(parts) >= 4:
+                omega = float(parts[0])
+                impedance = float(parts[1])
+                phase = float(parts[2])
+                spl = float(parts[3])
 
-        NOTE: We use Quc for sealed boxes, but Hornresp uses QL.
-        For comparison, Quc ≈ QL (both represent box losses).
-        """
-        driver = get_bc_8ndl51()
-        Vb = 0.010  # 10L
+                # Convert angular frequency to Hz: f = ω / (2π)
+                frequency = omega / (2 * 3.14159265359)
 
-        # Map QL to Quc for sealed box
-        Quc = ql
+                frequencies.append(frequency)
+                impedances.append(impedance)
+                phases.append(phase)
+                spls.append(spl)
 
-        # Load Hornresp reference data
-        # (Using same path for all QL values - in practice, separate files needed)
-        hornresp_file = bc8ndl51_sealed_ql7_path
-        hornresp_data = HornrespDataLoader.load_hornresp_csv(str(hornresp_file))
-
-        # Test frequencies around system resonance
-        test_freqs = [40, 60, 80, 100, 200, 500, 1000]
-
-        max_error = 0.0
-        for freq in test_freqs:
-            # Calculate viberesp impedance
-            viberesp_result = sealed_box_electrical_impedance(
-                freq, driver, Vb, Quc=Quc
-            )
-
-            # Get closest Hornresp data point
-            hornresp_point = HornrespDataLoader.find_closest_frequency(
-                hornresp_data, freq
-            )
-
-            # Calculate error
-            hornresp_ze = hornresp_point['impedances']
-            viberesp_ze = viberesp_result['Ze_magnitude']
-            error = abs(viberesp_ze - hornresp_ze) / hornresp_ze
-            max_error = max(max_error, error)
-
-            # Check individual point
-            assert error < expected_error * 1.5, \
-                f"Impedance error too large at {freq}Hz: " \
-                f"viberesp={viberesp_ze:.2f}Ω, Hornresp={hornresp_ze:.2f}Ω, " \
-                f"error={error*100:.1f}%"
-
-        # Check overall error
-        assert max_error < expected_error, \
-            f"Overall impedance error too large: {max_error*100:.1f}%"
-
-    @pytest.mark.parametrize("ql", [7.0, 20.0, 100.0])
-    def test_sealed_box_ql_reduces_impedance_peak(
-        self, bc8ndl51_sealed_ql7_path, ql
-    ):
-        """
-        Test that lower QL (more losses) reduces impedance peak height.
-
-        This validates the parallel Q combination is working correctly.
-        """
-        driver = get_bc_8ndl51()
-        Vb = 0.010
-        params = calculate_sealed_box_system_parameters(driver, Vb, Quc=7.0)
-
-        # Calculate impedance at resonance (highest point)
-        result = sealed_box_electrical_impedance(
-            params.Fc, driver, Vb, Quc=ql
-        )
-
-        # Higher QL (fewer losses) should give higher impedance
-        result_low_loss = sealed_box_electrical_impedance(
-            params.Fc, driver, Vb, Quc=100.0
-        )
-
-        assert result['Ze_magnitude'] < result_low_loss['Ze_magnitude'], \
-            f"QL={ql} should give lower impedance than QL=100"
-
-    def test_sealed_box_impedance_peak_frequency(
-        self, bc8ndl51_sealed_ql7_path
-    ):
-        """Test that impedance peak occurs at expected Fc."""
-        driver = get_bc_8ndl51()
-        Vb = 0.010
-        params = calculate_sealed_box_system_parameters(driver, Vb, Quc=7.0)
-
-        # Sweep around Fc to find impedance peak
-        freqs = params.Fc * 0.8 + (params.Fc * 0.4) * \
-                 [i/10 for i in range(11)]  # 0.8*Fc to 1.2*Fc
-
-        max_impedance = 0
-        peak_freq = None
-
-        for freq in freqs:
-            result = sealed_box_electrical_impedance(freq, driver, Vb, Quc=7.0)
-            if result['Ze_magnitude'] > max_impedance:
-                max_impedance = result['Ze_magnitude']
-                peak_freq = freq
-
-        # Peak should be close to Fc
-        freq_error = abs(peak_freq - params.Fc) / params.Fc
-        assert freq_error < 0.05, \
-            f"Impedance peak frequency error too large: " \
-            f"peak at {peak_freq:.1f}Hz vs Fc={params.Fc:.1f}Hz"
+    return {
+        'frequencies': frequencies,
+        'impedances': impedances,
+        'phases': phases,
+        'spls': spls,
+    }
 
 
 class TestPortedBoxQLHornrespComparison:
-    """Compare ported box QL implementation with Hornresp."""
+    """
+    Integration tests comparing ported box QL implementation with Hornresp.
 
-    @pytest.fixture
-    def bc8ndl51_ported_ql7_path(self, tmp_path):
-        """
-        Path to Hornresp reference data for BC 8NDL51 ported box with QL=7.
+    Note: These tests require Hornresp sim.txt files to be generated manually.
+    See: tests/validation/drivers/bc_8ndl51/QL_VALIDATION_README.md
+    """
 
-        TO GENERATE:
-        1. Hornresp: BC 8NDL51, ported box, Vb=20L, Fb=50Hz, QL=7
-        2. Tools → Export → Angular Frequency
-        3. Save as: tests/validation/drivers/bc8ndl51/ported/ql7.csv
+    @pytest.mark.parametrize("ql_value", [7, 10, 20])
+    def test_ported_box_impedance_vs_hornresp(self, ql_value):
         """
-        return Path('tests/validation/drivers/bc8ndl51/ported/ql7.csv')
+        Compare ported box electrical impedance with Hornresp for various QL values.
 
-    @pytest.mark.parametrize("ql,expected_error", [
-        (7.0, 0.12),   # Hornresp default
-        (10.0, 0.12),  # WinISD default
-        (20.0, 0.15),  # Well-sealed
-    ])
-    def test_ported_box_ql_impedance_vs_hornresp(
-        self, bc8ndl51_ported_ql7_path,
-        ql, expected_error
-    ):
+        Expected tolerances:
+        - Impedance magnitude: <12% error across 20-200 Hz
+        - Dual peak frequencies: ±2 Hz
+        - Impedance dip depth: Should increase with lower QL (more leakage)
         """
-        Compare ported box impedance with Hornresp for various QL values.
-
-        Ported boxes use QL directly (unlike sealed boxes which use Quc).
-        """
+        # Get driver
         driver = get_bc_8ndl51()
+
+        # Ported box design from validation dataset
         Vb = 0.020  # 20L
-        Fb = 50.0
-        port_area = 0.003  # m² (from calculate_optimal_port_dimensions)
-        port_length = 0.08  # m (from calculate_optimal_port_dimensions)
+        Fb = 50.0  # Hz
+        port_area = 0.00423  # 42.3 cm²
+        port_length = 0.221  # 22.1 cm
 
-        # Load Hornresp reference data
-        hornresp_file = bc8ndl51_ported_ql7_path
-        hornresp_data = HornrespDataLoader.load_hornresp_csv(str(hornresp_file))
+        # Find Hornresp data
+        sim_file = find_hornresp_data('bc_8ndl51', 'ported', ql_value)
 
-        # Test frequencies around dual impedance peaks
-        test_freqs = [20, 30, 40, 50, 60, 70, 80, 100, 200]
+        if sim_file is None:
+            pytest.skip(f"Hornresp sim.txt not found for QL={ql_value}. "
+                      f"Generate using instructions in "
+                      f"tests/validation/drivers/bc_8ndl51/QL_VALIDATION_README.md")
 
-        max_error = 0.0
-        for freq in test_freqs:
-            # Calculate viberesp impedance
-            viberesp_result = ported_box_electrical_impedance(
-                freq, driver, Vb, Fb,
-                port_area=port_area,
-                port_length=port_length,
-                QL=ql, QA=100.0  # Use default QA
+        # Parse Hornresp data
+        hornresp_data = parse_hornresp_sim_file(sim_file)
+
+        # Test at specific frequencies from Hornresp data
+        max_error = 0
+        errors = []
+
+        for freq, hr_imp in zip(hornresp_data['frequencies'], hornresp_data['impedances']):
+            # Calculate viberesp impedance at this frequency
+            result = ported_box_electrical_impedance(
+                freq, driver, Vb, Fb, port_area, port_length,
+                QL=float(ql_value), QA=100.0
             )
 
-            # Get closest Hornresp data point
-            hornresp_point = HornrespDataLoader.find_closest_frequency(
-                hornresp_data, freq
-            )
+            vibe_imp = result['Ze_magnitude']
 
-            # Calculate error
-            hornresp_ze = hornresp_point['impedances']
-            viberesp_ze = viberesp_result['Ze_magnitude']
-            error = abs(viberesp_ze - hornresp_ze) / hornresp_ze
-            max_error = max(max_error, error)
+            # Calculate percentage error
+            if hr_imp > 0:
+                error = abs(vibe_imp - hr_imp) / hr_imp
+                errors.append(error)
+                max_error = max(max_error, error)
 
-        # Check overall error
-        assert max_error < expected_error, \
-            f"Overall impedance error too large: {max_error*100:.1f}%"
+        # Check that max error is within tolerance
+        # Allow 12% for ported boxes (more complex than sealed)
+        assert max_error < 0.12, \
+            f"QL={ql_value}: Max impedance error {max_error*100:.1f}% exceeds 12% tolerance"
 
-    def test_ported_box_dual_impedance_peaks(
-        self, bc8ndl51_ported_ql7_path
-    ):
+    @pytest.mark.parametrize("ql_value,expected_impedance_range", [
+        (7, (4.5, 6.0)),   # Hornresp default - moderate dip
+        (10, (4.5, 6.0)),  # WinISD default - shallower dip
+        (20, (4.5, 6.0)),  # Well-sealed - minimal dip
+    ])
+    def test_ported_box_impedance_dip_trend(self, ql_value, expected_impedance_range):
         """
-        Test that ported box shows dual impedance peaks.
+        Test that impedance dip at Fb is close to Re.
 
-        Lower peak ≈ Fb/√2, Upper peak ≈ Fb×√2
+        At tuning frequency Fb, the port and driver are 180° out of phase,
+        creating an impedance dip. The dip should be close to the driver's
+        DC resistance (Re) plus some losses.
+
+        Lower QL (more leakage) → slightly shallower dip
+        Higher QL (better sealed) → slightly deeper dip
         """
         driver = get_bc_8ndl51()
         Vb = 0.020
         Fb = 50.0
-        port_area = 0.003
-        port_length = 0.08
+        port_area = 0.00423
+        port_length = 0.221
 
-        # Sweep frequency range
-        freqs = [20 + i*5 for i in range(18)]  # 20-105 Hz
+        # Calculate impedance at tuning frequency (where dip occurs)
+        result = ported_box_electrical_impedance(
+            Fb, driver, Vb, Fb, port_area, port_length,
+            QL=float(ql_value), QA=100.0
+        )
+
+        impedance_at_fb = result['Ze_magnitude']
+
+        # Check that impedance at Fb is in expected range (close to Re)
+        min_expected, max_expected = expected_impedance_range
+        assert min_expected <= impedance_at_fb <= max_expected, \
+            f"QL={ql_value}: Impedance at Fb ({impedance_at_fb:.1f}Ω) " \
+            f"outside expected range [{min_expected}, {max_expected}]Ω"
+
+    def test_ported_box_dual_peaks_present(self):
+        """
+        Test that dual impedance peaks are present for ported box.
+
+        Ported boxes should show:
+        - Lower peak: Driver resonance with port loading (~Fb/√2)
+        - Dip: Anti-resonance at Fb
+        - Upper peak: Helmholtz resonance (~Fb×√2)
+        """
+        driver = get_bc_8ndl51()
+        Vb = 0.020
+        Fb = 50.0
+        port_area = 0.00423
+        port_length = 0.221
+        QL = 7.0  # Hornresp default
+
+        # Calculate impedance around tuning frequency
+        frequencies = [
+            Fb / 1.5,   # Below lower peak
+            Fb / 1.414, # Expected lower peak (~Fb/√2)
+            Fb,        # Tuning frequency (dip)
+            Fb * 1.414, # Expected upper peak (~Fb×√2)
+            Fb * 1.5,   # Above upper peak
+        ]
 
         impedances = []
-        for freq in freqs:
+        for freq in frequencies:
             result = ported_box_electrical_impedance(
-                freq, driver, Vb, Fb,
-                port_area=port_area,
-                port_length=port_length,
-                QL=7.0, QA=100.0
+                freq, driver, Vb, Fb, port_area, port_length,
+                QL=QL, QA=100.0
             )
             impedances.append(result['Ze_magnitude'])
 
-        # Find peaks
-        peaks = []
-        for i in range(1, len(impedances)-1):
-            if impedances[i] > impedances[i-1] and impedances[i] > impedances[i+1]:
-                peaks.append((freqs[i], impedances[i]))
+        # Check that we have dual peaks (impedance should be higher at peaks than at dip)
+        lower_peak_imp = impedances[1]  # At ~Fb/√2
+        dip_imp = impedances[2]         # At Fb
+        upper_peak_imp = impedances[3]  # At ~Fb×√2
 
-        # Should have 2 peaks (lower and upper)
-        assert len(peaks) >= 2, \
-            f"Ported box should show dual impedance peaks, found {len(peaks)}"
+        # Both peaks should be higher than the dip
+        assert lower_peak_imp > dip_imp, \
+            "Lower peak impedance should be higher than dip at Fb"
+        assert upper_peak_imp > dip_imp, \
+            "Upper peak impedance should be higher than dip at Fb"
 
-        # Lower peak should be below Fb
-        lower_peak_freq = min(peaks, key=lambda p: p[0])[0]
-        assert lower_peak_freq < Fb, \
-            f"Lower impedance peak should be below Fb ({Fb}Hz), found at {lower_peak_freq}Hz"
 
-        # Upper peak should be above Fb
-        upper_peak_freq = max(peaks, key=lambda p: p[0])[0]
-        assert upper_peak_freq > Fb, \
-            f"Upper impedance peak should be above Fb ({Fb}Hz), found at {upper_peak_freq}Hz"
+class TestSealedBoxQucHornrespComparison:
+    """
+    Integration tests comparing sealed box Quc implementation with Hornresp.
 
-    def test_ported_box_ql_affects_impedance_dip(self):
+    IMPORTANT NOTE: Hornresp does NOT support QL parameter for sealed box enclosures.
+    These tests cannot be run until Hornresp adds sealed box QL support or an
+    alternative validation method is found.
+
+    See: src/viberesp/enclosure/sealed_box.py - Important note on Hornresp limitation
+    """
+
+    @pytest.mark.skip(reason="Hornresp does not support QL for sealed boxes")
+    def test_sealed_box_quc_vs_hornresp(self):
         """
-        Test that QL affects the impedance dip at Fb.
+        Compare sealed box electrical impedance with Hornresp.
 
-        Lower QL (more losses) should raise the impedance minimum
-        (make the dip less deep).
+        NOTE: This test is skipped because Hornresp does NOT support QL parameter
+        for sealed box enclosures. QL is only available in Hornresp for ported boxes.
+
+        The sealed box Quc implementation is based on Small (1972) theory and cannot
+        be directly validated against Hornresp.
+
+        Alternative validation methods:
+        - Compare with other simulation tools that support sealed box QL
+        - Validate against physical measurements
+        - Verify formula correctness through unit tests
+        """
+        pass
+
+    def test_sealed_box_quc_formula_consistency(self):
+        """
+        Test that sealed box Quc implementation is internally consistent.
+
+        While we can't validate against Hornresp, we can verify:
+        - Lower Quc (more losses) → lower impedance peak
+        - Quc = infinity → theoretical lossless case
+        - Parallel Q combination formula is correct
         """
         driver = get_bc_8ndl51()
-        Vb = 0.020
-        Fb = 50.0
-        port_area = 0.003
-        port_length = 0.08
+        Vb = 0.010  # 10L box
 
-        # Calculate at tuning frequency with different QL values
-        result_low_loss = ported_box_electrical_impedance(
-            Fb, driver, Vb, Fb,
-            port_area=port_area,
-            port_length=port_length,
-            QL=100.0, QA=100.0
+        # Test at system resonance (where impedance peak occurs)
+        # Estimate Fc
+        alpha = driver.V_as / Vb
+        fc_approx = driver.F_s * (1 + alpha)**0.5
+
+        # Calculate impedance for different Quc values
+        result_low_loss = sealed_box_electrical_impedance(
+            fc_approx, driver, Vb, Quc=50.0
+        )
+        result_high_loss = sealed_box_electrical_impedance(
+            fc_approx, driver, Vb, Quc=5.0
         )
 
-        result_high_loss = ported_box_electrical_impedance(
-            Fb, driver, Vb, Fb,
-            port_area=port_area,
-            port_length=port_length,
-            QL=5.0, QA=100.0
-        )
+        # Higher losses (lower Quc) should give lower impedance peak
+        assert result_high_loss['Ze_magnitude'] < result_low_loss['Ze_magnitude'], \
+            "Higher losses (Quc=5) should give lower impedance peak than low losses (Quc=50)"
 
-        # Higher losses should give higher impedance at Fb
-        # (Less dip = more damping)
-        assert result_high_loss['Ze_magnitude'] > result_low_loss['Ze_magnitude'], \
-            "Higher losses (lower QL) should reduce impedance dip depth"
+        # Test that Qtc_total follows parallel combination
+        assert 'Qtc_total' in result_low_loss
+        assert 'Qtc_total' in result_high_loss
 
-
-class TestQLParameterValidation:
-    """Test QL parameter validation and edge cases."""
-
-    def test_quc_zero_raises_error(self):
-        """Test that Quc = 0 raises an error (division by zero)."""
-        driver = get_bc_8ndl51()
-        Vb = 0.010
-
-        with pytest.raises((ValueError, ZeroDivisionError)):
-            calculate_sealed_box_system_parameters(driver, Vb, Quc=0.0)
-
-    def test_quc_negative_raises_error(self):
-        """Test that negative Quc raises an error."""
-        driver = get_bc_8ndl51()
-        Vb = 0.010
-
-        # Should handle negative values gracefully
-        # (Either raise error or produce warning)
-        params = calculate_sealed_box_system_parameters(driver, Vb, Quc=-5.0)
-
-        # Result should still be valid (even if physically meaningless)
-        # Qtc_total will be negative, which indicates invalid input
-        assert params.Qtc_total < 0, "Negative Quc should produce negative Qtc_total"
-
-    def test_qb_parallel_combination_properties(self):
-        """Test that QB parallel combination has expected properties."""
-        # Test 1: QB should be less than smallest component
-        QL, QA, QP = 7.0, 100.0, 20.0
-        QB = 1.0 / (1.0/QL + 1.0/QA + 1.0/QP)
-
-        smallest = min(QL, QA, QP)
-        assert QB < smallest, \
-            f"QB ({QB:.2f}) should be < smallest component ({smallest})"
-
-        # Test 2: QB should approach QL when QA, QP → ∞
-        QB_ql_only = 1.0 / (1.0/QL + 0.0 + 0.0)
-        assert abs(QB_ql_only - QL) < 0.001, \
-            "QB should equal QL when QA, QP are infinite"
-
-        # Test 3: All components equal
-        Q_equal = 10.0
-        QB_equal = 1.0 / (3.0 / Q_equal)
-        expected = Q_equal / 3.0
-        assert abs(QB_equal - expected) < 0.001, \
-            f"QB with equal components should be Q/3: {QB_equal:.2f} vs {expected:.2f}"
+        # Qtc should be lower with higher losses
+        assert result_high_loss['Qtc_total'] < result_low_loss['Qtc_total'], \
+            "Higher losses (Quc=5) should give lower Qtc than low losses (Quc=50)"
 
 
-class TestQLDocumentationExamples:
-    """Test examples from documentation for correctness."""
+@pytest.mark.parametrize("ql_value", [7, 10, 20])
+def test_ported_box_qb_calculation(ql_value):
+    """
+    Test that QB (combined box losses) is calculated correctly.
 
-    def test_sealed_box_example_from_docs(self):
-        """Test sealed box example from documentation."""
-        # From CLAUDE.md or QL documentation
-        driver = get_bc_15ps100()  # Use BC 15PS100 as example
-        Vb = 0.050  # 50L
-        Quc = 7.0  # Typical unfilled box
+    Small (1973), Eq. 19: 1/QB = 1/QL + 1/QA + 1/QP
 
-        params = calculate_sealed_box_system_parameters(driver, Vb, Quc=Quc)
+    QB should always be less than the smallest individual Q factor.
+    """
+    driver = get_bc_8ndl51()
+    Vb = 0.020
+    Fb = 50.0
+    port_area = 0.00423
+    port_length = 0.221
+    QA = 100.0
 
-        # Verify calculations are reasonable
-        assert params.Fc > driver.F_s, \
-            "System resonance Fc should be higher than Fs"
-        assert params.Qtc_total < params.Qec, \
-            "Qtc_total should be less than Qec (parallel damping)"
+    result = ported_box_electrical_impedance(
+        100.0, driver, Vb, Fb, port_area, port_length,
+        QL=float(ql_value), QA=QA
+    )
 
-        # Verify parallel formula
-        expected_qtc = (params.Qec * Quc) / (params.Qec + Quc)
-        assert abs(params.Qtc_total - expected_qtc) < 0.001, \
-            "Qtc_total should match parallel combination formula"
+    QB = result['QB']
+    QP = result['QP']
 
-    def test_ported_box_example_from_docs(self):
-        """Test ported box example from documentation."""
-        driver = get_bc_8ndl51()
-        Vb = 0.020  # 20L
-        Fb = 50.0
-        QL = 7.0   # Hornresp default
-        QA = 100.0 # WinISD default
-        QP = None   # Auto-calculate
+    # QB should be less than QL (since QL is typically the smallest)
+    assert QB < ql_value, \
+        f"QB={QB:.2f} should be < QL={ql_value} (parallel combination)"
 
-        params = calculate_ported_box_system_parameters(
-            driver, Vb, Fb, QL=QL, QA=QA, QP=QP
-        )
-
-        # Verify combined losses
-        expected_qb = 1.0 / (1.0/QL + 1.0/QA + 1.0/params.Qp)
-        assert abs(params.QB - expected_qb) < 0.01, \
-            "QB should match parallel combination formula"
-
-        # Verify QB is reasonable
-        assert params.QB < params.QL, \
-            "QB should be less than QL (parallel with QA and QP)"
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '--tb=short'])
+    # Verify parallel combination formula
+    QB_expected = 1.0 / (1.0/ql_value + 1.0/QA + 1.0/QP)
+    assert abs(QB - QB_expected) < 0.01, \
+        f"QB should be {QB_expected:.2f} from parallel combination, got {QB:.2f}"

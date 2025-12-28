@@ -122,6 +122,14 @@ def calculate_sealed_box_system_parameters(
     # Validate inputs
     if Vb <= 0:
         raise ValueError(f"Box volume Vb must be > 0, got {Vb} m³")
+    if Quc <= 0:
+        raise ValueError(f"Quc must be > 0, got {Quc}")
+    if Quc < 3.0:
+        # Warning for unrealistic Quc values
+        # Typical Quc range: 5-100
+        # Quc < 3 represents extremely high losses
+        import warnings
+        warnings.warn(f"Quc={Quc} is unusually low (typical range: 5-100)")
 
     # Small (1972): Compliance ratio α = Vas / Vb
     # literature/thiele_small/small_1972_closed_box.md
@@ -401,6 +409,23 @@ def sealed_box_electrical_impedance(
         - Beranek (1954), Eq. 5.20 - Radiation impedance (front side only)
         - literature/thiele_small/small_1972_closed_box.md
         - literature/horns/beranek_1954.md
+
+    IMPORTANT NOTE ON Hornresp VALIDATION LIMITATION:
+        Hornresp does NOT support QL/Quc parameter for sealed box enclosures.
+        QL is only available in Hornresp for ported boxes.
+
+        This means our sealed box Quc implementation CANNOT be directly validated
+        against Hornresp. The implementation is based on Small (1972) theory:
+        - Small (1972), Eq. 9: Parallel Q combination (well-established)
+        - R_box formula is empirical (not from Small 1972)
+
+        For validation, we rely on:
+        1. Small (1972) theoretical foundation
+        2. Physical reasoning (mechanical losses affect system damping)
+        3. Consistency with ported box QL implementation (where Hornresp validation IS possible)
+
+        If you need to match Hornresp sealed box behavior exactly, use Quc=float('inf')
+        which gives the lossless case that Hornresp assumes for sealed boxes.
 
     Key differences from infinite baffle:
         - System resonance: Fc = Fs × √(1 + α) where α = Vas/Vb

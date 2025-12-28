@@ -443,6 +443,16 @@ def calculate_ported_box_system_parameters(
         raise ValueError(f"Box volume Vb must be > 0, got {Vb} m³")
     if Fb <= 0:
         raise ValueError(f"Tuning frequency Fb must be > 0, got {Fb} Hz")
+    if QL <= 0:
+        raise ValueError(f"QL must be > 0, got {QL}")
+    if QA <= 0:
+        raise ValueError(f"QA must be > 0, got {QA}")
+    if QL < 5.0:
+        # Warning for unrealistic QL values
+        # Typical QL range: 7-20
+        # QL < 5 represents extremely leaky box
+        import warnings
+        warnings.warn(f"QL={QL} is unusually low (typical range: 7-20)")
 
     # Thiele (1971), Part 1: Compliance ratio α = Vas / Vb
     # Same definition as sealed box
@@ -616,6 +626,8 @@ def calculate_spl_ported_transfer_function(
     air_density: float = AIR_DENSITY,
     Qp: float = 7.0,
     include_hf_rolloff: bool = True,
+    QL: float = 7.0,
+    QA: float = 100.0,
 ) -> float:
     """
     Calculate SPL using Small's transfer function for ported box.
@@ -634,6 +646,7 @@ def calculate_spl_ported_transfer_function(
     Literature:
         - Small (1973), "Vented-Box Loudspeaker Systems Part I", JAES
           Equation 13 for normalized pressure response
+          Equation 19 for combined box losses
           Research findings: docs/validation/ported_box_impedance_fix.md
         - Thiele (1971), Part 1, Section 6 - "Acoustic Output"
         - literature/thiele_small/thiele_1971_vented_boxes.md
@@ -642,20 +655,28 @@ def calculate_spl_ported_transfer_function(
         The normalized pressure response for a vented box is a 4th-order
         high-pass filter with the form:
 
-        G(s) = K × (s²T_B² + sT_B/Q_L + 1) / D'(s)
+        G(s) = K × (s²T_B² + sT_B/Q_B + 1) / D'(s)
 
         where D'(s) is the 4th-order denominator polynomial (same as impedance):
 
-        D'(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_ES + T_BT_S²/Q_L) +
-                s²[(α+1)T_B² + T_BT_S/(Q_ES×Q_L) + T_S²] +
-                s(T_B/Q_L + T_S/Q_ES) + 1
+        D'(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_B + T_BT_S²/Q_T) +
+                s²[(α+1)T_B² + T_BT_S/(Q_B×Q_T) + T_S²] +
+                s(T_B/Q_B + T_S/Q_T) + 1
 
         and:
         - T_S = 1/ω_S = 1/(2πF_S) - driver time constant
         - T_B = 1/ω_B = 1/(2πF_B) - box (port) time constant
         - α = V_as/V_B - compliance ratio
-        - Q_ES - driver electrical Q factor
-        - Q_L - box losses Q factor (typically 7-10)
+        - Q_T = Qts - driver total Q factor (NOT Q_ES!)
+        - Q_B = combined box losses from QL, QA, QP
+
+        Combined box losses (Small 1973, Eq. 19):
+        1/QB = 1/QL + 1/QA + 1/QP
+
+        where:
+        - QL = leakage losses (7-20 typical, 7 = Hornresp default)
+        - QA = absorption losses (50-100 typical, 100 ≈ negligible)
+        - QP = port losses (5-20 typical)
 
     Args:
         frequency: Frequency in Hz
@@ -668,6 +689,8 @@ def calculate_spl_ported_transfer_function(
         air_density: Air density (kg/m³)
         Qp: Port Q factor (default 7.0, typical range 5-20)
         include_hf_rolloff: Include mass and inductance high-frequency roll-off (default True)
+        QL: Leakage losses Q factor (default 7.0 = Hornresp, typical 7-20)
+        QA: Absorption losses Q factor (default 100.0 ≈ negligible, typical 50-100)
 
     Returns:
         SPL in dB at measurement_distance
@@ -683,7 +706,7 @@ def calculate_spl_ported_transfer_function(
         78.5...  # dB
 
     Validation:
-        Compare with Hornresp vented box simulation.
+        Compare with Hornresp vented box simulation using same QL value.
         Expected: SPL within ±3 dB of Hornresp for frequencies > Fb/2
     """
     # Validate inputs
@@ -716,23 +739,35 @@ def calculate_spl_ported_transfer_function(
     # For SPL response, use Qts (total Q), not Qes (electrical Q)
     Qt = driver.Q_ts  # Total driver Q for SPL response
 
+    # Small (1973), Eq. 19: Combined box losses
+    # 1/QB = 1/QL + 1/QA + 1/QP
+    # QB represents the total losses from leakage, absorption, and port
+    # literature/thiele_small/small_1973_vented_box_part1.md
+    if QL == float('inf') and QA == float('inf') and Qp == float('inf'):
+        QB = float('inf')
+    else:
+        QB = 1.0 / (1.0/QL + 1.0/QA + 1.0/Qp)
+
     # Small (1973), Eq. 13: Denominator polynomial D(s)
-    # D(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_L + T_BT_S²/Q_T) +
-    #        s²[(α+1)T_B² + T_BT_S/(Q_L×Q_T) + T_S²] +
-    #        s(T_B/Q_L + T_S/Q_T) + 1
+    # D(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_B + T_BT_S²/Q_T) +
+    #        s²[(α+1)T_B² + T_BT_S/(Q_B×Q_T) + T_S²] +
+    #        s(T_B/Q_B + T_S/Q_T) + 1
     # literature/thiele_small/thiele_1971_vented_boxes.md
+    #
+    # CRITICAL: Use Q_T (total Q = Qts), NOT Q_ES (electrical Q)
+    # Research findings: tasks/ql_research_findings_summary.md
 
     # 4th order coefficient: s⁴
     a4 = (Ts ** 2) * (Tb ** 2)
 
     # 3rd order coefficient: s³
-    a3 = (Tb ** 2 * Ts / Qp) + (Tb * Ts ** 2 / Qt)
+    a3 = (Tb ** 2 * Ts / QB) + (Tb * Ts ** 2 / Qt)
 
     # 2nd order coefficient: s² (CRITICAL: (α+1) term!)
-    a2 = (alpha + 1) * (Tb ** 2) + (Tb * Ts / (Qp * Qt)) + (Ts ** 2)
+    a2 = (alpha + 1) * (Tb ** 2) + (Tb * Ts / (QB * Qt)) + (Ts ** 2)
 
     # 1st order coefficient: s
-    a1 = Tb / Qp + Ts / Qt
+    a1 = Tb / QB + Ts / Qt
 
     # 0th order coefficient: constant
     a0 = 1
@@ -1062,6 +1097,9 @@ def ported_box_electrical_impedance(
     leach_n: float = None,
     impedance_model: str = "small",
     use_transfer_function_spl: bool = True,
+    QL: float = 7.0,
+    QA: float = 100.0,
+    QP: Optional[float] = None,
 ) -> dict:
     """
     Calculate electrical impedance and SPL for ported box enclosure.
@@ -1127,6 +1165,9 @@ def ported_box_electrical_impedance(
         impedance_model: "small" (Small's transfer function) or "circuit" (coupled resonator)
                          Default "small" - recommended for accuracy
         use_transfer_function_spl: Use transfer function for SPL (default True)
+        QL: Leakage losses Q factor (default 7.0 = Hornresp default)
+        QA: Absorption losses Q factor (default 100.0 = WinISD default, ≈ negligible)
+        QP: Port losses Q factor. If None, auto-calculated from port dimensions
 
     Returns:
         Dictionary containing:
@@ -1144,6 +1185,10 @@ def ported_box_electrical_impedance(
         - 'alpha': Compliance ratio
         - 'h': Tuning ratio
         - 'Fb': Port tuning frequency (Hz)
+        - 'QL': Leakage losses Q factor
+        - 'QA': Absorption losses Q factor
+        - 'QP': Port losses Q factor
+        - 'QB': Combined box losses (1/QB = 1/QL + 1/QA + 1/QP)
 
     Raises:
         ValueError: If frequency <= 0, Vb <= 0, Fb <= 0, or invalid driver
@@ -1262,11 +1307,20 @@ def ported_box_electrical_impedance(
         # literature/thiele_small/thiele_1971_vented_boxes.md
 
         # Calculate port Q factor
-        Qp = calculate_port_Q(
-            port_area, port_length, Vb, Fb,
-            speed_of_sound=speed_of_sound,
-            air_density=air_density
-        )
+        if QP is None:
+            QP = calculate_port_Q(
+                port_area, port_length, Vb, Fb,
+                speed_of_sound=speed_of_sound,
+                air_density=air_density
+            )
+        Qp = QP  # For consistency
+
+        # Calculate combined box losses (Small 1973, Eq. 19)
+        # 1/QB = 1/QL + 1/QA + 1/QP
+        if QL == float('inf') and QA == float('inf') and Qp == float('inf'):
+            QB = float('inf')
+        else:
+            QB = 1.0 / (1.0/QL + 1.0/QA + 1.0/Qp)
 
         # Get base impedance from Small's transfer function
         Z_e_base = ported_box_impedance_small(
@@ -1377,12 +1431,43 @@ def ported_box_electrical_impedance(
         # The driver's own suspension compliance C_ms is much softer and is "swamped" by C_mb.
         # Original Hornresp approach: use C_mb only, not C_ms.
 
-        # BOX DAMPING (Empirical Fix for Hornresp Validation)
-        # Same fix applied to sealed box (reduced error from 31% to <7%)
-        # Research documented in docs/validation/sealed_box_spl_research_summary.md
-        # Hornresp includes box damping losses not in standard Small (1972) theory
-        Q_box_damping = 28.5  # Empirical value from Hornresp comparison
-        R_box = (omega * M_ms_enclosed) / Q_box_damping  # Frequency-dependent damping
+        # BOX DAMPING (Leakage, Absorption, Port Losses)
+        # Small (1973), Eq. 19: Combined box losses
+        # 1/QB = 1/QL + 1/QA + 1/QP
+        #
+        # The mechanical resistance R_box represents energy dissipation from:
+        # - QL: Leakage losses (air leaks through gaps/seams)
+        # - QA: Absorption losses (damping material)
+        # - QP: Port losses (viscous/thermal effects in port)
+        #
+        # R_box = (ω × M_ms_enclosed) / QB  (EMPIRICAL - not from Small 1973)
+        #
+        # NOTE: The formula R_box = ωM_ms/QB is empirical, not derived from
+        # Small (1973). Small does not provide an explicit R_box formula for
+        # converting QL/QA/QP to mechanical resistance. This relationship
+        # provides reasonable agreement with Hornresp results.
+        #
+        # Literature:
+        # - Small (1973), Eq. 19: Combined box losses
+        # - docs/validation/sealed_box_spl_research_summary.md (Empirical derivation)
+
+        # Calculate port Q if not provided
+        if QP is None:
+            QP = calculate_port_Q(port_area, port_length, Vb, Fb)
+
+        # Combined box losses
+        if QL == float('inf') and QA == float('inf') and QP == float('inf'):
+            QB = float('inf')
+        else:
+            QB = 1.0 / (1.0/QL + 1.0/QA + 1.0/QP)
+
+        # Box damping resistance
+        if QB == float('inf'):
+            R_box = 0.0
+        else:
+            # EMPIRICAL: R_box = ω × M_ms_enclosed / QB
+            # Approximates box losses as frequency-dependent damping
+            R_box = (omega * M_ms_enclosed) / QB
 
         # Driver mechanical impedance (mass + resistance + C_mb + BOX DAMPING)
         Z_m_driver = (driver.R_ms + R_box) + complex(0, omega * M_ms_enclosed) + \
@@ -1527,7 +1612,9 @@ def ported_box_electrical_impedance(
             measurement_distance=measurement_distance,
             speed_of_sound=speed_of_sound,
             air_density=air_density,
-            Qp=Qp
+            Qp=Qp,
+            QL=QL,
+            QA=QA,
         )
     else:
         # Legacy impedance coupling approach
@@ -1572,6 +1659,10 @@ def ported_box_electrical_impedance(
         'alpha': alpha,
         'h': h,
         'Fb': Fb,
+        'QL': QL,
+        'QA': QA,
+        'QP': QP,
+        'QB': QB,
     }
 
     return result
