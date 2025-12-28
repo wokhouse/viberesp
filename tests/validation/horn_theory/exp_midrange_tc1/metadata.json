@@ -1,0 +1,56 @@
+{
+  "test_case": "TC1 - Exponential Midrange Horn",
+  "description": "Pure horn theory validation - exponential horn T-matrix method",
+  "date_created": "2025-12-27",
+  "date_run": "2025-12-27",
+  "hornresp_version": "unknown",
+  "validation_status": "ready",
+  "validation_type": "horn_theory",
+  "horn_parameters": {
+    "type": "exponential",
+    "S1_cm2": 50.0,
+    "S2_cm2": 500.0,
+    "L12_cm": 30.0,
+    "F12_Hz": 210.11,
+    "expansion_ratio": 10.0,
+    "radiation_angle": "2π (half-space)",
+    "flare_constant_m": 7.675
+  },
+  "chamber_parameters": {
+    "Vtc_L": 0.0,
+    "Atc_cm2": 50.0,
+    "Vrc_L": 0.0,
+    "note": "No throat or rear chamber - pure horn theory validation"
+  },
+  "validation_criteria": {
+    "well_above_cutoff": {
+      "frequency_range": "f > 2×fc (f > 420 Hz)",
+      "magnitude_tolerance_percent": 1.0,
+      "phase_tolerance_degrees": 2.0
+    },
+    "transition_region": {
+      "frequency_range": "fc < f ≤ 2×fc (210 < f ≤ 420 Hz)",
+      "magnitude_tolerance_percent": 3.0,
+      "phase_tolerance_degrees": 5.0
+    },
+    "below_cutoff": {
+      "frequency_range": "f ≤ fc (f ≤ 210 Hz)",
+      "magnitude_tolerance_percent": 10.0,
+      "phase_tolerance_degrees": null,
+      "note": "Evanescent region - qualitative validation only"
+    }
+  },
+  "expected_results": {
+    "cutoff_frequency_Hz": 210.11,
+    "usable_range_Hz": "420 - 4202",
+    " throat_impedance_at_fc": "Highly reactive (mass-like)",
+    "throat_impedance_at_10fc": "Mostly resistive"
+  },
+  "notes": [
+    "This is pure horn theory validation - no driver coupling",
+    "Vtc = 0, Atc = S1 means no throat chamber compliance",
+    "Vrc = 0 means open back (no rear chamber)",
+    "Validates T-matrix calculation, not driver-horn integration",
+    "Literature: Kolbrek horn theory tutorial, Beranek (1954) Eq. 5.20"
+  ]
+}
