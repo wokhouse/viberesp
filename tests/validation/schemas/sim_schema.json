@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://viberesp.org/schemas/sim_schema.json",
+  "title": "Hornresp Simulation Results",
+  "description": "Schema for parsed Hornresp simulation results",
+  "type": "object",
+  "required": [
+    "test_case_id",
+    "metadata",
+    "data"
+  ],
+  "properties": {
+    "test_case_id": {
+      "type": "string",
+      "description": "Test case identifier"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Simulation metadata",
+      "properties": {
+        "hornresp_version": {
+          "type": "string",
+          "description": "Hornresp version used"
+        },
+        "date_parsed": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when sim.txt was parsed"
+        },
+        "source_file": {
+          "type": "string",
+          "description": "Path to original sim.txt file"
+        },
+        "frequency_range": {
+          "type": "object",
+          "properties": {
+            "start_hz": {"type": "number", "minimum": 0},
+            "end_hz": {"type": "number", "minimum": 0},
+            "num_points": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "description": "Simulation data arrays (indexed by frequency)",
+      "required": ["frequency"],
+      "properties": {
+        "frequency": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Frequency points (Hz)"
+        },
+        "ra": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Acoustic resistance (normalized)"
+        },
+        "xa": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Acoustic reactance (normalized)"
+        },
+        "za": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Acoustic impedance magnitude (normalized)"
+        },
+        "spl": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Sound pressure level (dB @ 1m, 2.83V)"
+        },
+        "ze": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Electrical impedance magnitude (Ω)"
+        },
+        "zephase": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Electrical impedance phase (degrees)"
+        },
+        "xg": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Diaphragm displacement (normalized)"
+        },
+        "eg": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Generator voltage (V)"
+        },
+        "efficiency": {
+          "type": "array",
+          "items": {"type": "number"},
+          "description": "Efficiency (%)"
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the simulation"
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://viberesp.org/schemas/driver_schema.json",
+  "title": "Driver Metadata",
+  "description": "Schema for driver metadata and Thiele-Small parameters",
+  "type": "object",
+  "required": [
+    "driver_name",
+    "manufacturer",
+    "thiele_small",
+    "enclosures_validated",
+    "validation_status"
+  ],
+  "properties": {
+    "driver_name": {
+      "type": "string",
+      "description": "Driver model name (e.g., BC_8NDL51)"
+    },
+    "manufacturer": {
+      "type": "string",
+      "description": "Manufacturer name (e.g., B&C Speakers)"
+    },
+    "size_inches": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Driver size in inches"
+    },
+    "thiele_small": {
+      "type": "object",
+      "description": "Thiele-Small parameters",
+      "required": [
+        "F_s",
+        "Q_ts",
+        "V_as",
+        "S_d",
+        "BL",
+        "R_e",
+        "M_md"
+      ],
+      "properties": {
+        "F_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Resonance frequency (Hz)"
+        },
+        "Q_ts": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total Q factor (dimensionless)"
+        },
+        "Q_es": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Electrical Q factor (dimensionless)"
+        },
+        "Q_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mechanical Q factor (dimensionless)"
+        },
+        "V_as": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Equivalent volume of compliance (m³)"
+        },
+        "S_d": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Effective piston area (m²)"
+        },
+        "BL": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Force factor (T·m)"
+        },
+        "R_e": {
+          "type": "number",
+          "minimum": 0,
+          "description": "DC resistance (Ω)"
+        },
+        "M_md": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Driver mass without radiation load (kg)"
+        },
+        "C_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Suspension compliance (m/N)"
+        },
+        "R_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mechanical resistance (N·s/m)"
+        },
+        "L_e": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Voice coil inductance (H)"
+        }
+      }
+    },
+    "enclosures_validated": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of enclosure types validated for this driver"
+    },
+    "validation_status": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "complete", "failed"],
+      "description": "Overall validation status"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the driver"
+    }
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://viberesp.org/schemas/validation_schema.json",
+  "title": "Validation Results",
+  "description": "Schema for validation results comparing viberesp to Hornresp",
+  "type": "object",
+  "required": [
+    "test_case_id",
+    "validation_date",
+    "status"
+  ],
+  "properties": {
+    "test_case_id": {
+      "type": "string",
+      "description": "Test case identifier"
+    },
+    "validation_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date validation was performed (YYYY-MM-DD)"
+    },
+    "viberesp_version": {
+      "type": "string",
+      "description": "Viberesp version used for validation"
+    },
+    "hornresp_version": {
+      "type": "string",
+      "description": "Hornresp version used for reference data"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "partial", "skipped"],
+      "description": "Overall validation status"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Validation metrics for each output type",
+      "properties": {
+        "ze_magnitude": {
+          "type": "object",
+          "description": "Electrical impedance magnitude validation",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether validation passed"
+            },
+            "max_percent_error": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Maximum percent error (%)"
+            },
+            "max_absolute_error_ohms": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Maximum absolute error (Ω)"
+            },
+            "rms_error_ohms": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Root-mean-square error (Ω)"
+            },
+            "mean_absolute_error_ohms": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Mean absolute error (Ω)"
+            },
+            "worst_frequency_hz": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Frequency with maximum error"
+            },
+            "tolerance_percent": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Tolerance used for validation (%)"
+            }
+          }
+        },
+        "ze_phase": {
+          "type": "object",
+          "description": "Electrical impedance phase validation",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether validation passed"
+            },
+            "max_error_degrees": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Maximum phase error (degrees)"
+            },
+            "rms_error_degrees": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Root-mean-square error (degrees)"
+            },
+            "mean_absolute_error_degrees": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Mean absolute error (degrees)"
+            },
+            "worst_frequency_hz": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Frequency with maximum error"
+            },
+            "tolerance_degrees": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Tolerance used for validation (degrees)"
+            }
+          }
+        },
+        "spl": {
+          "type": "object",
+          "description": "Sound pressure level validation",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "nullable": true,
+              "description": "Whether validation passed (null = not validated)"
+            },
+            "max_error_db": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Maximum SPL error (dB)"
+            },
+            "rms_error_db": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Root-mean-square error (dB)"
+            },
+            "mean_absolute_error_db": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Mean absolute error (dB)"
+            },
+            "worst_frequency_hz": {
+              "type": "number",
+              "minimum": 0,
+              "nullable": true,
+              "description": "Frequency with maximum error"
+            },
+            "tolerance_db": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Tolerance used for validation (dB)"
+            },
+            "note": {
+              "type": "string",
+              "description": "Note about why validation was not performed"
+            }
+          }
+        }
+      }
+    },
+    "worst_errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "description": "Metric name (e.g., 'ze_magnitude', 'ze_phase', 'spl')"
+          },
+          "frequency_hz": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Frequency of worst error"
+          },
+          "viberesp_value": {
+            "type": "number",
+            "description": "Viberesp value at this frequency"
+          },
+          "hornresp_value": {
+            "type": "number",
+            "description": "Hornresp value at this frequency"
+          },
+          "absolute_error": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Absolute error"
+          },
+          "percent_error": {
+            "type": "number",
+            "description": "Percent error (not applicable for phase/SPL)"
+          }
+        }
+      },
+      "description": "Worst errors for each metric"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Human-readable summary of validation results"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the validation"
+    }
+  }
+}

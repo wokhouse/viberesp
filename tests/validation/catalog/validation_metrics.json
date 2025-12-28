@@ -1,0 +1,67 @@
+{
+  "catalog_version": "1.0",
+  "last_updated": "2025-12-27",
+  "category": "validation_metrics",
+  "description": "Output metrics validated against Hornresp",
+  "metrics": [
+    {
+      "name": "Electrical impedance magnitude",
+      "symbol": "Ze",
+      "unit": "Ω",
+      "description": "Electrical impedance magnitude at voice coil terminals",
+      "validation_method": "compare_electrical_impedance",
+      "typical_tolerance": "2% away from resonance, higher near peaks"
+    },
+    {
+      "name": "Electrical impedance phase",
+      "symbol": "ZePhase",
+      "unit": "degrees",
+      "description": "Phase angle of electrical impedance",
+      "validation_method": "compare_electrical_impedance_phase",
+      "typical_tolerance": "±5°"
+    },
+    {
+      "name": "Sound pressure level",
+      "symbol": "SPL",
+      "unit": "dB",
+      "description": "Sound pressure level at 1 meter for 2.83V input",
+      "validation_method": "compare_spl",
+      "typical_tolerance": "±3 dB (audible threshold)"
+    },
+    {
+      "name": "Acoustic resistance",
+      "symbol": "Ra",
+      "unit": "normalized",
+      "description": "Normalized acoustic resistance",
+      "validation_method": "N/A (reference only)"
+    },
+    {
+      "name": "Acoustic reactance",
+      "symbol": "Xa",
+      "unit": "normalized",
+      "description": "Normalized acoustic reactance",
+      "validation_method": "N/A (reference only)"
+    },
+    {
+      "name": "Acoustic impedance",
+      "symbol": "Za",
+      "unit": "normalized",
+      "description": "Normalized acoustic impedance magnitude",
+      "validation_method": "N/A (reference only)"
+    },
+    {
+      "name": "Diaphragm displacement",
+      "symbol": "Xg",
+      "unit": "normalized",
+      "description": "Normalized diaphragm displacement",
+      "validation_method": "N/A (reference only)"
+    },
+    {
+      "name": "Efficiency",
+      "symbol": "η",
+      "unit": "%",
+      "description": "Power conversion efficiency",
+      "validation_method": "N/A (future implementation)"
+    }
+  ]
+}
