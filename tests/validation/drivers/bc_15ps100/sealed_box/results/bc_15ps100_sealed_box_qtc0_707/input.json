@@ -1,0 +1,9 @@
+{
+  "test_case_id": "bc_15ps100_sealed_box_qtc0_707",
+  "driver": "BC_15PS100",
+  "enclosure_type": "sealed_box",
+  "enclosure_parameters": {
+    "Qtc": 0.707
+  },
+  "generated_at": "2025-12-27T20:45:06.439974"
+}

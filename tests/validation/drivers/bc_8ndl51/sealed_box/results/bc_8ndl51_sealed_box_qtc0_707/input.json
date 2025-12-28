@@ -1,0 +1,9 @@
+{
+  "test_case_id": "bc_8ndl51_sealed_box_qtc0_707",
+  "driver": "BC_8NDL51",
+  "enclosure_type": "sealed_box",
+  "enclosure_parameters": {
+    "Qtc": 0.707
+  },
+  "generated_at": "2025-12-27T20:44:54.076966"
+}

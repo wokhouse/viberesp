@@ -1,0 +1,80 @@
+{
+  "catalog_version": "1.0",
+  "last_updated": "2025-12-27",
+  "category": "driver_thiele_small",
+  "description": "Driver Thiele-Small parameters used in validation",
+  "parameters": [
+    {
+      "name": "Resonance frequency",
+      "symbol": "F_s",
+      "unit": "Hz",
+      "description": "Driver free-air resonance frequency"
+    },
+    {
+      "name": "Total Q factor",
+      "symbol": "Q_ts",
+      "unit": "dimensionless",
+      "description": "Total quality factor at resonance (combined electrical and mechanical)"
+    },
+    {
+      "name": "Electrical Q factor",
+      "symbol": "Q_es",
+      "unit": "dimensionless",
+      "description": "Electrical quality factor at resonance"
+    },
+    {
+      "name": "Mechanical Q factor",
+      "symbol": "Q_ms",
+      "unit": "dimensionless",
+      "description": "Mechanical quality factor at resonance"
+    },
+    {
+      "name": "Equivalent volume of compliance",
+      "symbol": "V_as",
+      "unit": "m³",
+      "description": "Volume of air having same compliance as driver suspension"
+    },
+    {
+      "name": "Effective piston area",
+      "symbol": "S_d",
+      "unit": "m²",
+      "description": "Effective radiating area of diaphragm"
+    },
+    {
+      "name": "Force factor",
+      "symbol": "BL",
+      "unit": "T·m",
+      "description": "Force factor (magnetic field × voice coil length)"
+    },
+    {
+      "name": "DC resistance",
+      "symbol": "R_e",
+      "unit": "Ω",
+      "description": "Voice coil DC resistance"
+    },
+    {
+      "name": "Driver mass",
+      "symbol": "M_md",
+      "unit": "kg",
+      "description": "Mass of voice coil and diaphragm without radiation load"
+    },
+    {
+      "name": "Suspension compliance",
+      "symbol": "C_ms",
+      "unit": "m/N",
+      "description": "Suspension compliance (inverse of stiffness)"
+    },
+    {
+      "name": "Mechanical resistance",
+      "symbol": "R_ms",
+      "unit": "N·s/m",
+      "description": "Mechanical losses in suspension"
+    },
+    {
+      "name": "Voice coil inductance",
+      "symbol": "L_e",
+      "unit": "H",
+      "description": "Voice coil inductance"
+    }
+  ]
+}

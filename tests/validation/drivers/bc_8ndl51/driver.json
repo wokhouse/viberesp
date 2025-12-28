@@ -1,0 +1,19 @@
+{
+  "driver_name": "BC_8NDL51_8",
+  "manufacturer": "B&C Speakers",
+  "size_inches": 8.0,
+  "thiele_small": {
+    "F_s": 75.0,
+    "Q_ts": 0.616,
+    "V_as": 0.0101,
+    "S_d": 0.0232,
+    "BL": 7.3,
+    "R_e": 6.2,
+    "M_md": 0.02677
+  },
+  "enclosures_validated": [
+    "sealed_box",
+    "ported_box"
+  ],
+  "validation_status": "pending"
+}

@@ -15,6 +15,13 @@ from pathlib import Path
 
 from viberesp.driver.parameters import ThieleSmallParameters
 from viberesp.hornresp.export import export_to_hornresp, batch_export_to_hornresp
+from viberesp.validation.commands import (
+    validate_generate_input,
+    validate_parse_output,
+    validate_run,
+    validate_status,
+    validate_migrate
+)
 
 
 @click.group()
@@ -583,6 +590,14 @@ def import_cmd(file, driver, config, vb, fb, force):
     click.echo(f"\nNext steps:")
     click.echo(f"  Run 'viberesp validate list' to see all datasets")
     click.echo(f"  Run 'viberesp validate compare {driver} {config_subdir}' to validate")
+
+
+# Register new validation commands (Phase 1.5)
+validate.add_command(validate_generate_input)
+validate.add_command(validate_parse_output)
+validate.add_command(validate_run)
+validate.add_command(validate_status)
+validate.add_command(validate_migrate)
 
 
 @cli.command()

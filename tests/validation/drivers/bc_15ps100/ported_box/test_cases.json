@@ -1,0 +1,54 @@
+{
+  "driver": "BC_15PS100",
+  "enclosure_type": "ported_box",
+  "test_cases": [
+    {
+      "test_case_id": "bc_15ps100_ported_box_b4",
+      "description": "Butterworth maximally flat",
+      "parameters": {
+        "alignment": "B4"
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_ported_box_qb3",
+      "description": "Quasi-Butterworth 3rd-order",
+      "parameters": {
+        "alignment": "QB3"
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_ported_box_bb4",
+      "description": "Extended bass shelf",
+      "parameters": {
+        "alignment": "B4"
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_ported_box_port_2in",
+      "description": "2.0\u2033 port",
+      "parameters": {
+        "port_area_cm2": 20.27
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_ported_box_port_3in",
+      "description": "3.0\u2033 port",
+      "parameters": {
+        "port_area_cm2": 45.6
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_ported_box_port_4in",
+      "description": "4.0\u2033 port",
+      "parameters": {
+        "port_area_cm2": 81.07
+      },
+      "status": "pending"
+    }
+  ]
+}

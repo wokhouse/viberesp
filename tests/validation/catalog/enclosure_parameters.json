@@ -1,0 +1,68 @@
+{
+  "catalog_version": "1.0",
+  "last_updated": "2025-12-27",
+  "category": "enclosure_design",
+  "description": "Enclosure design parameters used in validation",
+  "parameters": [
+    {
+      "name": "Box volume",
+      "symbol": "Vb",
+      "unit": "L",
+      "description": "Enclosure internal volume (for sealed and ported boxes)"
+    },
+    {
+      "name": "System resonance frequency",
+      "symbol": "Fc",
+      "unit": "Hz",
+      "description": "System resonance frequency (sealed boxes)"
+    },
+    {
+      "name": "System Q factor",
+      "symbol": "Qtc",
+      "unit": "dimensionless",
+      "description": "System quality factor at resonance (sealed boxes)"
+    },
+    {
+      "name": "System compliance ratio",
+      "symbol": "α",
+      "unit": "dimensionless",
+      "description": "Ratio of driver compliance to box compliance (sealed boxes)"
+    },
+    {
+      "name": "Tuning frequency",
+      "symbol": "Fb",
+      "unit": "Hz",
+      "description": "Port tuning frequency (ported boxes)"
+    },
+    {
+      "name": "Box leakage losses",
+      "symbol": "QL",
+      "unit": "dimensionless",
+      "description": "Box leakage losses factor (5-20 typical, 7 = Hornresp default)"
+    },
+    {
+      "name": "Port area",
+      "symbol": "Ap",
+      "unit": "cm²",
+      "description": "Cross-sectional area of port (ported boxes)"
+    },
+    {
+      "name": "Port length",
+      "symbol": "Lpt",
+      "unit": "cm",
+      "description": "Physical length of port (ported boxes)"
+    },
+    {
+      "name": "Helical tuning ratio",
+      "symbol": "h",
+      "unit": "dimensionless",
+      "description": "Ratio of tuning frequency to driver resonance (ported boxes)"
+    },
+    {
+      "name": "Box damping factor",
+      "symbol": "Qb",
+      "unit": "dimensionless",
+      "description": "Box losses (combined absorption and leakage)"
+    }
+  ]
+}

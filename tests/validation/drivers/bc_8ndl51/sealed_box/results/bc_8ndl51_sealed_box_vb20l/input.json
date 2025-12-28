@@ -1,0 +1,9 @@
+{
+  "test_case_id": "bc_8ndl51_sealed_box_vb20l",
+  "driver": "BC_8NDL51",
+  "enclosure_type": "sealed_box",
+  "enclosure_parameters": {
+    "Vb_liters": 20.0
+  },
+  "generated_at": "2025-12-27T20:44:54.078234"
+}

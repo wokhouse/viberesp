@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://viberesp.org/schemas/test_case_schema.json",
+  "title": "Test Cases Definition",
+  "description": "Schema for test cases definition file for a driver/enclosure combination",
+  "type": "object",
+  "required": [
+    "driver",
+    "enclosure_type",
+    "test_cases"
+  ],
+  "properties": {
+    "driver": {
+      "type": "string",
+      "description": "Driver name (e.g., BC_8NDL51)"
+    },
+    "enclosure_type": {
+      "type": "string",
+      "enum": ["infinite_baffle", "sealed_box", "ported_box"],
+      "description": "Enclosure type"
+    },
+    "test_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "test_case_id",
+          "description",
+          "parameters",
+          "status"
+        ],
+        "properties": {
+          "test_case_id": {
+            "type": "string",
+            "description": "Unique test case identifier (format: {driver}_{enclosure}_{variant})"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the test case"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Enclosure-specific parameters",
+            "properties": {
+              "Vb_liters": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Box volume in liters (for sealed/ported boxes)"
+              },
+              "Qtc": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Target system Q (for sealed boxes)"
+              },
+              "Fb_hz": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Port tuning frequency in Hz (for ported boxes)"
+              },
+              "port_area_cm2": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Port area in cm² (for ported boxes)"
+              },
+              "port_length_cm": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Port length in cm (for ported boxes)"
+              },
+              "QL": {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "description": "Box leakage losses (null = not specified)"
+              }
+            }
+          },
+          "validation_criteria": {
+            "type": "object",
+            "description": "Validation tolerances for this test case",
+            "properties": {
+              "ze_max_error_percent": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Maximum acceptable electrical impedance magnitude error (%)"
+              },
+              "ze_phase_max_error_degrees": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Maximum acceptable electrical impedance phase error (degrees)"
+              },
+              "spl_max_error_db": {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "description": "Maximum acceptable SPL error (dB, null = not validated)"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "passed", "failed", "skipped"],
+            "description": "Test case validation status"
+          },
+          "date_validated": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Date validation was last run (YYYY-MM-DD)"
+          },
+          "error_metrics": {
+            "type": "object",
+            "description": "Actual error metrics from validation",
+            "properties": {
+              "ze_max_percent_error": {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "description": "Maximum impedance magnitude error (%)"
+              },
+              "ze_phase_max_error": {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "description": "Maximum impedance phase error (degrees)"
+              },
+              "spl_max_error_db": {
+                "type": "number",
+                "minimum": 0,
+                "nullable": true,
+                "description": "Maximum SPL error (dB)"
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Additional notes about this test case"
+          }
+        }
+      },
+      "description": "List of test cases for this driver/enclosure combination"
+    }
+  }
+}

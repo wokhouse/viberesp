@@ -1,0 +1,46 @@
+{
+  "driver": "BC_15PS100",
+  "enclosure_type": "sealed_box",
+  "test_cases": [
+    {
+      "test_case_id": "bc_15ps100_sealed_box_qtc0_5",
+      "description": "Underdamped",
+      "parameters": {
+        "Qtc": 0.5
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_sealed_box_qtc0_707",
+      "description": "Butterworth (B4)",
+      "parameters": {
+        "Qtc": 0.707
+      },
+      "status": "passed"
+    },
+    {
+      "test_case_id": "bc_15ps100_sealed_box_qtc0_97",
+      "description": "Near critical",
+      "parameters": {
+        "Qtc": 0.97
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_sealed_box_vb50l",
+      "description": "Between Qtc 0.71-0.94",
+      "parameters": {
+        "Vb_liters": 50.0
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_15ps100_sealed_box_vb80l",
+      "description": "Larger box",
+      "parameters": {
+        "Vb_liters": 80.0
+      },
+      "status": "pending"
+    }
+  ]
+}

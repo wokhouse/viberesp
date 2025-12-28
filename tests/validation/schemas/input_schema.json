@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://viberesp.org/schemas/input_schema.json",
+  "title": "Test Case Input Parameters",
+  "description": "Schema for input parameters for a specific test case",
+  "type": "object",
+  "required": [
+    "test_case_id",
+    "driver",
+    "enclosure_type",
+    "enclosure_parameters"
+  ],
+  "properties": {
+    "test_case_id": {
+      "type": "string",
+      "description": "Unique test case identifier"
+    },
+    "driver": {
+      "type": "string",
+      "description": "Driver name"
+    },
+    "enclosure_type": {
+      "type": "string",
+      "enum": ["infinite_baffle", "sealed_box", "ported_box"],
+      "description": "Enclosure type"
+    },
+    "driver_parameters": {
+      "type": "object",
+      "description": "Driver Thiele-Small parameters (optional, defaults to driver.json values)",
+      "properties": {
+        "F_s": {"type": "number", "minimum": 0},
+        "Q_ts": {"type": "number", "minimum": 0},
+        "Q_es": {"type": "number", "minimum": 0},
+        "Q_ms": {"type": "number", "minimum": 0},
+        "V_as": {"type": "number", "minimum": 0},
+        "S_d": {"type": "number", "minimum": 0},
+        "BL": {"type": "number", "minimum": 0},
+        "R_e": {"type": "number", "minimum": 0},
+        "M_md": {"type": "number", "minimum": 0},
+        "C_ms": {"type": "number", "minimum": 0},
+        "R_ms": {"type": "number", "minimum": 0},
+        "L_e": {"type": "number", "minimum": 0}
+      }
+    },
+    "enclosure_parameters": {
+      "type": "object",
+      "description": "Enclosure-specific parameters",
+      "properties": {
+        "Vb_liters": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Box volume in liters (sealed/ported boxes)"
+        },
+        "Fb_hz": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Port tuning frequency in Hz (ported boxes)"
+        },
+        "port_area_cm2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Port area in cm² (ported boxes)"
+        },
+        "port_length_cm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Port length in cm (ported boxes)"
+        },
+        "QL": {
+          "type": "number",
+          "minimum": 0,
+          "nullable": true,
+          "description": "Box leakage losses"
+        }
+      }
+    },
+    "hornresp_export_settings": {
+      "type": "object",
+      "description": "Settings for Hornresp export",
+      "properties": {
+        "comment": {
+          "type": "string",
+          "description": "Comment field in Hornresp file"
+        },
+        "ang": {
+          "type": "number",
+          "description": "Angular coverage (default: 2*pi)"
+        },
+        "eg": {
+          "type": "number",
+          "description": "Generator voltage (default: 2.83V)"
+        },
+        "rg": {
+          "type": "number",
+          "description": "Generator resistance (default: 0.0)"
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when input.json was generated"
+    }
+  }
+}
