@@ -1,0 +1,48 @@
+======================================================================
+Single-Objective Horn Optimization Results (Target Band)
+======================================================================
+
+Driver: TC2 Compression Driver
+Objective: response_flatness in target band
+Target band: 500 - 5000 Hz
+Algorithm: GA (Genetic Algorithm)
+Population: 80, Generations: 50
+
+======================================================================
+BEST DESIGN
+======================================================================
+
+Objective value:
+  Response flatness in target band: 2.57 dB
+
+Target band statistics:
+  Mean SPL: 83.65 dB
+  Std deviation: 2.55 dB
+  Min SPL: 79.02 dB
+  Max SPL: 89.65 dB
+  Peak-to-peak: 10.63 dB
+
+Parameters:
+  Throat area:  2.36 cm²
+  Middle area:  102.13 cm²
+  Mouth area:   495.48 cm²
+  Length 1:     10.00 cm
+  Length 2:     11.87 cm
+  Total length: 21.87 cm
+  Rear chamber: 3.49 L
+
+Flare constants:
+  m1 = 37.6575 m⁻¹ (Fc1 = 2055.7 Hz)
+  m2 = 13.3000 m⁻¹ (Fc2 = 726.0 Hz)
+  Overall Fc = 2055.7 Hz
+
+======================================================================
+ASSESSMENT
+======================================================================
+
+✓ EXCELLENT flatness (< 3 dB)
+  This design achieves studio-monitor quality in the target band.
+
+Target band coverage:
+⚠ Cutoff (2056 Hz) is within target band
+  Horn will not efficiently reproduce 500-3084 Hz range

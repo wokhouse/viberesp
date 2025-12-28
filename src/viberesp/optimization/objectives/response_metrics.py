@@ -122,7 +122,8 @@ def objective_response_flatness(
     frequency_range: Tuple[float, float] = (20.0, 500.0),
     n_points: int = 100,
     voltage: float = 2.83,
-    num_segments: int = 2
+    num_segments: int = 2,
+    target_band: Tuple[float, float] = None
 ) -> float:
     """
     Calculate frequency response variation (standard deviation) for minimization.
@@ -140,11 +141,16 @@ def objective_response_flatness(
             - Sealed: [Vb] (m³)
             - Ported: [Vb, Fb, port_area, port_length] (m³, Hz, m², m)
             - Exponential horn: [throat_area, mouth_area, length, V_rc] (m², m², m, m³)
+            - Multi-segment horn: [S1, S2, S3, L12, L23, V_rc] (m², m², m², m, m, m³)
         driver: ThieleSmallParameters instance
-        enclosure_type: "sealed", "ported", "infinite_baffle", "exponential_horn"
+        enclosure_type: "sealed", "ported", "infinite_baffle", "exponential_horn",
+                       "multisegment_horn"
         frequency_range: (f_min, f_max) in Hz for flatness calculation
         n_points: Number of frequency points to evaluate
         voltage: Input voltage for SPL calculation (default 2.83V)
+        num_segments: Number of segments for multisegment_horn (default 2)
+        target_band: Optional (f_min, f_max) target frequency band for optimization.
+                     When provided, overrides auto-calculated range for horns.
 
     Returns:
         Standard deviation of SPL (dB) over frequency range (lower is better)
@@ -182,33 +188,46 @@ def objective_response_flatness(
                 max(n_points // 2, 20)  # Fewer points for reduced range
             )
 
+    # For multisegment_horn, use target_band if provided
+    elif enclosure_type == "multisegment_horn" and target_band is not None:
+        f_min, f_max = target_band
+        frequencies = np.logspace(
+            np.log10(f_min),
+            np.log10(f_max),
+            n_points
+        )
+
     # For exponential horn, adjust frequency range to exclude cutoff region
     elif enclosure_type == "exponential_horn" and len(design_vector) >= 3:
         throat_area = design_vector[0]
         mouth_area = design_vector[1]
         length = design_vector[2]
 
-        # Calculate cutoff frequency
-        fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
-
-        # Determine appropriate frequency range based on horn type
-        # Bass horns (Fc < 100 Hz): Evaluate up to 5×Fc (bass range)
-        # Midrange horns (100 ≤ Fc < 500 Hz): Evaluate up to 20×Fc (full passband)
-        # Tweeter horns (Fc ≥ 500 Hz): Evaluate up to 20 kHz
-        if fc < 100:
-            # Bass horn: 20-500 Hz range
-            f_max = max(frequency_range[1], fc * 5)
-        elif fc < 500:
-            # Midrange horn: Extend to 20×Fc to cover full passband
-            # Literature: Beranek (1954) - Horn passband extends to ~20×Fc
-            f_max = max(frequency_range[1], fc * 20, 5000)
+        # Use target_band if provided, otherwise auto-calculate based on Fc
+        if target_band is not None:
+            f_min, f_max = target_band
         else:
-            # Tweeter horn: Extend to 20 kHz
-            f_max = 20000
+            # Calculate cutoff frequency
+            fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
 
-        # Start at 1.5×Fc to avoid cutoff rolloff dominating metric
-        # Literature: Olson (1947) - Horn response is flat above 1.5×Fc
-        f_min = max(frequency_range[0], fc * 1.5)
+            # Determine appropriate frequency range based on horn type
+            # Bass horns (Fc < 100 Hz): Evaluate up to 5×Fc (bass range)
+            # Midrange horns (100 ≤ Fc < 500 Hz): Evaluate up to 20×Fc (full passband)
+            # Tweeter horns (Fc ≥ 500 Hz): Evaluate up to 20 kHz
+            if fc < 100:
+                # Bass horn: 20-500 Hz range
+                f_max = max(frequency_range[1], fc * 5)
+            elif fc < 500:
+                # Midrange horn: Extend to 20×Fc to cover full passband
+                # Literature: Beranek (1954) - Horn passband extends to ~20×Fc
+                f_max = max(frequency_range[1], fc * 20, 5000)
+            else:
+                # Tweeter horn: Extend to 20 kHz
+                f_max = 20000
+
+            # Start at 1.5×Fc to avoid cutoff rolloff dominating metric
+            # Literature: Olson (1947) - Horn response is flat above 1.5×Fc
+            f_min = max(frequency_range[0], fc * 1.5)
 
         # Ensure f_min < f_max for valid range
         if f_min < f_max:
