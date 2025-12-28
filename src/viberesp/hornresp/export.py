@@ -12,7 +12,7 @@ Literature:
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Union
 
 from viberesp.driver.parameters import ThieleSmallParameters
 
@@ -955,3 +955,246 @@ def batch_export_to_hornresp(
         filename = f"{name.replace(' ', '_')}.txt"
         file_path = output_path / filename
         export_to_hornresp(driver, name, str(file_path))
+
+
+def export_multisegment_horn_to_hornresp(
+    driver: ThieleSmallParameters,
+    horn: 'MultiSegmentHorn',
+    driver_name: str,
+    output_path: str,
+    comment: Optional[str] = None,
+    radiation_angle: float = 6.283185307179586,  # 2π
+) -> None:
+    """Export a multi-segment horn to Hornresp format.
+
+    Generates a .txt file in Hornresp native format for a multi-segment
+    horn-loaded system with up to 4 segments (Hornresp limit).
+
+    Literature:
+        - Hornresp User Manual - Multi-segment horn parameter format
+        - Hornresp supports up to 4 conic/exponential segments (S1-S5)
+        - https://www.hornresp.net/
+
+    Args:
+        driver: ThieleSmallParameters instance in SI units
+        horn: MultiSegmentHorn geometry with 1-4 segments
+        driver_name: Name/identifier for the system
+        output_path: Path to output .txt file
+        comment: Optional comment/description
+        radiation_angle: Solid angle of radiation (steradians)
+            - 2π: half-space (infinite baffle) [default]
+            - 4π: full-space (free field)
+            - π: quarter-space
+
+    Raises:
+        ValueError: If horn has more than 4 segments (Hornresp limit)
+        IOError: If output file cannot be written
+
+    Examples:
+        >>> from viberesp.simulation.types import HornSegment, MultiSegmentHorn
+        >>> segment1 = HornSegment(throat_area=0.001, mouth_area=0.01, length=0.3)
+        >>> segment2 = HornSegment(throat_area=0.01, mouth_area=0.1, length=0.6)
+        >>> horn = MultiSegmentHorn(segments=[segment1, segment2])
+        >>> export_multisegment_horn_to_hornresp(driver, horn, "test_horn", "test.txt")
+    """
+
+    # Convert driver to Hornresp format
+    record = driver_to_hornresp_record(driver, driver_name)
+
+    # Validate number of segments
+    if horn.num_segments > 4:
+        raise ValueError(
+            f"Hornresp supports maximum 4 segments, got {horn.num_segments}. "
+            "Reduce number of segments or export segments separately."
+        )
+
+    # Set radiation angle
+    pi = 3.141592653589793
+    if radiation_angle == 2 * pi:
+        ang_value = "2.0"  # Half-space
+    elif radiation_angle == 4 * pi:
+        ang_value = "4.0"  # Full-space
+    elif radiation_angle == pi:
+        ang_value = "1.0"  # Quarter-space
+    else:
+        # Default to half-space for custom angles
+        ang_value = "2.0"
+
+    # Build horn parameter section based on number of segments
+    # Hornresp format: S1, S2, L12, F12, S2, S3, L23, F23, etc.
+    # Note: S2 appears twice (once as segment 1 mouth, once as segment 2 throat)
+    # Areas in cm², lengths in cm, flare constant (Exp) is unitless
+
+    segments = horn.segments
+    num_segments = len(segments)
+
+    # Helper function to convert m² to cm²
+    def area_to_cm2(area_m2: float) -> float:
+        return area_m2 * 10000.0
+
+    # Helper function to convert m to cm
+    def length_to_cm(length_m: float) -> float:
+        return length_m * 100.0
+
+    # Initialize all horn parameters to 0
+    s1, s2, s3, s4, s5 = 0.0, 0.0, 0.0, 0.0, 0.0
+    l12, l23, l34, l45 = 0.0, 0.0, 0.0, 0.0
+    f12, f23, f34, f45 = 0.0, 0.0, 0.0, 0.0
+
+    # Fill in segments
+    if num_segments >= 1:
+        s1 = area_to_cm2(segments[0].throat_area)
+        s2 = area_to_cm2(segments[0].mouth_area)
+        l12 = length_to_cm(segments[0].length)
+        f12 = segments[0].flare_constant
+
+    if num_segments >= 2:
+        s3 = area_to_cm2(segments[1].mouth_area)
+        l23 = length_to_cm(segments[1].length)
+        f23 = segments[1].flare_constant
+
+    if num_segments >= 3:
+        s4 = area_to_cm2(segments[2].mouth_area)
+        l34 = length_to_cm(segments[2].length)
+        f34 = segments[2].flare_constant
+
+    if num_segments >= 4:
+        s5 = area_to_cm2(segments[3].mouth_area)
+        l45 = length_to_cm(segments[3].length)
+        f45 = segments[3].flare_constant
+
+    # Generate file content
+    comment_text = comment or f"{driver_name} multi-segment horn from viberesp"
+    id_hash = abs(hash(driver_name)) % 100000
+    id_value = f"{id_hash / 100:.2f}"
+
+    # Hornresp format uses "Exp" instead of "F" for flare constant in newer versions
+    # But the file format uses F12, F23, etc.
+    horn_section = f"""|HORN PARAMETER VALUES:
+
+S1 = {s1:.2f}
+S2 = {s2:.2f}
+L12 = {l12:.2f}
+F12 = {f12:.4f}
+S2 = {s2:.2f}
+S3 = {s3:.2f}
+L23 = {l23:.2f}
+F23 = {f23:.4f}
+S3 = {s3:.2f}
+S4 = {s4:.2f}
+L34 = {l34:.2f}
+F34 = {f34:.4f}
+S4 = {s4:.2f}
+S5 = {s5:.2f}
+L45 = {l45:.2f}
+F45 = {f45:.4f}"""
+
+    content = f"""ID = {id_value}
+
+Comment = {comment_text}
+
+|RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
+
+Ang = {ang_value} x Pi
+Eg = 2.83
+Rg = 0.00
+Cir = 0.00
+
+{horn_section}
+
+{record.to_hornresp_format()}
+
+|ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
+
+Re' = 0.00
+Leb = 0.00
+Le = 0.00
+Ke = 0.00
+
+|ADVANCED DRIVER PARAMETER VALUES FOR MASS-INDUCTANCE MODEL:
+
+Red = 0.00
+Les = 0.00
+Kes = 0.00
+Cr = 0.00
+
+|PASSIVE RADIATOR PARAMETER VALUES:
+
+Mmpr = 0.00
+Cmpr = 0.00
+Rmpr = 0.00
+Sdp = 0.00
+
+|CHAMBER PARAMETER VALUES:
+
+Vrc = 0.00
+Lrc = 0.00
+Fr = 0.00
+Tal = 0.00
+Vtc = 0.00
+Atc = 0.00
+
+|MAXIMUM SPL PARAMETER VALUES:
+
+Pn = 0.00
+
+|ABSORBENT FILLING MATERIAL PARAMETER VALUES:
+
+Qa = 0.00
+
+|ACTIVE BAND PASS FILTER PARAMETER VALUES:
+
+Fa1 = 0.00
+FB1 = 0.00
+Fa2 = 0.00
+FB2 = 0.00
+
+|PASSIVE FILTER PARAMETER VALUES:
+
+Leh = 0.00
+Reh = 0.00
+Ch = 0.00
+Rch = 0.00
+
+|EQUALISER FILTER PARAMETER VALUES:
+
+Fke = 0.00
+Tke = 0.00
+Fqe = 0.00
+Qke = 0.00
+
+|STATUS FLAGS:
+
+IK = 0
+IR = 0
+IL = 0
+IP = 0
+IS = 0
+IT = 0
+IV = 0
+IQ = 0
+IF = 0
+I_eq = 0
+
+|OTHER SETTINGS:
+
+Filter Type Index = 0
+Filter Input Index = 0
+Filter Output Index = 0
+
+Filter Type = 1
+
+MEH Configuration = 0
+ME Amplifier Polarity Value = 1
+"""
+
+    # Write to file with CRLF line endings
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, 'w', encoding='utf-8', newline='\r\n') as f:
+        f.write(content)
+
+    print(f"Exported {driver_name} {num_segments}-segment horn to {output_path}")
+    print(f"  Throat: {s1:.1f} cm² → Mouth: {max(s2, s3, s4, s5):.1f} cm²")
+    print(f"  Total length: {horn.total_length()*100:.1f} cm")

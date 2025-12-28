@@ -191,3 +191,135 @@ def constraint_port_velocity(
     except Exception:
         # If calculation fails, assume OK
         return 0.0
+
+
+def constraint_multisegment_continuity(
+    design_vector: np.ndarray,
+    num_segments: int = 2
+) -> float:
+    """
+    Constrain multi-segment horn to have monotonic area expansion.
+
+    Ensures throat < middle < mouth (for 2 segments) to prevent
+    area discontinuities that would cause reflections.
+
+    Literature:
+        - Olson (1947), Chapter 8 - Horn area continuity
+        - Kolbrek Part 1 - Impedance discontinuities
+
+    Args:
+        design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        Constraint violation (positive = violation, negative = satisfied)
+
+    Examples:
+        >>> design = np.array([0.001, 0.005, 0.01, 0.3, 0.4, 0.0])
+        >>> constraint_multisegment_continuity(design, num_segments=2)
+        -0.004  # Satisfied (0.001 < 0.005 < 0.01)
+    """
+    if num_segments == 2:
+        throat_area, middle_area, mouth_area = design_vector[0], design_vector[1], design_vector[2]
+
+        # Check throat < middle
+        violation1 = throat_area - middle_area
+
+        # Check middle < mouth
+        violation2 = middle_area - mouth_area
+
+        # Return maximum violation
+        return max(violation1, violation2)
+
+    elif num_segments == 3:
+        throat_area, middle_area, area2, mouth_area = design_vector[0:4]
+
+        # Check monotonic expansion
+        violation1 = throat_area - middle_area
+        violation2 = middle_area - area2
+        violation3 = area2 - mouth_area
+
+        return max(violation1, violation2, violation3)
+
+    else:
+        return 0.0
+
+
+def constraint_multisegment_flare_limits(
+    design_vector: np.ndarray,
+    num_segments: int = 2,
+    min_mL: float = 0.5,
+    max_mL: float = 3.0
+) -> float:
+    """
+    Constrain flare constants for each segment to practical limits.
+
+    For each segment, ensure: min_mL ≤ m·L ≤ max_mL
+
+    This prevents unrealistic flare rates that would be difficult to
+    manufacture or would have poor acoustic performance.
+
+    Literature:
+        - Olson (1947), Chapter 5 - Practical flare rate limits
+        - Typical horns: 0.5 < m·L < 3.0
+
+    Args:
+        design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        num_segments: Number of segments (2 or 3)
+        min_mL: Minimum value for m·L product
+        max_mL: Maximum value for m·L product
+
+    Returns:
+        Constraint violation (positive = violation, negative = satisfied)
+
+    Examples:
+        >>> design = np.array([0.001, 0.01, 0.04, 0.2, 0.4, 0.0])
+        >>> constraint_multisegment_flare_limits(design, num_segments=2)
+        -0.5  # Satisfied
+    """
+    violations = []
+
+    if num_segments == 2:
+        throat_area, middle_area, mouth_area, length1, length2 = design_vector[0:5]
+
+        # Segment 1: m1·L1
+        if length1 > 0 and middle_area > throat_area:
+            m1 = np.log(middle_area / throat_area) / length1
+            mL1 = m1 * length1
+            violations.append(min_mL - mL1)  # Violation if too small
+            violations.append(mL1 - max_mL)  # Violation if too large
+
+        # Segment 2: m2·L2
+        if length2 > 0 and mouth_area > middle_area:
+            m2 = np.log(mouth_area / middle_area) / length2
+            mL2 = m2 * length2
+            violations.append(min_mL - mL2)
+            violations.append(mL2 - max_mL)
+
+    elif num_segments == 3:
+        (throat_area, middle_area, area2, mouth_area,
+         length1, length2, length3) = design_vector[0:7]
+
+        # Segment 1
+        if length1 > 0 and middle_area > throat_area:
+            m1 = np.log(middle_area / throat_area) / length1
+            violations.append(min_mL - m1 * length1)
+            violations.append(m1 * length1 - max_mL)
+
+        # Segment 2
+        if length2 > 0 and area2 > middle_area:
+            m2 = np.log(area2 / middle_area) / length2
+            violations.append(min_mL - m2 * length2)
+            violations.append(m2 * length2 - max_mL)
+
+        # Segment 3
+        if length3 > 0 and mouth_area > area2:
+            m3 = np.log(mouth_area / area2) / length3
+            violations.append(min_mL - m3 * length3)
+            violations.append(m3 * length3 - max_mL)
+
+    if not violations:
+        return 0.0
+
+    # Return maximum violation (positive = bad)
+    return max(violations)
