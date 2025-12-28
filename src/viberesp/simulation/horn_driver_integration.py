@@ -388,13 +388,22 @@ def horn_electrical_impedance(
         frequencies, horn, V_tc, A_tc, V_rc, driver.S_d, medium, radiation_angle
     )
 
-    # Total acoustic impedance
+    # Total acoustic impedance (at throat)
     Z_acoustic = Z_front[0] + Z_rear[0]
 
     # Reflect acoustic impedance to mechanical domain
-    # Z_mechanical_acoustic = Z_acoustic × S_d²
-    # COMSOL (2020), Eq. 1-2
-    Z_mechanical_acoustic = Z_acoustic * (driver.S_d ** 2)
+    # IMPORTANT: For compression drivers, Z_acoustic is calculated at the throat (area S1)
+    # not at the diaphragm (area Sd). We must scale by throat area, not diaphragm area.
+    #
+    # Z_mechanical_acoustic = Z_acoustic_at_throat × S1²
+    #
+    # The compression ratio (Sd/S1) affects the pressure transformation, but
+    # the acoustic impedance calculation already accounts for this.
+    #
+    # Literature:
+    # - Beranek (1954), Chapter 8 - Compression driver loading
+    # - Olson (1947), Chapter 8 - Horn driver impedance transformation
+    Z_mechanical_acoustic = Z_acoustic * (horn.throat_area ** 2)
 
     # Calculate mechanical impedance
     # Z_mechanical = R_ms + jωM_md + 1/(jωC_ms)
