@@ -60,6 +60,53 @@ def run_optimization_and_export():
 
     print(f"   ✓ Found {result.n_designs_found} valid designs")
 
+    # Validate frequency range for horn type
+    print("\n2. Validating optimization frequency range...")
+    from viberesp.optimization.parameters.exponential_horn_params import (
+        calculate_horn_cutoff_frequency
+    )
+    from viberesp.simulation.constants import SPEED_OF_SOUND
+
+    for i, design in enumerate(result.best_designs[:3]):
+        params = design['parameters']
+        objs = design['objectives']
+
+        throat_area = params['throat_area']
+        mouth_area = params['mouth_area']
+        length = params['length']
+
+        fc = calculate_horn_cutoff_frequency(
+            throat_area, mouth_area, length, SPEED_OF_SOUND
+        )
+
+        # Check optimization frequency range
+        f_min = max(20.0, fc * 1.5)
+        f_max_old = 500.0  # Old fixed range
+
+        # Determine appropriate range
+        if fc < 100:
+            f_max_appropriate = max(500, fc * 5)
+            horn_type = "Bass"
+        elif fc < 500:
+            f_max_appropriate = max(500, fc * 20, 5000)
+            horn_type = "Midrange"
+        else:
+            f_max_appropriate = 20000
+            horn_type = "Tweeter"
+
+        old_bandwidth = f_max_old - f_min
+        appropriate_bandwidth = f_max_appropriate - f_min
+
+        print(f"\n   Design {i+1} ({horn_type} horn, Fc={fc:.1f} Hz):")
+        print(f"     Old range: {f_min:.0f}-{f_max_old:.0f} Hz (bandwidth: {old_bandwidth:.0f} Hz)")
+        print(f"     New range: {f_min:.0f}-{f_max_appropriate:.0f} Hz (bandwidth: {appropriate_bandwidth:.0f} Hz)")
+
+        if old_bandwidth < appropriate_bandwidth * 0.5:
+            print(f"     ⚠ WARNING: Old optimization range was too narrow!")
+            print(f"              Old bandwidth is {100*old_bandwidth/appropriate_bandwidth:.0f}% of appropriate range")
+        else:
+            print(f"     ✓ Frequency range is appropriate")
+
     # Get driver
     driver = get_tc2_compression_driver()
 
@@ -68,7 +115,7 @@ def run_optimization_and_export():
     output_dir.mkdir(exist_ok=True)
 
     # Export top 3 designs
-    print(f"\n2. Exporting top 3 designs to Hornresp format...")
+    print(f"\n3. Exporting top 3 designs to Hornresp format...")
     print(f"   Output directory: {output_dir}")
 
     for i, design in enumerate(result.best_designs[:3]):
@@ -126,10 +173,15 @@ def run_optimization_and_export():
 
     # Print validation instructions
     print(f"\n" + "=" * 70)
-    print("3. Validation Instructions")
+    print("4. Validation Instructions")
     print("=" * 70)
     print("""
 To validate the optimized designs against Hornresp:
+
+IMPORTANT: Always validate over the FULL operating range:
+- Bass horns (Fc < 100 Hz): 20-500 Hz
+- Midrange horns (100 ≤ Fc < 500 Hz): 100-5000 Hz
+- Tweeter horns (Fc ≥ 500 Hz): 500-20000 Hz
 
 1. Open Hornresp (http://www.hornresp.net/)
 
@@ -139,7 +191,7 @@ To validate the optimized designs against Hornresp:
 
 3. Run simulation:
    - Tools → Combined Response
-   - Use frequency range: 20 Hz - 20 kHz
+   - Use frequency range appropriate for horn type (see above)
    - Set resolution: 5 points per octave
    - Click "Calculate"
 
@@ -152,19 +204,25 @@ To validate the optimized designs against Hornresp:
    - Compare SPL response and impedance
    - Expected agreement: <3 dB (above 2×Fc)
 
-6. Validation criteria:
+6. Check flatness across multiple bands:
+   - Low-mid (Fc to 2×Fc): Should be flat
+   - Mid (2×Fc to 10×Fc): Should be flat
+   - High-mid (10×Fc to 20×Fc): Should be flat
+   - Calculate std dev for each band separately
+
+7. Validation criteria:
    - Electrical impedance: <2% magnitude (f > Fc)
    - SPL response: <3 dB deviation (f > 2×Fc)
    - Cutoff frequency: <5 Hz from Olson's formula
 
-7. Document results:
+8. Document results:
    - Update this script with validation status
    - Add any discrepancies to notes section
     """)
 
     # Print design comparison
     print("=" * 70)
-    print("4. Design Comparison")
+    print("5. Design Comparison")
     print("=" * 70)
 
     print("\n   Design  Flatness(dB)  Volume(L)  Fc(Hz)  Throat(mm²)  Mouth(cm²)  Length(cm)")

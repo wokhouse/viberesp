@@ -195,6 +195,8 @@ def constraint_port_velocity(
 
 def constraint_multisegment_continuity(
     design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
     num_segments: int = 2
 ) -> float:
     """
@@ -209,6 +211,8 @@ def constraint_multisegment_continuity(
 
     Args:
         design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "multisegment_horn"
         num_segments: Number of segments (2 or 3)
 
     Returns:
@@ -216,9 +220,12 @@ def constraint_multisegment_continuity(
 
     Examples:
         >>> design = np.array([0.001, 0.005, 0.01, 0.3, 0.4, 0.0])
-        >>> constraint_multisegment_continuity(design, num_segments=2)
+        >>> constraint_multisegment_continuity(design, driver, "multisegment_horn", num_segments=2)
         -0.004  # Satisfied (0.001 < 0.005 < 0.01)
     """
+    if enclosure_type != "multisegment_horn":
+        return 0.0  # Not applicable for other enclosure types
+
     if num_segments == 2:
         throat_area, middle_area, mouth_area = design_vector[0], design_vector[1], design_vector[2]
 
@@ -247,9 +254,11 @@ def constraint_multisegment_continuity(
 
 def constraint_multisegment_flare_limits(
     design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
     num_segments: int = 2,
     min_mL: float = 0.5,
-    max_mL: float = 3.0
+    max_mL: float = 6.0
 ) -> float:
     """
     Constrain flare constants for each segment to practical limits.
@@ -261,22 +270,27 @@ def constraint_multisegment_flare_limits(
 
     Literature:
         - Olson (1947), Chapter 5 - Practical flare rate limits
-        - Typical horns: 0.5 < m·L < 3.0
+        - Typical horns: 0.5 < m·L < 3.0 (relaxed to 6.0 for optimization)
 
     Args:
         design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "multisegment_horn"
         num_segments: Number of segments (2 or 3)
-        min_mL: Minimum value for m·L product
-        max_mL: Maximum value for m·L product
+        min_mL: Minimum value for m·L product (default 0.5)
+        max_mL: Maximum value for m·L product (default 6.0, relaxed from 3.0)
 
     Returns:
         Constraint violation (positive = violation, negative = satisfied)
 
     Examples:
         >>> design = np.array([0.001, 0.01, 0.04, 0.2, 0.4, 0.0])
-        >>> constraint_multisegment_flare_limits(design, num_segments=2)
+        >>> constraint_multisegment_flare_limits(design, driver, "multisegment_horn", num_segments=2)
         -0.5  # Satisfied
     """
+    if enclosure_type != "multisegment_horn":
+        return 0.0  # Not applicable for other enclosure types
+
     violations = []
 
     if num_segments == 2:

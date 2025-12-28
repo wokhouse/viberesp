@@ -86,12 +86,13 @@ def get_exponential_horn_parameter_space(
     elif preset == "midrange_horn":
         # Midrange horn: Medium size, moderate cutoff frequency
         # Target cutoff: 200-500 Hz
-        # Mouth radius: ~6-18 cm
-        # This matches TC2 parameters (S1=5cm², S2=200cm², L=0.5m)
+        # Mouth size: Large enough for proper loading (Beranek 1954)
+        # Literature: Mouth circumference ≥ wavelength at cutoff for flat response <3 dB
+        # For Fc ≈ 350-450 Hz: need mouth_area ≥ 400-500 cm² (23-25 cm diameter)
         throat_min = 0.2 * S_d
         throat_max = 0.5 * S_d
-        mouth_min = 0.01  # m² (radius ~5.6 cm)
-        mouth_max = 0.1  # m² (radius ~18 cm)
+        mouth_min = 0.04  # m² (400 cm², radius ~11.3 cm)
+        mouth_max = 0.06  # m² (600 cm², radius ~13.8 cm)
         length_min = 0.3  # m (compact midrange)
         length_max = 1.0  # m (larger midrange)
         V_rc_min = 0.0  # No rear chamber
@@ -160,10 +161,11 @@ def get_exponential_horn_parameter_space(
             "V_rc": (0.8 * V_as, 1.2 * V_as),
         },
         "midrange_horn": {
-            # TC2-like parameters
+            # Large mouth for proper loading (Beranek 1954)
+            # Target: mouth_circumference ≥ wavelength at Fc for <3 dB flatness
             "throat_area": (0.3 * S_d, 0.4 * S_d),
-            "mouth_area": (0.01, 0.03),
-            "length": (0.4, 0.6),
+            "mouth_area": (0.04, 0.055),
+            "length": (0.5, 0.8),
             "V_rc": (0.0, 0.2 * V_as),
         },
         "fullrange_horn": {

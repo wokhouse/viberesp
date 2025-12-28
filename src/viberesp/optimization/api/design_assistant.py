@@ -257,7 +257,8 @@ class DesignAssistant:
         constraints: Dict[str, float] = None,
         population_size: int = 100,
         generations: int = 100,
-        top_n: int = 10
+        top_n: int = 10,
+        num_segments: int = 2
     ) -> OptimizationResult:
         """
         Run multi-objective optimization for enclosure design.
@@ -271,12 +272,14 @@ class DesignAssistant:
 
         Args:
             driver_name: Name of driver
-            enclosure_type: "sealed", "ported" (horn not yet supported)
-            objectives: List of objectives ["f3", "flatness", "efficiency", "size"]
+            enclosure_type: "sealed", "ported", "exponential_horn", "multisegment_horn"
+            objectives: List of objectives ["f3", "flatness", "efficiency", "size",
+                       "wavefront_sphericity", "impedance_smoothness"]
             constraints: Dict of constraint values (optional)
             population_size: Population size for NSGA-II (default 100)
             generations: Number of generations (default 100)
             top_n: Number of top designs to return (default 10)
+            num_segments: Number of segments for multisegment_horn (2 or 3)
 
         Returns:
             OptimizationResult with Pareto front and best designs
@@ -284,9 +287,9 @@ class DesignAssistant:
         Examples:
             >>> assistant = DesignAssistant()
             >>> result = assistant.optimize_design(
-            ...     driver_name="BC_12NDL76",
-            ...     enclosure_type="sealed",
-            ...     objectives=["f3", "size"],
+            ...     driver_name="TC2",
+            ...     enclosure_type="multisegment_horn",
+            ...     objectives=["wavefront_sphericity", "impedance_smoothness"],
             ...     population_size=50,
             ...     generations=50
             ... )
@@ -305,6 +308,9 @@ class DesignAssistant:
         )
         from viberesp.optimization.parameters.exponential_horn_params import (
             get_exponential_horn_parameter_space
+        )
+        from viberesp.optimization.parameters.multisegment_horn_params import (
+            get_multisegment_horn_parameter_space
         )
         from viberesp.optimization.objectives.composite import EnclosureOptimizationProblem
         from viberesp.optimization.optimizers.pymoo_interface import run_nsga2
@@ -337,7 +343,8 @@ class DesignAssistant:
         driver = driver_functions[driver_name]()
 
         # Validate enclosure type
-        if enclosure_type not in ["sealed", "ported", "exponential_horn"]:
+        supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn"]
+        if enclosure_type not in supported_types:
             return OptimizationResult(
                 success=False,
                 pareto_front=[],
@@ -348,7 +355,7 @@ class DesignAssistant:
                 optimization_metadata={},
                 warnings=[
                     f"Unsupported enclosure type: {enclosure_type}",
-                    "Currently supported: sealed, ported, exponential_horn"
+                    f"Currently supported: {', '.join(supported_types)}"
                 ]
             )
 
@@ -361,6 +368,12 @@ class DesignAssistant:
             # Get preset from constraints, default to midrange_horn
             preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
             param_space = get_exponential_horn_parameter_space(driver, preset=preset)
+        elif enclosure_type == "multisegment_horn":
+            # Get preset from constraints, default to midrange_horn
+            preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
+            param_space = get_multisegment_horn_parameter_space(
+                driver, preset=preset, num_segments=num_segments
+            )
         else:
             return OptimizationResult(
                 success=False,
@@ -398,6 +411,13 @@ class DesignAssistant:
                     "constraint_list",
                     ["mouth_size", "flare_constant_limits"]
                 ))
+
+            if enclosure_type == "multisegment_horn":
+                # Multisegment horn constraints
+                constraint_list.extend(constraints.get(
+                    "constraint_list",
+                    ["segment_continuity", "flare_constant_limits"]
+                ))
         else:
             # Default constraints
             constraint_list = ["max_displacement"]
@@ -406,6 +426,9 @@ class DesignAssistant:
             if enclosure_type == "exponential_horn":
                 # Default horn constraints
                 constraint_list = ["mouth_size", "flare_constant_limits"]
+            if enclosure_type == "multisegment_horn":
+                # Default multisegment horn constraints
+                constraint_list = ["segment_continuity", "flare_constant_limits"]
 
         # Setup problem
         try:
@@ -414,7 +437,8 @@ class DesignAssistant:
                 enclosure_type=enclosure_type,
                 objectives=objectives,
                 parameter_bounds=bounds_dict,
-                constraints=constraint_list
+                constraints=constraint_list,
+                num_segments=num_segments
             )
         except Exception as e:
             return OptimizationResult(
