@@ -21,6 +21,9 @@ from viberesp.driver.parameters import ThieleSmallParameters
 from viberesp.enclosure.sealed_box import calculate_sealed_box_system_parameters, SealedBoxSystemParameters
 from viberesp.enclosure.ported_box import calculate_ported_box_system_parameters, PortedBoxSystemParameters
 from viberesp.driver.response import direct_radiator_electrical_impedance
+from viberesp.simulation.types import ExponentialHorn
+from viberesp.enclosure.front_loaded_horn import FrontLoadedHorn
+from viberesp.optimization.parameters.exponential_horn_params import calculate_horn_cutoff_frequency
 
 
 def objective_f3(
@@ -48,9 +51,10 @@ def objective_f3(
         design_vector: Enclosure parameters
             - Sealed: [Vb] (m³)
             - Ported: [Vb, Fb] (m³, Hz)
+            - Exponential horn: [throat_area, mouth_area, length, V_rc] (m², m², m, m³)
         driver: ThieleSmallParameters instance
-        enclosure_type: "sealed", "ported", "infinite_baffle"
-        frequency_points: Frequency array for interpolation (not used for sealed/ported)
+        enclosure_type: "sealed", "ported", "infinite_baffle", "exponential_horn"
+        frequency_points: Frequency array for interpolation (not used for sealed/ported/horns)
 
     Returns:
         F3 frequency in Hz (to be minimized)
@@ -89,6 +93,20 @@ def objective_f3(
         # For infinite baffle, F3 ≈ Fs (driver resonance)
         return driver.F_s
 
+    elif enclosure_type == "exponential_horn":
+        # For exponential horn, F3 is the cutoff frequency
+        # Literature: Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
+        # Horns act as high-pass filters below cutoff frequency
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+        # V_rc not used for cutoff calculation (design_vector[3])
+
+        # Calculate cutoff frequency using Olson's formula
+        fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
+
+        return fc  # Minimize cutoff frequency for better bass extension
+
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
@@ -116,8 +134,9 @@ def objective_response_flatness(
         design_vector: Enclosure parameters
             - Sealed: [Vb] (m³)
             - Ported: [Vb, Fb, port_area, port_length] (m³, Hz, m², m)
+            - Exponential horn: [throat_area, mouth_area, length, V_rc] (m², m², m, m³)
         driver: ThieleSmallParameters instance
-        enclosure_type: "sealed", "ported", "infinite_baffle"
+        enclosure_type: "sealed", "ported", "infinite_baffle", "exponential_horn"
         frequency_range: (f_min, f_max) in Hz for flatness calculation
         n_points: Number of frequency points to evaluate
         voltage: Input voltage for SPL calculation (default 2.83V)
@@ -129,6 +148,8 @@ def objective_response_flatness(
         Uses log-spaced frequencies to match human hearing perception.
         Ported box evaluation excludes frequencies below Fb to avoid
         steep rolloff region dominating the metric.
+        Horn evaluation excludes frequencies below 1.5×Fc to avoid
+        cutoff region dominating the metric (Olson 1947).
 
     Examples:
         >>> driver = get_bc_8ndl51()
@@ -149,6 +170,25 @@ def objective_response_flatness(
     if enclosure_type == "ported" and len(design_vector) >= 2:
         Fb = design_vector[1]
         f_min = max(frequency_range[0], Fb * 0.8)  # Start slightly below Fb
+        if f_min < frequency_range[1]:
+            frequencies = np.logspace(
+                np.log10(f_min),
+                np.log10(frequency_range[1]),
+                max(n_points // 2, 20)  # Fewer points for reduced range
+            )
+
+    # For exponential horn, adjust frequency range to exclude cutoff region
+    elif enclosure_type == "exponential_horn" and len(design_vector) >= 3:
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+
+        # Calculate cutoff frequency
+        fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
+
+        # Start at 1.5×Fc to avoid cutoff rolloff dominating metric
+        # Literature: Olson (1947) - Horn response is flat above 1.5×Fc
+        f_min = max(frequency_range[0], fc * 1.5)
         if f_min < frequency_range[1]:
             frequencies = np.logspace(
                 np.log10(f_min),
@@ -192,6 +232,19 @@ def objective_response_flatness(
                 result = direct_radiator_electrical_impedance(
                     freq, driver, voltage=voltage
                 )
+            elif enclosure_type == "exponential_horn":
+                throat_area = design_vector[0]
+                mouth_area = design_vector[1]
+                length = design_vector[2]
+                V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+
+                # Create horn system
+                horn = ExponentialHorn(throat_area, mouth_area, length)
+                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
             else:
                 raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
