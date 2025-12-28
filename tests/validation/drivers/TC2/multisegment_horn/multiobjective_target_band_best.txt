@@ -1,4 +1,4 @@
-ID = 24.22
+ID = 185.68
 
 Comment = Multi-obj optimization (WITH target band 500-5000 Hz). Flatness=2.60dB, Fc=2031Hz. Best compromise design.
 
@@ -7,17 +7,17 @@ Comment = Multi-obj optimization (WITH target band 500-5000 Hz). Flatness=2.60dB
 Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
-Cir = 0.00
+Cir = 25.12
 
 |HORN PARAMETER VALUES:
 
 S1 = 2.36
 S2 = 102.13
-L12 = 10.00
+Exp = 10.00
 F12 = 2056.7301
 S2 = 102.13
 S3 = 495.48
-L23 = 11.87
+Exp = 11.87
 F23 = 726.3113
 S3 = 495.48
 S4 = 0.00
