@@ -1,0 +1,38 @@
+======================================================================
+MULTI-OBJECTIVE OPTIMIZATION WITH TARGET BAND
+======================================================================
+
+Target band: 500 - 5000 Hz
+Objectives: wavefront_sphericity, impedance_smoothness, flatness
+Population: 60, Generations: 40
+Pareto-optimal designs: 60
+
+======================================================================
+BEST DESIGNS
+======================================================================
+
+1. Best Flatness (in target band):
+   Flatness: 2.60 dB
+   Wavefront: 1.747648
+   Impedance: 3.0617
+   Fc: 2031 Hz
+
+   Quality: ✓ EXCELLENT
+
+======================================================================
+KEY FINDINGS
+======================================================================
+
+1. Multi-objective WITH target band achieves:
+   Flatness: 2.60 dB
+   Wavefront: 1.747648
+   Impedance: 3.0617
+
+2. Comparison with previous results:
+   Multi-obj (no target): 16.19 dB flatness
+   Single-obj (flatness): 13.01 dB flatness
+   Target band (single): 2.57 dB flatness
+   Multi-obj (WITH target): 2.60 dB flatness
+
+3. Improvement: 6.2× better than multi-objective without target band
+

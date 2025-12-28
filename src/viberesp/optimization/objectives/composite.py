@@ -17,7 +17,7 @@ The problem class supports:
 """
 
 import numpy as np
-from typing import List, Dict, Callable, Optional
+from typing import List, Dict, Callable, Optional, Tuple
 from dataclasses import dataclass
 
 from pymoo.core.problem import Problem
@@ -86,7 +86,8 @@ class EnclosureOptimizationProblem(Problem):
         objectives: List[str],
         parameter_bounds: Dict[str, tuple],
         constraints: List[str] = None,
-        num_segments: int = 2
+        num_segments: int = 2,
+        target_band: Tuple[float, float] = None
     ):
         """
         Initialize optimization problem.
@@ -99,6 +100,8 @@ class EnclosureOptimizationProblem(Problem):
             parameter_bounds: Dict of parameter ranges
             constraints: Optional list of constraint function names
             num_segments: Number of segments for multisegment_horn (2 or 3)
+            target_band: Optional (f_min, f_max) tuple for constraining flatness optimization
+                        to a specific frequency band (e.g., (500, 5000) for midrange)
         """
         # Import objective functions
         from viberesp.optimization.objectives.response_metrics import (
@@ -170,6 +173,7 @@ class EnclosureOptimizationProblem(Problem):
         self.enclosure_type = enclosure_type
         self.param_names = list(parameter_bounds.keys())
         self.num_segments = num_segments
+        self.target_band = target_band
 
         # Extract parameter bounds in order
         xl = np.array([parameter_bounds[p][0] for p in self.param_names])
@@ -220,18 +224,49 @@ class EnclosureOptimizationProblem(Problem):
             # Evaluate each objective
             for j, obj_config in enumerate(self.objective_configs):
                 try:
+                    # Check if this objective needs target_band parameter
+                    needs_target_band = (
+                        self.target_band is not None and
+                        obj_config.name in ["flatness", "response_flatness"]
+                    )
+
                     # For multisegment_horn objectives, pass num_segments
                     if needs_num_segments and obj_config.name in [
                         "wavefront_sphericity", "impedance_smoothness",
                         "response_flatness", "response_slope", "flatness", "slope"
                     ]:
+                        # Pass both num_segments and target_band (if needed)
+                        if needs_target_band:
+                            obj_value = obj_config.function(
+                                design_vector,
+                                self.driver,
+                                self.enclosure_type,
+                                frequency_range=self.target_band,
+                                n_points=100,
+                                voltage=2.83,
+                                num_segments=self.num_segments,
+                                target_band=self.target_band
+                            )
+                        else:
+                            obj_value = obj_config.function(
+                                design_vector,
+                                self.driver,
+                                self.enclosure_type,
+                                num_segments=self.num_segments
+                            )
+                    elif needs_target_band:
+                        # Not multisegment, but needs target_band
                         obj_value = obj_config.function(
                             design_vector,
                             self.driver,
                             self.enclosure_type,
-                            num_segments=self.num_segments
+                            frequency_range=self.target_band,
+                            n_points=100,
+                            voltage=2.83,
+                            target_band=self.target_band
                         )
                     else:
+                        # Standard evaluation
                         obj_value = obj_config.function(
                             design_vector,
                             self.driver,
