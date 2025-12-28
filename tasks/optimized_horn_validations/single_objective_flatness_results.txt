@@ -1,0 +1,39 @@
+======================================================================
+Single-Objective Horn Optimization Results
+======================================================================
+
+Driver: TC2 Compression Driver
+Objective: response_flatness (minimize)
+Algorithm: GA (Genetic Algorithm)
+Population: 80, Generations: 50
+
+======================================================================
+BEST DESIGN
+======================================================================
+
+Objective value:
+  Response flatness: 13.01 dB
+
+Parameters:
+  Throat area:  1.00 cm²
+  Middle area:  10.00 cm²
+  Mouth area:   1000.00 cm²
+  Length 1:     5.00 cm
+  Length 2:     5.00 cm
+  Total length: 10.00 cm
+  Rear chamber: 5.00 L
+
+Flare constants:
+  m1 = 46.0513 m⁻¹ (Fc1 = 2513.9 Hz)
+  m2 = 92.1032 m⁻¹ (Fc2 = 5027.9 Hz)
+  Overall Fc = 5027.9 Hz
+
+======================================================================
+ASSESSMENT
+======================================================================
+
+✗ POOR flatness (> 10 dB)
+  This design has significant response variations.
+
+Cutoff frequency assessment:
+⚠ High cutoff (5028 Hz) - limited bandwidth, not suitable for full-range

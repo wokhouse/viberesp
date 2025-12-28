@@ -121,7 +121,8 @@ def objective_response_flatness(
     enclosure_type: str,
     frequency_range: Tuple[float, float] = (20.0, 500.0),
     n_points: int = 100,
-    voltage: float = 2.83
+    voltage: float = 2.83,
+    num_segments: int = 2
 ) -> float:
     """
     Calculate frequency response variation (standard deviation) for minimization.
@@ -268,7 +269,6 @@ def objective_response_flatness(
                 result = {'SPL': spl}
             elif enclosure_type == "multisegment_horn":
                 # Decode multi-segment horn design
-                num_segments = 2  # Default to 2 segments
                 params = decode_multisegment_design(design_vector, driver, num_segments)
 
                 # Build horn segments
@@ -317,7 +317,8 @@ def objective_response_slope(
     enclosure_type: str,
     frequency_range: Tuple[float, float] = (20.0, 500.0),
     n_points: int = 100,
-    voltage: float = 2.83
+    voltage: float = 2.83,
+    num_segments: int = 2
 ) -> float:
     """
     Calculate frequency response slope (dB/decade) for minimization.
@@ -444,7 +445,6 @@ def objective_response_slope(
                 spl_values.append(spl)
             elif enclosure_type == "multisegment_horn":
                 # Decode multi-segment horn design
-                num_segments = 2
                 params = decode_multisegment_design(design_vector, driver, num_segments)
 
                 # Build horn segments
