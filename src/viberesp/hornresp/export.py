@@ -1041,27 +1041,35 @@ def export_multisegment_horn_to_hornresp(
     l12, l23, l34, l45 = 0.0, 0.0, 0.0, 0.0
     f12, f23, f34, f45 = 0.0, 0.0, 0.0, 0.0
 
+    # Speed of sound for flare constant conversion (m/s)
+    c = 343.0
+
     # Fill in segments
     if num_segments >= 1:
         s1 = area_to_cm2(segments[0].throat_area)
         s2 = area_to_cm2(segments[0].mouth_area)
         l12 = length_to_cm(segments[0].length)
-        f12 = segments[0].flare_constant
+        # Convert dimensionless flare constant m (m^-1) to Hornresp F12 (Hz)
+        # F(Hz) = c * m / (2π)
+        f12 = (c * segments[0].flare_constant) / (2.0 * math.pi)
 
     if num_segments >= 2:
         s3 = area_to_cm2(segments[1].mouth_area)
         l23 = length_to_cm(segments[1].length)
-        f23 = segments[1].flare_constant
+        # Convert dimensionless flare constant m (m^-1) to Hornresp F23 (Hz)
+        f23 = (c * segments[1].flare_constant) / (2.0 * math.pi)
 
     if num_segments >= 3:
         s4 = area_to_cm2(segments[2].mouth_area)
         l34 = length_to_cm(segments[2].length)
-        f34 = segments[2].flare_constant
+        # Convert dimensionless flare constant m (m^-1) to Hornresp F34 (Hz)
+        f34 = (c * segments[2].flare_constant) / (2.0 * math.pi)
 
     if num_segments >= 4:
         s5 = area_to_cm2(segments[3].mouth_area)
         l45 = length_to_cm(segments[3].length)
-        f45 = segments[3].flare_constant
+        # Convert dimensionless flare constant m (m^-1) to Hornresp F45 (Hz)
+        f45 = (c * segments[3].flare_constant) / (2.0 * math.pi)
 
     # Generate file content
     comment_text = comment or f"{driver_name} multi-segment horn from viberesp"
