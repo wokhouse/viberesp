@@ -1,0 +1,50 @@
+TC2: Driver + Horn (Vtc=0, Vrc=0) - No chambers
+
+|TRADITIONAL DRIVER PARAMETER VALUES:
+
+Sd = 8.00
+Bl = 12.00
+Cms = 5.00E-05
+Rms = 3.00
+Mmd = 8.00
+Le = 0.10
+Re = 6.50
+Nd = 1
+
+|LOUDSPEAKER ENCLOSURE OR HORN-LOADED SYSTEM PARAMETERS:
+
+S1 = 5.00
+S2 = 200.00
+L12 = 0.500
+Vtc = 0.0000
+Atc = 5.00
+Vrc = 0.0000
+Lrc = 0.0000
+Ap = 0.00
+Lpt = 0.00
+Fr = 0.00
+Ang = 2.00 * Pi
+Vtc = 0.0000
+Atc = 0.00
+Vrc = 0.0000
+Lrc = 0.00
+ta = 0.00
+tb = 0.00
+tc = 0.00
+td = 0.00
+te = 0.00
+tf = 0.00
+tg = 0.00
+th = 0.00
+Input Parameters = 1.00 100.00 10.00 0.00
+Chart = 0.00
+Eg = 2.83
+Rg = 0.00
+Pt = 1.00
+Ngc = 0
+Th = 293.2
+Pb = 101325.0
+Ro = 1.205
+B = 344.0
+Sp = 0.00
+Sd = 0.00
