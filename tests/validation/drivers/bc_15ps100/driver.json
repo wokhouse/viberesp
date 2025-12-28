@@ -1,0 +1,19 @@
+{
+  "driver_name": "BC_15PS100",
+  "manufacturer": "B&C Speakers",
+  "size_inches": 15.0,
+  "thiele_small": {
+    "F_s": 37.3,
+    "Q_ts": 0.441,
+    "V_as": 0.1055,
+    "S_d": 0.0855,
+    "BL": 21.2,
+    "R_e": 5.2,
+    "M_md": 0.147
+  },
+  "enclosures_validated": [
+    "sealed_box",
+    "ported_box"
+  ],
+  "validation_status": "pending"
+}

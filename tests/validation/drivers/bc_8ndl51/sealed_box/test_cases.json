@@ -1,0 +1,54 @@
+{
+  "driver": "BC_8NDL51",
+  "enclosure_type": "sealed_box",
+  "test_cases": [
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_qtc0_65",
+      "description": "Near Butterworth",
+      "parameters": {
+        "Qtc": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_qtc0_707",
+      "description": "Butterworth (B4)",
+      "parameters": {
+        "Qtc": 0.707
+      },
+      "status": "passed"
+    },
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_qtc0_8",
+      "description": "Slight overdamp",
+      "parameters": {
+        "Qtc": 0.8
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_qtc1_0",
+      "description": "Critical damped",
+      "parameters": {
+        "Qtc": 1.0
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_qtc1_1",
+      "description": "Overdamped",
+      "parameters": {
+        "Qtc": 1.1
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_sealed_box_vb20l",
+      "description": "Between Qtc 0.8-1.0",
+      "parameters": {
+        "Vb_liters": 20.0
+      },
+      "status": "pending"
+    }
+  ]
+}

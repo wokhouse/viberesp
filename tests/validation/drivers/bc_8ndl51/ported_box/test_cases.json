@@ -1,0 +1,36 @@
+{
+  "driver": "BC_8NDL51",
+  "enclosure_type": "ported_box",
+  "test_cases": [
+    {
+      "test_case_id": "bc_8ndl51_ported_box_b4",
+      "description": "Butterworth maximally flat",
+      "parameters": {
+        "alignment": "B4"
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_ported_box_port_1in",
+      "description": "1.0\u2033 port",
+      "parameters": {
+        "port_area_cm2": 5.07
+      },
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_ported_box_port_1_5in",
+      "description": "1.5\u2033 port",
+      "parameters": {},
+      "status": "pending"
+    },
+    {
+      "test_case_id": "bc_8ndl51_ported_box_port_2in",
+      "description": "2.0\u2033 port",
+      "parameters": {
+        "port_area_cm2": 20.27
+      },
+      "status": "pending"
+    }
+  ]
+}

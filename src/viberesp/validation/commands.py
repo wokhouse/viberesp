@@ -146,8 +146,10 @@ def parse_readme_driver_params(readme_path: Path) -> Optional[Dict]:
     if size_match:
         params["size_inches"] = float(size_match.group(1))
 
-    # Extract Thiele-Small parameters
-    ts_pattern = r'\*\*([A-Z_a-z]+)\*\*:\s*([0-9.eE+-]+)\s*(?:Hz|L|cm²|T·m|Ω|g|m/N|H)?'
+    # Extract Thiele-Small parameters (support both bold and list formats)
+    # Format 1: **F_s**: 75.0 Hz
+    # Format 2: - F_s: 75.0 Hz
+    ts_pattern = r'(?:\*\*)?([A-Z_a-z]+)(?:\*\*)?:\s*([0-9.eE+-]+)\s*(?:Hz|L|cm²|T·m|Ω|g|m/N|H)?'
     for match in re.finditer(ts_pattern, section_text):
         param_name = match.group(1)
         param_value = match.group(2)

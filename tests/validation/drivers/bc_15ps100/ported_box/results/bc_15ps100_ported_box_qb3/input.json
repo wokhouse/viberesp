@@ -1,0 +1,9 @@
+{
+  "test_case_id": "bc_15ps100_ported_box_qb3",
+  "driver": "BC_15PS100",
+  "enclosure_type": "ported_box",
+  "enclosure_parameters": {
+    "alignment": "QB3"
+  },
+  "generated_at": "2025-12-27T20:45:06.441864"
+}

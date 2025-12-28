@@ -1,0 +1,9 @@
+{
+  "test_case_id": "bc_15ps100_ported_box_port_2in",
+  "driver": "BC_15PS100",
+  "enclosure_type": "ported_box",
+  "enclosure_parameters": {
+    "port_area_cm2": 20.27
+  },
+  "generated_at": "2025-12-27T20:45:06.442493"
+}
