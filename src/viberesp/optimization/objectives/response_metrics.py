@@ -266,6 +266,24 @@ def objective_response_flatness(
                 # Calculate SPL at this frequency
                 spl = flh.spl_response(freq, voltage=voltage)
                 result = {'SPL': spl}
+            elif enclosure_type == "multisegment_horn":
+                # Decode multi-segment horn design
+                num_segments = 2  # Default to 2 segments
+                params = decode_multisegment_design(design_vector, driver, num_segments)
+
+                # Build horn segments
+                segments = []
+                for throat_area, mouth_area, length in params['segments']:
+                    segments.append(HornSegment(throat_area, mouth_area, length))
+                horn = MultiSegmentHorn(segments=segments)
+
+                # Create front-loaded horn
+                V_rc = params['V_rc']
+                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
             else:
                 raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
@@ -352,7 +370,7 @@ def objective_response_slope(
         n_points
     )
 
-    # For exponential horn, adjust frequency range to exclude cutoff region
+    # For exponential or multi-segment horn, adjust frequency range to exclude cutoff region
     if enclosure_type == "exponential_horn" and len(design_vector) >= 3:
         throat_area = design_vector[0]
         mouth_area = design_vector[1]
@@ -362,6 +380,34 @@ def objective_response_slope(
         fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
 
         # Determine appropriate frequency range based on horn type
+        if fc < 100:
+            f_max = max(frequency_range[1], fc * 5)
+        elif fc < 500:
+            f_max = max(frequency_range[1], fc * 20, 5000)
+        else:
+            f_max = 20000
+
+        f_min = max(frequency_range[0], fc * 1.5)
+
+        # Ensure f_min < f_max for valid range
+        if f_min < f_max:
+            frequencies = np.logspace(
+                np.log10(f_min),
+                np.log10(f_max),
+                n_points
+            )
+    elif enclosure_type == "multisegment_horn" and len(design_vector) >= 6:
+        # For multi-segment horn, calculate cutoff frequency
+        num_segments = 2
+        params = decode_multisegment_design(design_vector, driver, num_segments)
+        flare_constants = params['flare_constants']
+
+        # Calculate cutoff for each segment
+        c = 343.0
+        fc_values = [(c * m) / (2 * np.pi) for m in flare_constants if m > 0]
+        fc = max(fc_values) if fc_values else 500.0
+
+        # Determine appropriate frequency range
         if fc < 100:
             f_max = max(frequency_range[1], fc * 5)
         elif fc < 500:
@@ -391,6 +437,24 @@ def objective_response_slope(
 
                 # Create horn system
                 horn = ExponentialHorn(throat_area, mouth_area, length)
+                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                spl_values.append(spl)
+            elif enclosure_type == "multisegment_horn":
+                # Decode multi-segment horn design
+                num_segments = 2
+                params = decode_multisegment_design(design_vector, driver, num_segments)
+
+                # Build horn segments
+                segments = []
+                for throat_area, mouth_area, length in params['segments']:
+                    segments.append(HornSegment(throat_area, mouth_area, length))
+                horn = MultiSegmentHorn(segments=segments)
+
+                # Create front-loaded horn
+                V_rc = params['V_rc']
                 flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
 
                 # Calculate SPL at this frequency

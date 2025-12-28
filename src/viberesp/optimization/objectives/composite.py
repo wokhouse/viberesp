@@ -222,7 +222,8 @@ class EnclosureOptimizationProblem(Problem):
                 try:
                     # For multisegment_horn objectives, pass num_segments
                     if needs_num_segments and obj_config.name in [
-                        "wavefront_sphericity", "impedance_smoothness"
+                        "wavefront_sphericity", "impedance_smoothness",
+                        "response_flatness", "response_slope", "flatness", "slope"
                     ]:
                         obj_value = obj_config.function(
                             design_vector,
