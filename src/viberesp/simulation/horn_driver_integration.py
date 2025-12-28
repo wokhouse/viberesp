@@ -13,13 +13,13 @@ Literature:
 - literature/thiele_small/small_1972_closed_box.md
 """
 
+from __future__ import annotations
+
 import math
 import cmath
 from typing import Optional, Tuple
 import numpy as np
 from numpy.typing import NDArray
-
-from viberesp.driver.parameters import ThieleSmallParameters
 from viberesp.simulation.horn_theory import (
     exponential_horn_throat_impedance,
     circular_piston_radiation_impedance,
@@ -372,6 +372,9 @@ def horn_electrical_impedance(
     # Validate inputs
     if frequency <= 0:
         raise ValueError(f"Frequency must be > 0, got {frequency} Hz")
+
+    # Local import to avoid circular dependency
+    from viberesp.driver.parameters import ThieleSmallParameters
 
     if not isinstance(driver, ThieleSmallParameters):
         raise TypeError(f"driver must be ThieleSmallParameters, got {type(driver)}")
