@@ -32,6 +32,14 @@ from viberesp.simulation.horn_theory import (
     throat_impedance_from_tmatrix,
 )
 
+# Horn driver integration functions
+from viberesp.simulation.horn_driver_integration import (
+    throat_chamber_impedance,
+    rear_chamber_impedance,
+    horn_system_acoustic_impedance,
+    horn_electrical_impedance,
+)
+
 __all__ = [
     # Constants
     "SPEED_OF_SOUND",
@@ -49,6 +57,11 @@ __all__ = [
     "exponential_horn_throat_impedance",
     "exponential_horn_tmatrix",
     "throat_impedance_from_tmatrix",
+    # Horn driver integration functions
+    "throat_chamber_impedance",
+    "rear_chamber_impedance",
+    "horn_system_acoustic_impedance",
+    "horn_electrical_impedance",
     # Data structures
     "ExponentialHorn",
     "FrequencyResponse",
