@@ -434,7 +434,10 @@ def calculate_optimal_port_dimensions(
         Tuple of (port_area_m2, port_length_m, estimated_velocity_m_s)
 
     Raises:
-        ValueError: If Vb <= 0, Fb <= 0, or invalid driver parameters
+        ValueError: If Vb <= 0, Fb <= 0, invalid driver parameters, or port length
+                    exceeds practical limits (> 2× box dimension). This can occur
+                    when box volume is too small for the target tuning frequency
+                    with a driver that has high Xmax.
 
     Examples:
         >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
@@ -447,7 +450,9 @@ def calculate_optimal_port_dimensions(
 
     Validation:
         Verify port velocity stays below 5% of speed of sound at Fb.
-        Check physical feasibility: port must fit inside box.
+        Check physical feasibility: port length must not exceed 2× box dimension
+        (prevents obviously impractical designs). If port is too long, suggests
+        increasing box volume, increasing tuning frequency, or using multiple ports.
     """
     # Validate inputs
     if Vb <= 0:
@@ -496,6 +501,41 @@ def calculate_optimal_port_dimensions(
             Sp_practical, Vb, Fb,
             speed_of_sound=speed_of_sound,
             flanged=True
+        )
+
+    # VALIDATE: Check if port length is practical for this box size
+    # Calculate approximate box dimension (assuming cube for worst case)
+    box_dimension = Vb ** (1/3)  # Cube root of volume
+
+    # Constraint: Port length should not exceed 2× the box dimension
+    # This allows for folded ports but prevents obviously impractical designs
+    max_practical_length = box_dimension * 2.0
+
+    if Lpt > max_practical_length:
+        # Port is impractically long for this box
+        # Calculate what tuning we'd get with this port length
+        actual_fb = helmholtz_resonance_frequency(
+            Sp_practical, Vb, Lpt,
+            speed_of_sound=speed_of_sound,
+            flanged=True
+        )
+
+        # Calculate minimum box volume for this port length and target Fb
+        # From Helmholtz formula rearranged: Vb_min = c² × Sp / (Lp × Fb² × (2π)²)
+        Lp_eff = Lpt + (0.85 * math.sqrt(Sp_practical / math.pi))  # Add end correction
+        Vb_min = ((speed_of_sound ** 2) * Sp_practical) / (Lp_eff * (Fb ** 2) * (2 * math.pi) ** 2)
+
+        raise ValueError(
+            f"Impractical port dimensions for Vb={Vb*1000:.1f}L @ {Fb:.1f}Hz.\n"
+            f"Calculated port length Lpt={Lpt*100:.1f}cm exceeds practical limit "
+            f"(max {max_practical_length*100:.1f}cm for this box size).\n"
+            f"With current port area (Sp={Sp_practical*10000:.1f}cm²), actual tuning would be "
+            f"Fb={actual_fb:.1f}Hz, not {Fb:.1f}Hz.\n"
+            f"Solutions:\n"
+            f"  1. Increase box volume to at least {Vb_min*1000:.1f}L (current: {Vb*1000:.1f}L)\n"
+            f"  2. Increase tuning frequency (reduce port length requirement)\n"
+            f"  3. Use multiple smaller ports instead of one large port\n"
+            f"  4. Accept higher port velocity (reduce safety_factor from {safety_factor} to ~1.0)"
         )
 
     # Estimate maximum port velocity (should be below threshold)
