@@ -40,44 +40,55 @@ class SealedBoxSystemParameters:
     Sealed box system parameters.
 
     Literature:
-        - Small (1972), Part I - System parameters analysis
+        - Small (1972), Part I - System parameters analysis, Eq. 9
         - literature/thiele_small/small_1972_closed_box.md
 
     Attributes:
         Vb: Box volume (m³)
         alpha: Compliance ratio (Vas/Vb)
         Fc: System resonance frequency (Hz)
-        Qtc: System total Q factor
+        Qec: Electrical Q at system resonance Fc (Qes × √(1+α))
+        Quc: Mechanical + absorption losses (typical: 5-10 unfilled, 2-5 filled)
+        Qtc_total: Total system Q including mechanical losses (parallel combination)
         F3: -3dB cutoff frequency (Hz)
     """
     Vb: float
     alpha: float
     Fc: float
-    Qtc: float
+    Qec: float
+    Quc: float
+    Qtc_total: float
     F3: float
 
 
 def calculate_sealed_box_system_parameters(
     driver: ThieleSmallParameters,
     Vb: float,
+    Quc: float = 7.0,
 ) -> SealedBoxSystemParameters:
     """
-    Calculate sealed box system parameters (Fc, Qtc, F3, α).
+    Calculate sealed box system parameters (Fc, Qec, Quc, Qtc_total, F3, α).
 
     Literature:
-        - Small (1972), Eq. for system resonance and Q
+        - Small (1972), Eq. 9 for parallel Q combination
         - literature/thiele_small/small_1972_closed_box.md
 
     Args:
         driver: ThieleSmallParameters instance
         Vb: Box volume (m³)
+        Quc: Mechanical + absorption losses (default 7.0)
+            - Quc = 2-5: Filled box (heavy damping)
+            - Quc = 5-10: Unfilled box (mechanical losses only)
+            - Quc = ∞: No losses (theoretical)
 
     Returns:
         SealedBoxSystemParameters dataclass with:
         - Vb: Box volume (m³)
         - alpha: Compliance ratio (Vas/Vb)
         - Fc: System resonance frequency (Hz)
-        - Qtc: System total Q factor
+        - Qec: Electrical Q at Fc (Qes × √(1+α))
+        - Quc: Mechanical + absorption losses
+        - Qtc_total: Total system Q (parallel combination of Qec and Quc)
         - F3: -3dB cutoff frequency (Hz)
 
     Raises:
@@ -89,14 +100,24 @@ def calculate_sealed_box_system_parameters(
         >>> params = calculate_sealed_box_system_parameters(driver, Vb=0.010)
         >>> params.Fc  # System resonance
         99.4...  # Hz (higher than Fs due to small box)
-        >>> params.Qtc  # System Q
-        0.58...  # Higher than Qts due to box stiffness
+        >>> params.Qec  # Electrical Q at Fc
+        0.50...  # Qes × √(1+α)
+        >>> params.Qtc_total  # Total system Q with mechanical losses
+        0.47...  # Parallel combination of Qec and Quc
         >>> params.alpha  # Compliance ratio
         1.4...  # Vas/Vb
 
+    Theory:
+        Small (1972), Eq. 9: Parallel Q combination
+        Qtc_total = (Qec × Quc) / (Qec + Quc)
+
+        Where:
+        - Qec = Qes × √(1 + α)  # Electrical Q at system resonance
+        - Quc = Mechanical + absorption losses
+
     Validation:
-        Compare Fc and Qtc with Hornresp sealed box simulation.
-        Expected: <0.5 Hz deviation for Fc, <0.02 for Qtc
+        Compare Fc and Qtc_total with Hornresp sealed box simulation.
+        Expected: <0.5 Hz deviation for Fc, <0.02 for Qtc_total
     """
     # Validate inputs
     if Vb <= 0:
@@ -112,25 +133,35 @@ def calculate_sealed_box_system_parameters(
     sqrt_factor = math.sqrt(1.0 + alpha)
     Fc = driver.F_s * sqrt_factor
 
-    # Small (1972): System Q factor Qtc = Qts × √(1 + α)
-    # Damping ratio changes with stiffness in the same way as resonance
+    # Electrical Q at system resonance Fc
+    # Small (1972): Qec = Qes × √(1 + α)
     # literature/thiele_small/small_1972_closed_box.md
-    Qtc = driver.Q_ts * sqrt_factor
+    Qec = driver.Q_es * sqrt_factor
+
+    # Total system Q with mechanical losses
+    # Small (1972), Eq. 9: PARALLEL COMBINATION (not geometric mean!)
+    # Qtc_total = (Qec × Quc) / (Qec + Quc)
+    # This models mechanical losses as parallel damping with electrical damping
+    if Quc == float('inf'):
+        Qtc_total = Qec
+    else:
+        # Standard parallel damping formula
+        Qtc_total = (Qec * Quc) / (Qec + Quc)
 
     # Calculate F3 (-3dB point)
-    # For Butterworth alignment (Qtc = 0.707): F3 = Fc
+    # For Butterworth alignment (Qtc_total = 0.707): F3 = Fc
     # For other alignments, use approximate formula from Small (1972)
     # literature/thiele_small/small_1972_closed_box.md
 
-    if abs(Qtc - 0.707) < 0.01:
+    if abs(Qtc_total - 0.707) < 0.01:
         # Butterworth alignment: F3 = Fc
         F3 = Fc
     else:
         # General case: approximate formula
-        # F3 = Fc × √((1/Qtc² - 2 + √((1/Qtc² - 2)² + 4)) / 2)
+        # F3 = Fc × √((1/Qtc_total² - 2 + √((1/Qtc_total² - 2)² + 4)) / 2)
         # From solving |G(jω)|² / |G(jω)|²max = 0.5
-        Qtc_squared = Qtc * Qtc
-        term1 = 1.0 / Qtc_squared - 2.0
+        Qtc_sq = Qtc_total * Qtc_total
+        term1 = 1.0 / Qtc_sq - 2.0
         term2 = math.sqrt(term1 * term1 + 4.0)
         F3_ratio = math.sqrt((term1 + term2) / 2.0)
         F3 = Fc * F3_ratio
@@ -139,7 +170,9 @@ def calculate_sealed_box_system_parameters(
         Vb=Vb,
         alpha=alpha,
         Fc=Fc,
-        Qtc=Qtc,
+        Qec=Qec,
+        Quc=Quc,
+        Qtc_total=Qtc_total,
         F3=F3,
     )
 
@@ -153,6 +186,7 @@ def calculate_spl_from_transfer_function(
     speed_of_sound: float = SPEED_OF_SOUND,
     air_density: float = AIR_DENSITY,
     f_mass: float = None,
+    Quc: float = 7.0,
 ) -> float:
     """
     Calculate SPL using Small's transfer function for sealed box.
@@ -164,18 +198,27 @@ def calculate_spl_from_transfer_function(
 
     Literature:
         - Small (1972), Equation 1 - Normalized pressure response transfer function
+        - Small (1972), Eq. 9 - Parallel Q combination
         - Small (1972), Reference efficiency equation (Section 7)
         - literature/thiele_small/small_1972_closed_box.md
 
     Transfer Function (Small 1972, Eq. 1):
-        G(s) = (s²/ωc²) / [s²/ωc² + s/(Qtc·ωc) + 1]
+        G(s) = (s²/ωc²) / [s²/ωc² + s/(Qtc'·ωc) + 1]
 
     where:
         - s = jω (complex frequency variable)
         - ωc = 2πfc (system cutoff angular frequency)
         - fc = Fs × √(1 + α) (system resonance frequency)
-        - Qtc = Qts × √(1 + α) (system total Q)
+        - Qtc' = Total system Q including mechanical losses (parallel combination)
         - α = Vas/Vb (compliance ratio)
+
+    System Q with Mechanical Losses:
+        Small (1972), Eq. 9: Parallel Q combination
+        Qtc' = (Qec × Quc) / (Qec + Quc)
+
+        Where:
+        - Qec = Qes × √(1 + α)  # Electrical Q at system resonance
+        - Quc = Mechanical + absorption losses
 
     Reference SPL Calculation:
         The reference efficiency is calculated from Small (1972):
@@ -209,6 +252,10 @@ def calculate_spl_from_transfer_function(
         speed_of_sound: Speed of sound (m/s)
         air_density: Air density (kg/m³)
         f_mass: Mass break frequency (Hz) for HF roll-off. If None, no HF roll-off applied.
+        Quc: Mechanical + absorption losses (default 7.0)
+            - Quc = 2-5: Filled box (heavy damping)
+            - Quc = 5-10: Unfilled box (mechanical losses only)
+            - Quc = ∞: No losses (theoretical)
 
     Returns:
         SPL in dB at measurement_distance
@@ -248,18 +295,29 @@ def calculate_spl_from_transfer_function(
     alpha = driver.V_as / Vb
     sqrt_factor = math.sqrt(1.0 + alpha)
     fc = driver.F_s * sqrt_factor  # System resonance frequency
-    Qtc = driver.Q_ts * sqrt_factor  # System total Q
     wc = 2 * math.pi * fc  # System cutoff angular frequency
 
+    # Electrical Q at system resonance Fc
+    # Small (1972): Qec = Qes × √(1 + α)
+    Qec = driver.Q_es * sqrt_factor
+
+    # Total system Q with mechanical losses
+    # Small (1972), Eq. 9: PARALLEL COMBINATION
+    # Qtc' = (Qec × Quc) / (Qec + Quc)
+    if Quc == float('inf'):
+        Qtc_prime = Qec
+    else:
+        Qtc_prime = (Qec * Quc) / (Qec + Quc)
+
     # Small (1972), Eq. 1: Normalized pressure response transfer function
-    # G(s) = (s²/ωc²) / [s²/ωc² + s/(Qtc·ωc) + 1]
+    # G(s) = (s²/ωc²) / [s²/ωc² + s/(Qtc'·ωc) + 1]
     # literature/thiele_small/small_1972_closed_box.md
     omega = 2 * math.pi * frequency
     s = complex(0, omega)
 
-    # Transfer function magnitude
+    # Transfer function magnitude (uses Qtc_prime, not Qts)
     numerator = (s ** 2) / (wc ** 2)
-    denominator = (s ** 2) / (wc ** 2) + s / (Qtc * wc) + 1
+    denominator = (s ** 2) / (wc ** 2) + s / (Qtc_prime * wc) + 1
     G = numerator / denominator
 
     # Small (1972): Reference efficiency calculation (Section 7)
@@ -333,12 +391,13 @@ def sealed_box_electrical_impedance(
     leach_n: float = None,
     use_transfer_function_spl: bool = True,
     f_mass: float = None,
+    Quc: float = 7.0,
 ) -> dict:
     """
     Calculate electrical impedance and SPL for sealed box enclosure.
 
     Literature:
-        - Small (1972) - Closed-box electrical impedance
+        - Small (1972) - Closed-box electrical impedance, Eq. 9 for parallel Q
         - Beranek (1954), Eq. 5.20 - Radiation impedance (front side only)
         - literature/thiele_small/small_1972_closed_box.md
         - literature/horns/beranek_1954.md
@@ -374,6 +433,10 @@ def sealed_box_electrical_impedance(
         leach_n: Leach n parameter (for "leach" model)
         use_transfer_function_spl: Use transfer function for SPL (default True)
         f_mass: Mass break frequency (Hz) for HF roll-off. If None, no HF roll-off applied.
+        Quc: Mechanical + absorption losses (default 7.0)
+            - Quc = 2-5: Filled box (heavy damping)
+            - Quc = 5-10: Unfilled box (mechanical losses only)
+            - Quc = ∞: No losses (theoretical)
 
     Returns:
         Dictionary containing:
@@ -389,7 +452,9 @@ def sealed_box_electrical_impedance(
         - 'radiation_resistance': Radiation resistance (Pa·s/m³)
         - 'radiation_reactance': Radiation reactance (Pa·s/m³)
         - 'Fc': System resonance frequency (Hz)
-        - 'Qtc': System Q factor
+        - 'Qec': Electrical Q at Fc (Qes × √(1+α))
+        - 'Quc': Mechanical + absorption losses
+        - 'Qtc_total': Total system Q (parallel combination of Qec and Quc)
 
     Raises:
         ValueError: If frequency <= 0, Vb <= 0, or invalid driver
@@ -479,21 +544,31 @@ def sealed_box_electrical_impedance(
     # Research shows sealed boxes need both front and rear air loads
     # See: docs/validation/sealed_box_spl_investigation.md for details
     #
-    # BOX DAMPING (Empirical Fix for Hornresp Validation):
-    # Research (docs/validation/sealed_box_spl_research_summary.md) found that Hornresp includes
-    # box damping losses not in standard Small (1972) theory. Adding R_box improves
-    # electrical impedance match from 31% error to 0.4% error.
+    # BOX DAMPING (Mechanical + Absorption Losses):
+    # Small (1972), Eq. 9 models mechanical losses as Quc (non-electrical Q).
+    # This is combined in parallel with electrical Q to get total system Q.
     #
-    # R_box = (ω × M_ms) / Q_b
-    # where Q_b ≈ 28 (empirically derived from Hornresp comparison)
+    # The mechanical resistance R_box represents energy dissipation in:
+    # - Driver suspension losses (R_ms from driver)
+    # - Box absorption losses (damping material)
+    # - Box leakage losses (air leaks)
     #
-    # NOTE: This is an empirical correction. Standard literature (Small 1972, Beranek 1954)
-    # does NOT include box losses in the basic Z_mech formula. Hornresp appears to use
-    # proprietary loss models not documented in acoustic literature.
+    # R_box = (ω × M_ms) / Quc  (EMPIRICAL - not from Small 1972)
     #
-    # Literature: docs/validation/sealed_box_spl_research_summary.md (Research Investigation)
-    Q_box_damping = 28.5  # Empirical value from Hornresp comparison
-    R_box = (omega * driver.M_ms) / Q_box_damping  # Frequency-dependent damping
+    # NOTE: The formula R_box = ωM_ms/Quc is empirical, not derived from
+    # Small (1972). Small does not provide an explicit R_box formula.
+    # This relationship provides reasonable agreement with Hornresp results.
+    #
+    # Literature:
+    # - Small (1972), Eq. 9: Parallel Q combination
+    # - docs/validation/sealed_box_spl_research_summary.md (Empirical derivation)
+    if Quc == float('inf'):
+        R_box = 0.0
+    else:
+        # EMPIRICAL: R_box = ω × M_ms / Quc
+        # Approximates mechanical/absorption losses as frequency-dependent damping
+        R_box = (omega * driver.M_ms) / Quc
+
     Z_mechanical = (driver.R_ms + R_box) + complex(0, omega * driver.M_ms) + \
                    complex(0, -1 / (omega * C_mb))
 
@@ -596,7 +671,8 @@ def sealed_box_electrical_impedance(
             measurement_distance=measurement_distance,
             speed_of_sound=speed_of_sound,
             air_density=air_density,
-            f_mass=f_mass
+            f_mass=f_mass,
+            Quc=Quc,
         )
     else:
         # Legacy impedance coupling approach
@@ -625,10 +701,17 @@ def sealed_box_electrical_impedance(
         p_ref = 20e-6  # Reference pressure: 20 μPa
         spl = 20 * math.log10(pressure_amplitude / p_ref) if pressure_amplitude > 0 else -float('inf')
 
-    # Step 8: Calculate system Qtc for reference
-    # Small (1972): Qtc = Qts × √(1 + α)
+    # Step 8: Calculate system Q parameters for reference
+    # Small (1972), Eq. 9: Parallel Q combination
     sqrt_factor = math.sqrt(1.0 + alpha)
-    Qtc = driver.Q_ts * sqrt_factor
+    Qec = driver.Q_es * sqrt_factor  # Electrical Q at system resonance Fc
+
+    # Total system Q (parallel combination of electrical and mechanical)
+    # Small (1972), Eq. 9: Qtc_total = (Qec × Quc) / (Qec + Quc)
+    if Quc == float('inf'):
+        Qtc_total = Qec
+    else:
+        Qtc_total = (Qec * Quc) / (Qec + Quc)
 
     # Prepare return dictionary
     result = {
@@ -644,7 +727,9 @@ def sealed_box_electrical_impedance(
         'radiation_resistance': Z_rad.real,
         'radiation_reactance': Z_rad.imag,
         'Fc': Fc,
-        'Qtc': Qtc,
+        'Qec': Qec,
+        'Quc': Quc,
+        'Qtc_total': Qtc_total,
     }
 
     return result

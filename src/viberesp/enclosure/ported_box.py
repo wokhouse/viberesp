@@ -45,6 +45,7 @@ class PortedBoxSystemParameters:
 
     Literature:
         - Thiele (1971), Part 2, Table 1 - Alignment constants
+        - Small (1973), Eq. 19 - Combined box losses
         - literature/thiele_small/thiele_1971_vented_boxes.md
 
     Attributes:
@@ -56,6 +57,10 @@ class PortedBoxSystemParameters:
         port_area: Port cross-sectional area (m²)
         port_length: Port physical length (m)
         port_velocity_max: Maximum port air velocity at rated power (m/s)
+        Qp: Port losses Q factor (typical: 5-20)
+        QL: Leakage losses Q factor (typical: 5-20, Hornresp default: 7)
+        QA: Absorption losses Q factor (typical: 50-100, WinISD default: 100)
+        QB: Combined box losses: 1/QB = 1/QL + 1/QA + 1/QP
     """
     Vb: float
     Fb: float
@@ -65,6 +70,10 @@ class PortedBoxSystemParameters:
     port_area: float
     port_length: float
     port_velocity_max: float
+    Qp: float
+    QL: float
+    QA: float
+    QB: float
 
 
 def helmholtz_resonance_frequency(
@@ -368,12 +377,16 @@ def calculate_ported_box_system_parameters(
     port_area: Optional[float] = None,
     port_length: Optional[float] = None,
     alignment: str = "B4",
+    QL: float = 7.0,
+    QA: float = 100.0,
+    QP: Optional[float] = None,
 ) -> PortedBoxSystemParameters:
     """
-    Calculate ported box system parameters (α, h, F3, port dimensions).
+    Calculate ported box system parameters (α, h, F3, port dimensions, box losses).
 
     Literature:
         - Thiele (1971), Part 2, Table 1 - Alignment constants
+        - Small (1973), Eq. 19 - Combined box losses
         - literature/thiele_small/thiele_1971_vented_boxes.md
 
     Args:
@@ -383,12 +396,20 @@ def calculate_ported_box_system_parameters(
         port_area: Optional port cross-sectional area (m²). If None, auto-calculated
         port_length: Optional port physical length (m). If None, auto-calculated from Fb
         alignment: Alignment type ("B4" for Butterworth, etc.), default "B4"
+        QL: Leakage losses Q factor (default 7.0 = Hornresp default)
+            - QL = 5-10: Typical box (some leakage)
+            - QL = 20-30: Well-sealed box
+            - QL = 100+: Near-perfect seal
+        QA: Absorption losses Q factor (default 100.0 = WinISD default, ≈ negligible)
+            - QA = 50-100: Some absorption material
+            - QA = 100+: Minimal absorption
+        QP: Port losses Q factor. If None, auto-calculated from port dimensions
 
     Returns:
-        PortedBoxSystemParameters dataclass with system parameters
+        PortedBoxSystemParameters dataclass with system parameters including box losses
 
     Raises:
-        ValueError: If Vb <= 0, Fb <= 0, or invalid alignment
+        ValueError: If Vb <= 0, Fb <= 0, invalid alignment, or missing port dimensions
 
     Examples:
         >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
@@ -400,6 +421,18 @@ def calculate_ported_box_system_parameters(
         0.78...  # Fb/Fs
         >>> params.F3  # -3dB frequency (for B4 alignment, F3=Fb)
         50.0  # Hz
+        >>> params.QB  # Combined box losses
+        6.5...  # Slightly lower than QL due to parallel combination
+
+    Theory:
+        Small (1973), Eq. 19: Combined box losses
+        1/QB = 1/QL + 1/QA + 1/QP
+
+        Where:
+        - QL = Leakage losses (air leaks through gaps/seams)
+        - QA = Absorption losses (damping material)
+        - QP = Port losses (viscous/thermal effects in port)
+        - QB = Total effective losses
 
     Validation:
         Compare α and h with Thiele (1971) Table 1 for B4 alignment.
@@ -447,6 +480,23 @@ def calculate_ported_box_system_parameters(
         else:
             v_max = 0.0
 
+    # Calculate port Q if not provided
+    if QP is None:
+        if port_area is None or port_length is None:
+            raise ValueError(
+                "Must provide port_area and port_length to calculate QP, "
+                "or provide QP directly"
+            )
+        QP = calculate_port_Q(port_area, port_length, Vb, Fb)
+
+    # Combined box losses
+    # Small (1973), Eq. 19: 1/QB = 1/QL + 1/QA + 1/QP
+    # This models leakage, absorption, and port losses as parallel damping
+    if QL == float('inf') and QA == float('inf') and QP == float('inf'):
+        QB = float('inf')
+    else:
+        QB = 1.0 / (1.0/QL + 1.0/QA + 1.0/QP)
+
     return PortedBoxSystemParameters(
         Vb=Vb,
         Fb=Fb,
@@ -456,6 +506,10 @@ def calculate_ported_box_system_parameters(
         port_area=port_area,
         port_length=port_length,
         port_velocity_max=v_max,
+        Qp=QP,
+        QL=QL,
+        QA=QA,
+        QB=QB,
     )
 
 
