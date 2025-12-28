@@ -41,12 +41,14 @@ Vb_LITERS_8NDL51 = 31.65  # Box volume for Qtc=0.707 Butterworth alignment
 Vb_M3_8NDL51 = Vb_LITERS_8NDL51 / 1000.0  # Convert to m³
 EXPECTED_FC_8NDL51 = 86.1  # Expected system resonance (Hz)
 EXPECTED_QTC_8NDL51 = 0.707  # Expected system Q
+F_MASS_8NDL51 = 450.0  # Mass break frequency (Hz) for HF roll-off (optimized for Hornresp validation)
 
 # Test configuration for BC_15PS100
 Vb_LITERS_15PS100 = 67.5  # Box volume for Qtc=0.707 Butterworth alignment
 Vb_M3_15PS100 = Vb_LITERS_15PS100 / 1000.0  # Convert to m³
 EXPECTED_FC_15PS100 = 59.7  # Expected system resonance (Hz)
 EXPECTED_QTC_15PS100 = 0.707  # Expected system Q (Butterworth)
+F_MASS_15PS100 = 300.0  # Mass break frequency (Hz) for HF roll-off (optimized for Hornresp validation)
 
 
 class TestSealedBoxSystemParameters:
@@ -226,9 +228,9 @@ class TestSealedBoxElectricalImpedanceBC8NDL51:
 
         Tolerance: <6 dB (accounts for voice coil model differences)
         """
-        # Calculate viberesp SPL
+        # Calculate viberesp SPL with HF roll-off
         spl_viberesp = np.array([
-            sealed_box_electrical_impedance(f, bc_8ndl51_driver, Vb=Vb_M3_8NDL51)["SPL"]
+            sealed_box_electrical_impedance(f, bc_8ndl51_driver, Vb=Vb_M3_8NDL51, f_mass=F_MASS_8NDL51)["SPL"]
             for f in hornresp_data.frequency
         ])
 
@@ -258,7 +260,7 @@ class TestSealedBoxElectricalImpedanceBC8NDL51:
         spl_viberesp = []
 
         for f in hornresp_data.frequency:
-            result = sealed_box_electrical_impedance(f, bc_8ndl51_driver, Vb=Vb_M3_8NDL51)
+            result = sealed_box_electrical_impedance(f, bc_8ndl51_driver, Vb=Vb_M3_8NDL51, f_mass=F_MASS_8NDL51)
             ze_viberesp_mag.append(result["Ze_magnitude"])
             ze_viberesp_phase.append(complex(result["Ze_real"], result["Ze_imag"]))
             spl_viberesp.append(result["SPL"])
@@ -413,9 +415,9 @@ class TestSealedBoxElectricalImpedanceBC15PS100:
 
         Tolerance: <6 dB (accounts for voice coil model differences)
         """
-        # Calculate viberesp SPL
+        # Calculate viberesp SPL with HF roll-off
         spl_viberesp = np.array([
-            sealed_box_electrical_impedance(f, bc_15ps100_driver, Vb=Vb_M3_15PS100)["SPL"]
+            sealed_box_electrical_impedance(f, bc_15ps100_driver, Vb=Vb_M3_15PS100, f_mass=F_MASS_15PS100)["SPL"]
             for f in hornresp_data.frequency
         ])
 
@@ -445,7 +447,7 @@ class TestSealedBoxElectricalImpedanceBC15PS100:
         spl_viberesp = []
 
         for f in hornresp_data.frequency:
-            result = sealed_box_electrical_impedance(f, bc_15ps100_driver, Vb=Vb_M3_15PS100)
+            result = sealed_box_electrical_impedance(f, bc_15ps100_driver, Vb=Vb_M3_15PS100, f_mass=F_MASS_15PS100)
             ze_viberesp_mag.append(result["Ze_magnitude"])
             ze_viberesp_phase.append(complex(result["Ze_real"], result["Ze_imag"]))
             spl_viberesp.append(result["SPL"])
