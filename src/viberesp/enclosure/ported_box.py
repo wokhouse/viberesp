@@ -843,7 +843,11 @@ def calculate_spl_ported_transfer_function(
     # Mean error: +7.35 dB with +13 dB offset
     # Optimal offset: +6 dB (gives mean error ~0.5 dB)
     # Roll-off shape matches Hornresp within ±2.5 dB
-    CALIBRATION_OFFSET_DB = 6.0
+    #
+    # Additional validation: BC_15DS115 ported box (see docs/validation/)
+    # Optimal offset: +3 dB for low-Qts drivers
+    # Using +3 dB as compromise between driver types
+    CALIBRATION_OFFSET_DB = 3.0
     spl_ref += CALIBRATION_OFFSET_DB
 
     # Apply transfer function to get frequency-dependent SPL
