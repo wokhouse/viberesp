@@ -447,19 +447,23 @@ def calculate_f3_from_spl(
     # Thiele (1971), Part 2: F3 defined as -3dB from peak response
     spl_norm = spl_values - peak_spl
 
-    # Find -3dB point: the LOWEST frequency where response is within 3dB of peak
+    # Find -3dB point on the low-frequency side of the peak
     # Thiele (1971), Part 2: For vented boxes, F3 is lower -3dB frequency
-    above_3db = spl_norm >= -3.0
+    # This is the bass rolloff corner frequency
+    peak_idx = np.argmax(spl_values)
 
-    if np.any(above_3db):
-        # Find indices where response is above -3dB
-        above_indices = np.where(above_3db)[0]
-        # Return the lowest frequency that's still above -3dB
-        f3 = freqs[above_indices[0]]
-        return f3
-    else:
-        # If response never reaches -3dB in range, return f_max as upper bound
-        return f_max
+    # Search backward from peak to find where response drops below -3dB
+    for i in range(peak_idx, 0, -1):
+        if spl_norm[i] < -3.0:
+            # Linear interpolation for more accuracy
+            f1, f2 = freqs[i-1], freqs[i]
+            spl1, spl2 = spl_norm[i-1], spl_norm[i]
+            # Interpolate to find exact -3dB frequency
+            f3 = f1 + (f2 - f1) * (-3.0 - spl1) / (spl2 - spl1)
+            return f3
+
+    # If we never drop below -3dB in range, return f_min
+    return f_min
 
 
 def calculate_ported_box_system_parameters(
