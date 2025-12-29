@@ -667,6 +667,207 @@ def export(driver_name, output):
 
 
 @cli.command()
+@click.argument('filepath', type=click.Path(exists=True))
+@click.option('--freq-min', type=float, help='Minimum frequency (Hz)')
+@click.option('--freq-max', type=float, help='Maximum frequency (Hz)')
+@click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
+def sim_summary(filepath, freq_min, freq_max, as_json):
+    """
+    Display summary statistics for Hornresp simulation file.
+
+    FILEPATH: Path to _sim.txt file
+
+    Shows key metrics including impedance peaks, SPL range, efficiency,
+    and notable features. Efficiently analyzes data without loading
+    entire file into context.
+
+    Examples:
+        $ viberesp sim-summary tests/validation/drivers/bc_8ndl51/infinite_baffle/sim.txt
+        $ viberesp sim-summary sim.txt --freq-min 50 --freq-max 200
+        $ viberesp sim-summary sim.txt --json > summary.json
+    """
+    from viberesp.hornresp.query_tools import get_simulation_summary
+
+    # Build freq_range if provided
+    freq_range = None
+    if freq_min is not None and freq_max is not None:
+        freq_range = (freq_min, freq_max)
+
+    # Get summary
+    summary = get_simulation_summary(filepath, freq_range)
+
+    if as_json:
+        import json
+        click.echo(json.dumps(summary, indent=2, default=str))
+    else:
+        # Human-readable output
+        click.echo(f"\n{'='*70}")
+        click.echo(f"Hornresp Simulation Summary: {summary['metadata']['filename']}")
+        click.echo(f"{'='*70}\n")
+
+        click.echo("Frequency Range:")
+        click.echo(f"  {summary['frequency']['min_hz']:.1f} - {summary['frequency']['max_hz']:.1f} Hz")
+        click.echo(f"  {summary['frequency']['num_points']} data points\n")
+
+        click.echo("Electrical Impedance (Ze):")
+        click.echo(f"  Range: {summary['impedance']['min_ohms']:.2f} - {summary['impedance']['max_ohms']:.2f} Ω")
+        click.echo(f"  Mean: {summary['impedance']['mean_ohms']:.2f} Ω")
+        if summary['impedance']['peaks']:
+            click.echo(f"  Peaks:")
+            for peak in summary['impedance']['peaks']:
+                click.echo(f"    {peak['freq_hz']:.1f} Hz: {peak['magnitude_ohms']:.2f} Ω")
+        click.echo()
+
+        click.echo("Sound Pressure Level (SPL @ 1m, 2.83V):")
+        click.echo(f"  Range: {summary['spl']['min_db']:.1f} - {summary['spl']['max_db']:.1f} dB")
+        click.echo(f"  Mean: {summary['spl']['mean_db']:.1f} dB")
+        if summary['spl']['bandwidth']['minus_3db_hz']:
+            click.echo(f"  -3dB bandwidth: {summary['spl']['bandwidth']['minus_3db_hz']:.1f} Hz")
+        click.echo()
+
+        click.echo("Efficiency:")
+        click.echo(f"  Range: {summary['efficiency']['min_percent']:.3f} - {summary['efficiency']['max_percent']:.3f} %")
+        click.echo()
+
+        if summary['notable_features']:
+            click.echo("Notable Features:")
+            for feature in summary['notable_features']:
+                click.echo(f"  • {feature}")
+            click.echo()
+
+
+@cli.command()
+@click.argument('filepath', type=click.Path(exists=True))
+@click.option('--columns', '-c', required=True,
+              help='Comma-separated list of columns (e.g., "frequency,spl_db,ze_ohms")')
+@click.option('--freq-min', type=float, help='Minimum frequency (Hz)')
+@click.option('--freq-max', type=float, help='Maximum frequency (Hz)')
+@click.option('--output', '-o', type=click.Path(), help='Save to CSV file')
+@click.option('--head', '-n', type=int, help='Show only first N rows')
+def sim_extract(filepath, columns, freq_min, freq_max, output, head):
+    """
+    Extract specific columns from Hornresp simulation file.
+
+    FILEPATH: Path to _sim.txt file
+
+    Extracts only the columns you need, avoiding loading all data.
+    Useful for quick analysis or plotting specific metrics.
+
+    Examples:
+        $ viberesp sim-extract sim.txt -c frequency,spl_db,ze_ohms
+        $ viberesp sim-extract sim.txt -c spl_db --freq-min 50 --freq-max 200
+        $ viberesp sim-extract sim.txt -c frequency,ze_ohms,zephase_deg -o impedance.csv
+        $ viberesp sim-extract sim.txt -c spl_db --head 10
+    """
+    from viberesp.hornresp.query_tools import extract_columns
+
+    # Parse columns
+    column_list = [c.strip() for c in columns.split(',')]
+
+    # Build freq_range
+    freq_range = None
+    if freq_min is not None and freq_max is not None:
+        freq_range = (freq_min, freq_max)
+
+    # Extract data
+    data = extract_columns(filepath, column_list, freq_range, as_dict=True)
+
+    # Try to use pandas for nice table output
+    try:
+        import pandas as pd
+
+        # Convert to pandas DataFrame for nice display
+        df = pd.DataFrame(data)
+
+        if head:
+            click.echo(f"Showing first {head} rows of {len(df)} total\n")
+            df = df.head(head)
+
+        if output:
+            df.to_csv(output, index=False)
+            click.echo(f"✓ Saved {len(df)} rows to {output}")
+        else:
+            # Display as table
+            click.echo(df.to_string(index=False))
+    except ImportError:
+        # Fallback if pandas not available
+        if output:
+            # Simple CSV output
+            import csv
+            with open(output, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=column_list)
+                writer.writeheader()
+                for i in range(len(data[column_list[0]])):
+                    row = {col: data[col][i] for col in column_list}
+                    writer.writerow(row)
+            click.echo(f"✓ Saved to {output}")
+        else:
+            # Simple text output
+            if head:
+                num_rows = min(head, len(data[column_list[0]]))
+            else:
+                num_rows = len(data[column_list[0]])
+
+            # Print header
+            header = "\t".join(column_list)
+            click.echo(header)
+
+            # Print data rows
+            for i in range(num_rows):
+                row = "\t".join(str(data[col][i]) for col in column_list)
+                click.echo(row)
+
+
+@cli.command()
+@click.argument('filepath', type=click.Path(exists=True))
+@click.option('--metric', '-m', default='spl_db',
+              type=click.Choice(['spl_db', 'ze_ohms', 'efficiency_percent', 'xd_mm']),
+              help='Metric to analyze')
+@click.option('--top', '-t', type=int, default=5, help='Show top N values')
+@click.option('--bottom', '-b', type=int, default=5, help='Show bottom N values')
+def sim_query(filepath, metric, top, bottom):
+    """
+    Query extremes in Hornresp simulation data.
+
+    FILEPATH: Path to _sim.txt file
+
+    Quickly find highest/lowest values for any metric.
+    Useful for identifying resonance frequencies, efficiency peaks, etc.
+
+    Examples:
+        $ viberesp sim-query sim.txt -m spl_db
+        $ viberesp sim-query sim.txt -m ze_ohms --top 3
+        $ viberesp sim-query sim.txt -m efficiency_percent --top 10 --bottom 0
+    """
+    from viberesp.hornresp.query_tools import find_extremes
+
+    # Map CLI option names to column names
+    metric_map = {
+        'spl_db': 'SPL (dB)',
+        'ze_ohms': 'Ze (Ω)',
+        'efficiency_percent': 'Efficiency (%)',
+        'xd_mm': 'Displacement (mm)'
+    }
+
+    result = find_extremes(filepath, metric=metric, n=max(top, bottom))
+
+    click.echo(f"\n{metric_map[metric]} - Extremes")
+    click.echo(f"{'='*70}\n")
+
+    if top > 0:
+        click.echo(f"Top {top} values:")
+        for i, p in enumerate(result['highest'][:top], 1):
+            click.echo(f"  {i}. {p['frequency']:.1f} Hz: {p['value']:.3f}")
+        click.echo()
+
+    if bottom > 0:
+        click.echo(f"Bottom {bottom} values:")
+        for i, p in enumerate(result['lowest'][:bottom], 1):
+            click.echo(f"  {i}. {p['frequency']:.1f} Hz: {p['value']:.3f}")
+        click.echo()
+
+
+@cli.command()
 @click.option("--output", "-o", type=click.Path(), default="./exports", help="Output directory")
 def export_all(output):
     """
