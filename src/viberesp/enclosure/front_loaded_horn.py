@@ -216,17 +216,23 @@ class FrontLoadedHorn:
         Calculate acoustic power output at a single frequency.
 
         Literature:
+            - Kolbrek, "Horn Loudspeaker Simulation Part 3" - Power from T-matrix
             - Beranek (1954), Chapter 4 - Acoustic power radiation
             - Olson (1947), Chapter 8 - Horn efficiency
             - literature/horns/beranek_1954.md
             - literature/horns/olson_1947.md
+            - literature/horns/kolbrek_horn_theory_tutorial.md
 
-        Acoustic power from diaphragm velocity:
-            W_acoustic = |U|² × Re(Z_acoustic)
+        Acoustic power at horn mouth:
+            W_acoustic = Re(p_m × U_m*)
 
         where:
-            U = u_d × S_d (volume velocity)
-            Z_acoustic = Z_front + Z_rear (total acoustic impedance)
+            p_m = pressure at mouth [Pa]
+            U_m = volume velocity at mouth [m³/s]
+            U_m* = complex conjugate of U_m
+
+        The mouth quantities are obtained by transforming throat quantities
+        through the horn T-matrix.
 
         Args:
             frequency: Frequency [Hz]
@@ -250,27 +256,114 @@ class FrontLoadedHorn:
         if medium is None:
             medium = MediumProperties()
 
-        # Get diaphragm velocity from electrical impedance calculation
+        # Get electrical impedance result (complex phasors)
         result = self.electrical_impedance(frequency, voltage, medium)
-        u_diaphragm = result['diaphragm_velocity']
 
-        # Calculate volume velocity: U = u_d × S_d
-        # Kinsler et al. (1982), Chapter 4
-        volume_velocity = u_diaphragm * self.driver.S_d
+        # Calculate diaphragm volume velocity (complex)
+        # From electrical impedance calculation:
+        # I = voltage / Ze
+        # F = Bl × I
+        # u_d = F / Z_mechanical_total
+        # U_d = u_d × S_d (diaphragm volume velocity)
+        Ze = result['Ze_real'] + 1j * result['Ze_imag']
+        if abs(Ze) == 0:
+            return 0.0
 
-        # Get acoustic impedance
+        omega = 2 * np.pi * frequency
+        I_complex = voltage / Ze
+        F_complex = self.driver.BL * I_complex
+
+        # Reconstruct mechanical impedance (same as in horn_electrical_impedance)
+        Z_mechanical_driver = (self.driver.R_ms +
+                              complex(0, omega * self.driver.M_md) +
+                              complex(0, -1 / (omega * self.driver.C_ms)))
+
+        # Get acoustic impedance at throat
         frequencies = np.array([frequency])
         Z_front, Z_rear = horn_system_acoustic_impedance(
             frequencies, self.horn, self.V_tc, self.A_tc,
             self.V_rc, self.driver.S_d, medium, self.radiation_angle
         )
-        Z_acoustic = Z_front[0] + Z_rear[0]
+        Z_acoustic_throat = Z_front[0] + Z_rear[0]
 
-        # Acoustic power: W = |U|² × Re(Z_acoustic)
-        # Beranek (1954), Chapter 4
-        power = (volume_velocity ** 2) * Z_acoustic.real
+        # Transform acoustic impedance to mechanical domain
+        # IMPORTANT: For compression drivers, Z_acoustic is calculated at throat (area S1)
+        # not at diaphragm (area Sd). We must scale by throat area, not diaphragm area.
+        #
+        # Z_mechanical_acoustic = Z_acoustic_at_throat × S_throat²
+        #
+        # The compression ratio (Sd/S_throat) affects the pressure transformation, but
+        # the acoustic impedance calculation already accounts for this.
+        #
+        # Literature:
+        # - Beranek (1954), Chapter 8 - Compression driver loading
+        # - Olson (1947), Chapter 8 - Horn driver impedance transformation
+        Z_mechanical_acoustic = Z_acoustic_throat * (self.horn.throat_area ** 2)
 
-        return power
+        # Total mechanical impedance
+        Z_mechanical_total = Z_mechanical_driver + Z_mechanical_acoustic
+
+        if abs(Z_mechanical_total) == 0:
+            return 0.0
+
+        # Diaphragm velocity (complex)
+        u_diaphragm_complex = F_complex / Z_mechanical_total
+
+        # Volume velocity at throat
+        # For compression driver: U_throat = u_d × S_d (not S_throat!)
+        # The driver's diaphragm area determines the volume velocity
+        U_throat_complex = u_diaphragm_complex * self.driver.S_d
+
+        # Pressure at throat
+        # p_throat = Z_acoustic_throat × U_throat
+        p_throat_complex = Z_acoustic_throat * U_throat_complex
+
+        # Check horn type for appropriate power calculation
+        horn_type = type(self.horn).__name__
+
+        if horn_type == "MultiSegmentHorn":
+            # For multi-segment horn: calculate power at throat
+            # Power is conserved in lossless horn: W_throat = W_mouth
+            # W = Re(p_throat × conj(U_throat))
+            # Kolbrek, "Horn Loudspeaker Simulation Part 3"
+            # Beranek (1954), Chapter 4
+            power = np.real(p_throat_complex * np.conj(U_throat_complex))
+        else:
+            # For single-segment exponential horn: transform to mouth
+            # [p_throat, U_throat] = T_horn @ [p_mouth, U_mouth]
+            # Therefore: [p_mouth, U_mouth] = inv(T_horn) @ [p_throat, U_throat]
+
+            from viberesp.simulation.horn_theory import exponential_horn_tmatrix
+
+            # Get horn T-matrix
+            a, b, c_mat, d = exponential_horn_tmatrix(
+                np.array([frequency]), self.horn, medium
+            )
+
+            # T-matrix elements at this frequency
+            a_f = a[0]
+            b_f = b[0]
+            c_f = c_mat[0]
+            d_f = d[0]
+
+            # Determinant of T-matrix (should be 1 for lossless horn)
+            det = a_f * d_f - b_f * c_f
+
+            if abs(det) < 1e-15:
+                return 0.0
+
+            # Inverse transform: [p_mouth, U_mouth] = (1/det) × [d, -b; -c, a] @ [p_throat, U_throat]
+            p_mouth_complex = (d_f * p_throat_complex - b_f * U_throat_complex) / det
+            U_mouth_complex = (-c_f * p_throat_complex + a_f * U_throat_complex) / det
+
+            # Acoustic power at mouth
+            # W = Re(p_m × U_m*)
+            # Kolbrek, "Horn Loudspeaker Simulation Part 3"
+            # Beranek (1954), Chapter 4
+            power = np.real(p_mouth_complex * np.conj(U_mouth_complex))
+
+        # Ensure non-negative (numerical errors can give tiny negative values)
+        return max(0.0, power)
 
     def spl_response(
         self,

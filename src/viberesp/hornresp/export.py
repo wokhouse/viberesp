@@ -661,18 +661,28 @@ def export_front_loaded_horn_to_hornresp(
     # Convert driver to Hornresp format
     record = driver_to_hornresp_record(driver, driver_name)
 
-    # Convert horn parameters to Hornresp units (cm²)
+    # Convert horn parameters to Hornresp units
+    # Hornresp uses: areas in cm², lengths in cm
     s1_cm2 = horn.throat_area * 10000.0
     s2_cm2 = horn.mouth_area * 10000.0
-    l12_m = horn.length
+    l12_cm = horn.length * 100.0  # Convert m to cm
+    at_cm2 = s1_cm2  # AT = throat area (same as S1)
 
-    # Calculate flare constant (for documentation)
-    # m = (1/L12) * ln(S2/S1)
-    if s1_cm2 > 0 and s2_cm2 > 0 and l12_m > 0:
-        flare_constant = (1.0 / l12_m) * math.log(s2_cm2 / s1_cm2)
-        # Calculate cutoff frequency for documentation
-        # fc = c * m / (2*pi) assuming c = 343 m/s
-        fc_hz = 343.0 * flare_constant / (2.0 * math.pi)
+    # Calculate flare constant and F12 for Hornresp
+    # m = (1/L) * ln(S2/S1) where m is in m⁻¹ (Olson 1947, Eq. 5.12)
+    # F12 = c * m / (4π) where c is in m/s (Hornresp formula)
+    # Note: Area ratio S2/S1 is unit-independent, can use cm² values directly
+    if s1_cm2 > 0 and s2_cm2 > 0 and horn.length > 0:
+        flare_constant = (1.0 / horn.length) * math.log(s2_cm2 / s1_cm2)
+        c_m_per_s = 343.0  # Speed of sound in m/s
+        f12_hz = c_m_per_s * flare_constant / (4.0 * math.pi)
+    else:
+        f12_hz = 0.0
+
+    # Calculate Olson cutoff for documentation (uses 2π, not 4π)
+    # fc_olson = c * m / (2π) where c is in m/s (Olson 1947, Eq. 5.18)
+    if s1_cm2 > 0 and s2_cm2 > 0 and horn.length > 0:
+        fc_hz = 343.0 * flare_constant / (2.0 * math.pi)  # For documentation only
     else:
         fc_hz = 0.0
 
@@ -746,11 +756,11 @@ def export_front_loaded_horn_to_hornresp(
     # Generate comment
     if comment is None:
         if V_tc_liters > 0 and V_rc_liters > 0:
-            comment = f"{driver_name}: Front-loaded horn (fc={fc_hz:.0f}Hz) with throat chamber ({V_tc_liters*1000:.0f}cm³) and rear chamber ({V_rc_liters:.1f}L)"
+            comment = f"{driver_name}: Front-loaded horn (F12={f12_hz:.1f}Hz, fc_olson={fc_hz:.0f}Hz) with throat chamber ({V_tc_liters*1000:.0f}cm³) and rear chamber ({V_rc_liters:.1f}L)"
         elif V_tc_liters > 0:
-            comment = f"{driver_name}: Front-loaded horn (fc={fc_hz:.0f}Hz) with throat chamber ({V_tc_liters*1000:.0f}cm³)"
+            comment = f"{driver_name}: Front-loaded horn (F12={f12_hz:.1f}Hz, fc_olson={fc_hz:.0f}Hz) with throat chamber ({V_tc_liters*1000:.0f}cm³)"
         else:
-            comment = f"{driver_name}: Front-loaded horn (fc={fc_hz:.0f}Hz)"
+            comment = f"{driver_name}: Front-loaded horn (F12={f12_hz:.1f}Hz, fc_olson={fc_hz:.0f}Hz)"
 
     # Build chamber section
     # Hornresp expects Vtc in cm³ (not liters), Vrc in liters, Atc in cm²
@@ -779,12 +789,11 @@ Cir = 0.42
 
 S1 = {s1_cm2:.2f}
 S2 = {s2_cm2:.2f}
-Exp = 50.00
-F12 = {fc_hz:.2f}
+Exp = {l12_cm:.2f}
+F12 = {f12_hz:.2f}
 S2 = 0.00
 S3 = 0.00
 L23 = 0.00
-AT = 2.66
 S3 = 0.00
 S4 = 0.00
 L34 = 0.00
@@ -793,6 +802,7 @@ S4 = 0.00
 S5 = 0.00
 L45 = 0.00
 F45 = 0.00
+AT = {at_cm2:.2f}
 
 {record.to_hornresp_format()}
 
