@@ -370,6 +370,85 @@ def calculate_optimal_port_dimensions(
     return Sp_practical, Lpt, v_port_estimated
 
 
+def calculate_f3_from_spl(
+    driver: ThieleSmallParameters,
+    Vb: float,
+    Fb: float,
+    f_min: float = 20.0,
+    f_max: float = 300.0,
+    num_points: int = 280,
+) -> float:
+    """
+    Calculate the -3dB frequency (F3) from the actual SPL response.
+
+    Instead of using the simplified F3 = Fb approximation, this function
+    calculates the actual frequency where the response drops to -3dB
+    from the peak in the bass region.
+
+    This is more accurate than the F3 = Fb simplification, especially for
+    drivers that are not optimally aligned (e.g., Qts not suitable for B4).
+
+    Args:
+        driver: ThieleSmallParameters for the driver
+        Vb: Box volume (m³)
+        Fb: Port tuning frequency (Hz)
+        f_min: Minimum frequency to search for F3 (Hz), default 20Hz
+        f_max: Maximum frequency to search for F3 (Hz), default 300Hz
+        num_points: Number of frequency points to evaluate, default 280
+
+    Returns:
+        F3 frequency in Hz, or f_max if -3dB point not found in range
+
+    Literature:
+        - Thiele (1971), "Loudspeakers in Vented Boxes" - F3 varies with alignment
+        - Small (1973), "Vented-Box Loudspeaker Systems Part I" - Transfer function
+        - literature/thiele_small/thiele_1971_vented_boxes.md
+
+    Examples:
+        >>> driver = bc_drivers.get_bc_8ndl51()
+        >>> f3 = calculate_f3_from_spl(driver, Vb=0.020, Fb=50.0)
+        >>> f3  # Actual -3dB frequency, not necessarily 50Hz
+    """
+    import numpy as np
+
+    # Calculate SPL response across frequency range
+    freqs = np.linspace(f_min, f_max, num_points)
+    spl_values = []
+
+    for f in freqs:
+        try:
+            spl = calculate_spl_ported_transfer_function(
+                f, driver, Vb, Fb, voltage=2.83, measurement_distance=1.0
+            )
+            spl_values.append(spl)
+        except:
+            spl_values.append(0)
+
+    spl_values = np.array(spl_values)
+
+    # Find peak in bass region
+    peak_idx = np.argmax(spl_values)
+    peak_spl = spl_values[peak_idx]
+
+    # Normalize to peak
+    spl_norm = spl_values - peak_spl
+
+    # Find -3dB point: the LOWEST frequency where response is within 3dB of peak
+    # Search from high to low frequency to find where it drops below -3dB
+    # This is the F3 (bass extension frequency)
+    above_3db = spl_norm >= -3.0
+
+    if np.any(above_3db):
+        # Find indices where response is above -3dB
+        above_indices = np.where(above_3db)[0]
+        # Return the lowest frequency that's still above -3dB
+        f3 = freqs[above_indices[0]]
+        return f3
+    else:
+        # If response never reaches -3dB in range, return f_max as upper bound
+        return f_max
+
+
 def calculate_ported_box_system_parameters(
     driver: ThieleSmallParameters,
     Vb: float,
@@ -464,17 +543,16 @@ def calculate_ported_box_system_parameters(
     # literature/thiele_small/thiele_1971_vented_boxes.md
     h = Fb / driver.F_s
 
-    # Calculate F3 based on alignment
-    if alignment == "B4":
-        # Butterworth B4 alignment: F3 = Fb
-        # Maximally flat response, -3dB occurs at tuning frequency
-        # literature/thiele_small/thiele_1971_vented_boxes.md
-        F3 = Fb
-    else:
-        # For other alignments, F3 differs from Fb
-        # This is a simplified placeholder - full implementation would use
-        # Thiele's transfer function tables
-        F3 = Fb  # Default approximation
+    # Calculate F3 from actual SPL response
+    # The simplified F3 = Fb formula only applies to B4 alignment with
+    # the correct driver Qts (Qts ≈ 0.38-0.40). For other alignments or
+    # non-optimal drivers, calculate F3 from the actual response.
+    #
+    # This provides accurate F3 values regardless of alignment or driver Qts.
+    F3 = calculate_f3_from_spl(driver, Vb, Fb)
+
+    # Note: For B4 alignment with Qts ≈ 0.38, F3 ≈ Fb is a reasonable approximation.
+    # For other cases, F3 can differ significantly from Fb.
 
     # Auto-calculate port dimensions if not provided
     if port_area is None or port_length is None:
