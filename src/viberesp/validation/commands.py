@@ -70,28 +70,14 @@ def load_test_cases_json(driver_name: str, enclosure_type: str) -> dict:
 
 
 def get_driver_from_json(driver_data: dict):
-    """Import driver from viberesp.driver.bc_drivers based on driver name."""
-    from viberesp.driver.bc_drivers import (
-        get_bc_8ndl51,
-        get_bc_12ndl76,
-        get_bc_15ds115,
-        get_bc_15ps100,
-        get_bc_18pzw100,
-    )
-
-    driver_map = {
-        "BC_8NDL51": get_bc_8ndl51,
-        "BC_12NDL76": get_bc_12ndl76,
-        "BC_15DS115": get_bc_15ds115,
-        "BC_15PS100": get_bc_15ps100,
-        "BC_18PZW100": get_bc_18pzw100,
-    }
+    """Import driver from YAML files based on driver name."""
+    from viberesp.driver import load_driver
 
     driver_name = driver_data["driver_name"]
-    if driver_name not in driver_map:
+    try:
+        return load_driver(driver_name)
+    except FileNotFoundError as e:
         raise click.ClickException(f"Unknown driver: {driver_name}")
-
-    return driver_map[driver_name]()
 
 
 # ============================================================================

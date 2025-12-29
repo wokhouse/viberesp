@@ -46,7 +46,7 @@ def constraint_f3_limit(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_12ndl76()
+        >>> driver = load_driver("BC_12NDL76")
         >>> # Require F3 < 80 Hz
         >>> violation = constraint_f3_limit(
         ...     np.array([0.020]), driver, "sealed", max_f3=80
@@ -87,7 +87,7 @@ def constraint_f3_target(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> # Target F3 = 70 Hz ± 5 Hz
         >>> violation = constraint_f3_target(
         ...     np.array([0.010]), driver, "sealed",
@@ -141,7 +141,7 @@ def constraint_qtc_range(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> # Require Butterworth alignment (Qtc = 0.707 ± 0.05)
         >>> violation = constraint_qtc_range(
         ...     np.array([0.010]), driver, "sealed",
@@ -191,7 +191,7 @@ def constraint_volume_limit(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_15ds115()
+        >>> driver = load_driver("BC_15DS115")
         >>> # Maximum 100L enclosure
         >>> violation = constraint_volume_limit(
         ...     np.array([0.080]), driver, "sealed",
@@ -241,7 +241,7 @@ def constraint_horn_cutoff_frequency(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> # Target Fc = 400 Hz ± 20 Hz
         >>> violation = constraint_horn_cutoff_frequency(
         ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn",
@@ -306,7 +306,7 @@ def constraint_mouth_size(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> # Ensure mouth is at least λ/2 at cutoff
         >>> violation = constraint_mouth_size(
         ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn"
@@ -372,7 +372,7 @@ def constraint_flare_constant_limits(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> # Ensure practical horn geometry
         >>> violation = constraint_flare_constant_limits(
         ...     np.array([0.0005, 0.02, 0.5, 0.0]), driver, "exponential_horn"

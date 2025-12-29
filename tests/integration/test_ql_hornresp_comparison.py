@@ -16,12 +16,7 @@ Validation Dataset:
 import os
 import pytest
 from pathlib import Path
-from viberesp.driver.bc_drivers import get_bc_8ndl51
-from viberesp.enclosure.sealed_box import sealed_box_electrical_impedance
-from viberesp.enclosure.ported_box import ported_box_electrical_impedance
-
-
-def find_hornresp_data(driver_name, enclosure_type, ql_value):
+from viberesp.driver import load_driver:
     """
     Find Hornresp simulation data for a specific QL value.
 
@@ -110,7 +105,7 @@ class TestPortedBoxQLHornrespComparison:
         - Impedance dip depth: Should increase with lower QL (more leakage)
         """
         # Get driver
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
 
         # Ported box design from validation dataset
         Vb = 0.020  # 20L
@@ -169,7 +164,7 @@ class TestPortedBoxQLHornrespComparison:
         Lower QL (more leakage) → slightly shallower dip
         Higher QL (better sealed) → slightly deeper dip
         """
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
         Vb = 0.020
         Fb = 50.0
         port_area = 0.00423
@@ -198,7 +193,7 @@ class TestPortedBoxQLHornrespComparison:
         - Dip: Anti-resonance at Fb
         - Upper peak: Helmholtz resonance (~Fb×√2)
         """
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
         Vb = 0.020
         Fb = 50.0
         port_area = 0.00423
@@ -272,7 +267,7 @@ class TestSealedBoxQucHornrespComparison:
         - Quc = infinity → theoretical lossless case
         - Parallel Q combination formula is correct
         """
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
         Vb = 0.010  # 10L box
 
         # Test at system resonance (where impedance peak occurs)
@@ -310,7 +305,7 @@ def test_ported_box_qb_calculation(ql_value):
 
     QB should always be less than the smallest individual Q factor.
     """
-    driver = get_bc_8ndl51()
+    driver = load_driver("BC_8NDL51")
     Vb = 0.020
     Fb = 50.0
     port_area = 0.00423

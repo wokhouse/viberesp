@@ -1,0 +1,44 @@
+name: "BC_12NDL76"
+manufacturer: "B&C Speakers"
+model: "12NDL76-4"
+description: "12 inch Mid-Woofer driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 50  # Hz
+  re: 5.3  # Ohms
+  qts: 0.2
+  qes: 0.21
+  qms: 4.2
+  vas: 73  # dm³ (73 L)
+  sd: 522  # cm²
+  bl: 20.1  # T·m
+  cms: 0.19  # mm/N
+  rms: 4.0  # N·s/m
+  le: 1.0  # mH
+  xmax: 7  # mm
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.039898  # kg - driver mass only (calculated from Mms - radiation mass)
+  C_ms: 0.00019  # m/N - compliance
+  R_ms: 4.0  # N·s/m - mechanical resistance
+  R_e: 5.3  # Ohms - voice coil DC resistance
+  L_e: 1.0e-3  # H - voice coil inductance
+  BL: 20.1  # T·m - force factor
+  S_d: 0.0522  # m² - effective area
+  X_max: 0.007  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  The datasheet reports Mms = 53g (total mass including radiation), which
+  is consistent with Fs and Cms. Radiation mass at resonance is ~13.4g,
+  so M_md = 53g - 13.4g = 39.9g driver mass only.
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 12NDL76 datasheet"

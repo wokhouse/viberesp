@@ -104,19 +104,12 @@ class DesignAssistant:
             >>> rec.confidence > 0.7
             True
         """
-        from viberesp.driver import bc_drivers
-
-        # Driver name to function mapping
-        driver_functions = {
-            "BC_8NDL51": bc_drivers.get_bc_8ndl51,
-            "BC_12NDL76": bc_drivers.get_bc_12ndl76,
-            "BC_15DS115": bc_drivers.get_bc_15ds115,
-            "BC_15PS100": bc_drivers.get_bc_15ps100,
-            "BC_18PZW100": bc_drivers.get_bc_18pzw100,
-        }
+        from viberesp.driver import load_driver
 
         # Load driver
-        if driver_name not in driver_functions:
+        try:
+            driver = load_driver(driver_name)
+        except FileNotFoundError:
             return DesignRecommendation(
                 enclosure_type="unknown",
                 confidence=0.0,
@@ -125,8 +118,6 @@ class DesignAssistant:
                 expected_performance={},
                 validation_notes=[f"Driver '{driver_name}' not found"]
             )
-
-        driver = driver_functions[driver_name]()
 
         # Build user constraints dict
         user_constraints = {}
@@ -300,8 +291,7 @@ class DesignAssistant:
             >>> len(result.best_designs)
             10
         """
-        from viberesp.driver import bc_drivers
-        from viberesp.driver.test_drivers import get_tc2_compression_driver
+        from viberesp.driver import load_driver
         from viberesp.optimization.parameters import (
             get_sealed_box_parameter_space,
             get_ported_box_parameter_space
@@ -316,18 +306,10 @@ class DesignAssistant:
         from viberesp.optimization.optimizers.pymoo_interface import run_nsga2
         from viberesp.optimization.results.pareto_front import rank_designs
 
-        # Driver name to function mapping
-        driver_functions = {
-            "BC_8NDL51": bc_drivers.get_bc_8ndl51,
-            "BC_12NDL76": bc_drivers.get_bc_12ndl76,
-            "BC_15DS115": bc_drivers.get_bc_15ds115,
-            "BC_15PS100": bc_drivers.get_bc_15ps100,
-            "BC_18PZW100": bc_drivers.get_bc_18pzw100,
-            "TC2": get_tc2_compression_driver,
-        }
-
-        # Validate driver
-        if driver_name not in driver_functions:
+        # Load driver
+        try:
+            driver = load_driver(driver_name)
+        except FileNotFoundError:
             return OptimizationResult(
                 success=False,
                 pareto_front=[],
@@ -338,9 +320,6 @@ class DesignAssistant:
                 optimization_metadata={},
                 warnings=[f"Unknown driver: {driver_name}"]
             )
-
-        # Load driver
-        driver = driver_functions[driver_name]()
 
         # Validate enclosure type
         supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn"]
@@ -592,7 +571,7 @@ class DesignAssistant:
             - If sweeping "Vb" for ported, fix "Fb" in fixed_params (and vice versa)
             - All parameter values should be in SI units (m³ for volume, Hz for frequency)
         """
-        from viberesp.driver import bc_drivers
+        from viberesp.driver import load_driver
         from viberesp.optimization.objectives.response_metrics import (
             objective_f3, objective_response_flatness
         )
@@ -600,15 +579,9 @@ class DesignAssistant:
         from viberesp.optimization.objectives.size_metrics import objective_enclosure_volume
 
         # Load driver
-        driver_functions = {
-            "BC_8NDL51": bc_drivers.get_bc_8ndl51,
-            "BC_12NDL76": bc_drivers.get_bc_12ndl76,
-            "BC_15DS115": bc_drivers.get_bc_15ds115,
-            "BC_15PS100": bc_drivers.get_bc_15ps100,
-            "BC_18PZW100": bc_drivers.get_bc_18pzw100,
-        }
-
-        if driver_name not in driver_functions:
+        try:
+            driver = load_driver(driver_name)
+        except FileNotFoundError:
             return ParameterSweepResult(
                 parameter_swept=parameter,
                 parameter_values=np.array([]),
@@ -616,8 +589,6 @@ class DesignAssistant:
                 sensitivity_analysis={},
                 recommendations=[f"Unknown driver: {driver_name}"]
             )
-
-        driver = driver_functions[driver_name]()
 
         # Validate parameter
         if enclosure_type == "sealed" and parameter != "Vb":

@@ -1,0 +1,57 @@
+name: "BC_8FMB51"
+manufacturer: "B&C Speakers"
+model: "8FMB51"
+description: "8 inch Mid-Bass driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 67  # Hz
+  re: 4.7  # Ohms
+  qes: 0.31
+  qms: 3.07
+  qts: 0.28
+  vas: 20.7  # dm³ (20.7 L)
+  sd: 227  # cm²
+  eta0: 1.91  # %
+  xmax: 5.5  # mm
+  mms: 0.0202  # kg (total moving mass)
+  bl: 11.3  # T·m
+  le: 0.48  # mH
+  ebp: 216  # Hz
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.0156  # kg - driver mass only (M_ms - 2×M_rad)
+  C_ms: 2.89e-4  # m/N - compliance (from Vas=20.7L, Sd=227cm²)
+  R_ms: 2.67  # N·s/m - mechanical resistance (from Qms=3.07)
+  R_e: 4.7  # Ohms - voice coil DC resistance
+  L_e: 0.48e-3  # H - voice coil inductance
+  BL: 11.3  # T·m - force factor
+  S_d: 0.0227  # m² - effective area
+  X_max: 0.0055  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  The datasheet Mms=20.2g, Fs=67Hz, and Vas=20.7L are consistent when
+  using the standard Thiele-Small relationships.
+
+  Calculated from datasheet Mms=20.2g and Fs=67Hz:
+  - C_ms = 2.89e-4 m/N (from Vas=20.7L, Sd=227cm²)
+  - R_ms = 2.67 N·s/m (from Qms=3.07)
+  - M_md = 0.0156 kg (M_ms - 2×M_rad at 67 Hz)
+
+  Resulting values (match datasheet):
+  - Fs ≈ 67 Hz ✓
+  - Qes ≈ 0.30 ✓ (datasheet 0.31)
+  - Qms ≈ 3.07 ✓
+  - Qts ≈ 0.28 ✓
+  - Vas ≈ 20.7 L ✓
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 8FMB51 datasheet"
+  - "https://www.bcspeakers.com/"

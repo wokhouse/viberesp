@@ -55,8 +55,7 @@ def get_exponential_horn_parameter_space(
         ValueError: If preset is not recognized
 
     Examples:
-        >>> from viberesp.driver.test_drivers import get_tc2_compression_driver
-        >>> driver = get_tc2_compression_driver()
+        >>> from viberesp.driver import load_driver
         >>> param_space = get_exponential_horn_parameter_space(driver, preset="midrange_horn")
         >>> param_space.get_parameter_names()
         ['throat_area', 'mouth_area', 'length', 'V_rc']

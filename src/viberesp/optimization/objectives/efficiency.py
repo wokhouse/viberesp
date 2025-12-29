@@ -64,7 +64,7 @@ def objective_efficiency(
         per Kinsler et al. (1982), Chapter 4.
 
     Examples:
-        >>> driver = get_bc_12ndl76()
+        >>> driver = load_driver("BC_12NDL76")
         >>> # High efficiency design
         >>> eff = objective_efficiency(
         ...     np.array([0.020]), driver, "sealed",
@@ -233,7 +233,7 @@ def objective_reference_sensitivity(
         (Return negative because pymoo minimizes by default)
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> sens = objective_reference_sensitivity(
         ...     np.array([0.010]), driver, "sealed", reference_frequency=100
         ... )
@@ -357,7 +357,7 @@ def objective_efficiency_percent(
         Multiply by -1 to get positive percentage
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> eff = objective_efficiency_percent(
         ...     design_vector, driver, "multisegment_horn", reference_frequency=1000
         ... )

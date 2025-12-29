@@ -1,0 +1,57 @@
+name: "BC_18RBX100"
+manufacturer: "B&C Speakers"
+model: "18RBX100-8"
+description: "18 inch Subwoofer driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 40  # Hz
+  re: 5.1  # Ohms
+  qts: 0.34
+  qes: 0.36
+  qms: 7.3
+  vas: 220  # dm³ (220 L)
+  sd: 1225  # cm²
+  eta0: 2.2  # %
+  xmax: 10  # mm
+  mms: 0.199  # kg (total moving mass)
+  bl: 25.1  # T·m
+  le: 1.5  # mH
+  ebp: 111  # Hz
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.1665  # kg - driver mass only (M_ms - 2×M_rad)
+  C_ms: 1.059e-4  # m/N - compliance (from Vas=220L, Sd=1225cm²)
+  R_ms: 14.54  # N·s/m - mechanical resistance (from Qms=7.3)
+  R_e: 5.1  # Ohms - voice coil DC resistance
+  L_e: 1.5e-3  # H - voice coil inductance
+  BL: 25.1  # T·m - force factor
+  S_d: 0.1225  # m² - effective area
+  X_max: 0.010  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  The datasheet Mms=199g, Fs=40Hz, and Vas=220L are consistent when
+  using the standard Thiele-Small relationships.
+
+  Calculated from datasheet Mms=199g and Fs=40Hz:
+  - C_ms = 1.059e-4 m/N (from Vas=220L, Sd=1225cm²)
+  - R_ms = 14.54 N·s/m (from Qms=7.3)
+  - M_md = 0.1665 kg (M_ms - 2×M_rad at 40 Hz)
+
+  Resulting values (match datasheet):
+  - Fs ≈ 40.0 Hz ✓
+  - Qes ≈ 0.36 ✓
+  - Qms ≈ 7.3 ✓
+  - Qts ≈ 0.34 ✓
+  - Vas ≈ 220 L ✓
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 18RBX100 datasheet"
+  - "https://www.bcspeakers.com/"

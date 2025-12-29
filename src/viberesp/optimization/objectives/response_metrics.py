@@ -163,7 +163,7 @@ def objective_response_flatness(
         cutoff region dominating the metric (Olson 1947).
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> objective_response_flatness(
         ...     np.array([0.010]), driver, "sealed",
         ...     frequency_range=(40, 200), n_points=50
@@ -376,7 +376,7 @@ def objective_response_slope(
         Returns absolute value of slope (minimizes both upward and downward slopes)
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> # Calculate slope from 1-10 kHz
         >>> slope = objective_response_slope(
         ...     np.array([0.0002, 0.04, 0.6, 0.0]), driver, "exponential_horn",
@@ -708,7 +708,7 @@ def objective_wavefront_sphericity(
         ValueError: If enclosure_type is not "multisegment_horn"
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> design = np.array([0.000212, 0.010, 0.04084, 0.20, 0.394, 0.0])
         >>> sphericity = objective_wavefront_sphericity(
         ...     design, driver, "multisegment_horn", num_segments=2
@@ -829,7 +829,7 @@ def objective_impedance_smoothness(
         ValueError: If enclosure_type is not "multisegment_horn"
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> design = np.array([0.000212, 0.010, 0.04084, 0.20, 0.394, 0.0])
         >>> smoothness = objective_impedance_smoothness(
         ...     design, driver, "multisegment_horn",
@@ -941,7 +941,7 @@ def multisegment_horn_objectives(
         List of objective values (to be minimized)
 
     Examples:
-        >>> driver = get_tc2_compression_driver()
+        >>> driver = load_driver("TC2")
         >>> design = np.array([0.000212, 0.010, 0.04084, 0.20, 0.394, 0.0])
         >>> objectives = multisegment_horn_objectives(
         ...     design, driver, num_segments=2,

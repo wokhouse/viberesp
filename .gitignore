@@ -165,6 +165,8 @@ $RECYCLE.BIN/
 
 # Project-specific
 data/
+# Exception: driver definitions are tracked
+!src/viberesp/driver/data/
 *.csv
 *.xlsx
 *.json.bak

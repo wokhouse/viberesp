@@ -9,16 +9,9 @@ import math
 import pytest
 
 from viberesp.driver.response import direct_radiator_electrical_impedance
-from viberesp.driver.bc_drivers import get_bc_8ndl51
-
-
-class TestDirectRadiatorResponse:
-    """Test direct radiator frequency response calculations."""
-
-    @pytest.fixture
-    def bc_8ndl51_driver(self):
+from viberesp.driver import load_driver:
         """Get BC 8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     def test_response_returns_all_keys(self, bc_8ndl51_driver):
         """Test that response dictionary contains all expected keys."""

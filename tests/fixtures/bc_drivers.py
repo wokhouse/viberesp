@@ -11,12 +11,7 @@ Literature:
 """
 
 import pytest
-from viberesp.driver.bc_drivers import (
-    get_bc_8ndl51,
-    get_bc_12ndl76,
-    get_bc_15ds115,
-    get_bc_18pzw100
-)
+from viberesp.driver import load_driver
 
 
 @pytest.fixture
@@ -40,7 +35,7 @@ def bc_8ndl51():
 
     Literature: B&C 8NDL51 datasheet
     """
-    return get_bc_8ndl51()
+    return load_driver("BC_8NDL51")
 
 
 @pytest.fixture
@@ -64,7 +59,7 @@ def bc_12ndl76():
 
     Literature: B&C 12NDL76 datasheet
     """
-    return get_bc_12ndl76()
+    return load_driver("BC_12NDL76")
 
 
 @pytest.fixture
@@ -88,7 +83,7 @@ def bc_15ds115():
 
     Literature: B&C 15DS115 datasheet
     """
-    return get_bc_15ds115()
+    return load_driver("BC_15DS115")
 
 
 @pytest.fixture
@@ -112,15 +107,15 @@ def bc_18pzw100():
 
     Literature: B&C 18PZW100 datasheet
     """
-    return get_bc_18pzw100()
+    return load_driver("BC_18PZW100")
 
 
 @pytest.fixture
 def all_bc_drivers():
     """Return all 4 B&C drivers as a list for batch testing."""
     return [
-        get_bc_8ndl51(),
-        get_bc_12ndl76(),
-        get_bc_15ds115(),
-        get_bc_18pzw100()
+        load_driver("BC_8NDL51"),
+        load_driver("BC_12NDL76"),
+        load_driver("BC_15DS115"),
+        load_driver("BC_18PZW100")
     ]

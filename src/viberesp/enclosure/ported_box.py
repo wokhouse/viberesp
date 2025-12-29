@@ -265,8 +265,8 @@ def calculate_optimal_port_dimensions(
                     with a driver that has high Xmax.
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> Sp, Lpt, v_max = calculate_optimal_port_dimensions(driver, Vb=0.020, Fb=50.0)
         >>> Sp  # Port area
         0.003...  # m² (≈ 2.5" diameter)
@@ -405,7 +405,8 @@ def calculate_f3_from_spl(
         - literature/thiele_small/thiele_1971_vented_boxes.md
 
     Examples:
-        >>> driver = bc_drivers.get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> f3 = calculate_f3_from_spl(driver, Vb=0.020, Fb=50.0)
         >>> f3  # Actual -3dB frequency, not necessarily 50Hz
 
@@ -508,8 +509,8 @@ def calculate_ported_box_system_parameters(
         ValueError: If Vb <= 0, Fb <= 0, invalid alignment, or missing port dimensions
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()  # Fs=64Hz, Qts=0.37, Vas=14L
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")  # Fs=64Hz, Qts=0.37, Vas=14L
         >>> params = calculate_ported_box_system_parameters(driver, Vb=0.020, Fb=50.0)
         >>> params.alpha  # Compliance ratio
         0.70...  # Vas/Vb
@@ -799,8 +800,8 @@ def calculate_spl_ported_transfer_function(
         ValueError: If frequency <= 0, Vb <= 0, Fb <= 0, or invalid driver
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> spl = calculate_spl_ported_transfer_function(50, driver, Vb=0.020, Fb=50.0)
         >>> spl  # SPL at 1m for 20L ported box tuned to 50Hz
         78.5...  # dB
@@ -1056,8 +1057,8 @@ def ported_box_impedance_small(
         ValueError: If frequency <= 0, Vb <= 0, Fb <= 0, or invalid driver
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> Z = ported_box_impedance_small(50, driver, Vb=0.020, Fb=50.0)
         >>> abs(Z)  # Impedance magnitude at tuning frequency (should dip toward Re)
         3.2...  # Ohms (close to Re=2.6 due to impedance dip at Fb)
@@ -1303,8 +1304,8 @@ def ported_box_electrical_impedance(
         ValueError: If frequency <= 0, Vb <= 0, Fb <= 0, or invalid driver
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> result = ported_box_electrical_impedance(100, driver, Vb=0.020, Fb=50.0,
         ...                                          port_area=0.003, port_length=0.08)
         >>> result['alpha']  # Compliance ratio

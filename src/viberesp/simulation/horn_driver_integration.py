@@ -370,8 +370,8 @@ def horn_electrical_impedance(
 
     Examples:
         >>> from viberesp.simulation.types import ExponentialHorn
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> horn = ExponentialHorn(0.001, 0.01, 0.3)
         >>> result = horn_electrical_impedance(500, driver, horn)
         >>> result['Ze_magnitude']

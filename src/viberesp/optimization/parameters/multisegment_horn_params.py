@@ -69,8 +69,7 @@ def get_multisegment_horn_parameter_space(
         ValueError: If preset or num_segments is not recognized
 
     Examples:
-        >>> from viberesp.driver.test_drivers import get_tc2_compression_driver
-        >>> driver = get_tc2_compression_driver()
+        >>> from viberesp.driver import load_driver
         >>> param_space = get_multisegment_horn_parameter_space(
         ...     driver, preset="midrange_horn", num_segments=2
         ... )

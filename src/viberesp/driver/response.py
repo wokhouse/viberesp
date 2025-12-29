@@ -105,8 +105,7 @@ def direct_radiator_electrical_impedance(
         ValueError: If frequency <= 0 or other invalid inputs
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
         >>> # Simple model (lossless inductor)
         >>> result = direct_radiator_electrical_impedance(100, driver)
         >>> result['Ze_magnitude']
