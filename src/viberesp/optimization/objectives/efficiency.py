@@ -73,6 +73,13 @@ def objective_efficiency(
         >>> -eff  # Convert back to positive SPL
         89.5  # dB average SPL (example value)
     """
+    # For multi-segment horns, use true efficiency calculation (percentage)
+    # instead of SPL-based approximation
+    if enclosure_type == "multisegment_horn":
+        return objective_efficiency_percent(
+            design_vector, driver, enclosure_type, reference_frequency, voltage
+        )
+
     from viberesp.optimization.objectives.response_metrics import (
         sealed_box_electrical_impedance,
         ported_box_electrical_impedance
@@ -314,6 +321,99 @@ def objective_reference_sensitivity(
             raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
         return -result['SPL']  # Return negative for minimization
+
+    except Exception:
+        return -1000.0  # Large penalty on failure
+
+
+def objective_efficiency_percent(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    reference_frequency: float = 1000.0,
+    voltage: float = 2.83
+) -> float:
+    """
+    Calculate actual efficiency as percentage (for maximization).
+
+    This function calculates true efficiency (acoustic power / electrical power)
+    rather than SPL. For multi-segment horns, this uses the corrected
+    acoustic_power() method.
+
+    Literature:
+        - Kolbrek, "Horn Simulation Part 3" - Power calculation
+        - Beranek (1954), Chapter 4 - Acoustic power efficiency
+        - Olson (1947), Chapter 8 - Horn efficiency
+
+    Args:
+        design_vector: Enclosure parameters
+        driver: ThieleSmallParameters instance
+        enclosure_type: Type of enclosure (must be "multisegment_horn")
+        reference_frequency: Frequency for efficiency measurement (Hz), default 1 kHz
+        voltage: Input voltage (default 2.83V)
+
+    Returns:
+        Negative efficiency percentage (for minimization)
+        Multiply by -1 to get positive percentage
+
+    Examples:
+        >>> driver = get_tc2_compression_driver()
+        >>> eff = objective_efficiency_percent(
+        ...     design_vector, driver, "multisegment_horn", reference_frequency=1000
+        ... )
+        >>> -eff  # Convert back to positive
+        0.57  # % efficiency at 1 kHz (example value)
+    """
+    try:
+        if enclosure_type == "multisegment_horn":
+            from viberesp.optimization.parameters.multisegment_horn_params import decode_multisegment_design
+            from viberesp.simulation.types import MultiSegmentHorn, HornSegment
+
+            # Decode design vector to parameters
+            params = decode_multisegment_design(design_vector, driver, num_segments=len(design_vector) - 5)
+
+            # Extract chamber volumes
+            V_tc = params.get('V_tc', 0.0)
+            V_rc = params.get('V_rc', 0.0)
+
+            # Convert segment tuples to HornSegment objects
+            segments = params['segments']
+            flare_constants = params['flare_constants']
+
+            horn_segments = []
+            for i, (throat, mouth, length) in enumerate(segments):
+                m = flare_constants[i] if i < len(flare_constants) else 0
+                horn_segments.append(HornSegment(throat, mouth, length, m))
+
+            # Create multi-segment horn
+            horn = MultiSegmentHorn(horn_segments)
+            flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+            # Calculate acoustic power at reference frequency
+            power_acoustic = flh.acoustic_power(reference_frequency, voltage=voltage)
+
+            # Calculate electrical power
+            result = flh.electrical_impedance(reference_frequency, voltage=voltage)
+            Ze = result['Ze_real'] + 1j * result['Ze_imag']
+
+            if abs(Ze) > 0:
+                power_electrical = (voltage ** 2) * Ze.real / (abs(Ze) ** 2)
+            else:
+                power_electrical = 0
+
+            # Calculate efficiency as percentage
+            if power_electrical > 0:
+                efficiency_percent = (power_acoustic / power_electrical) * 100
+            else:
+                efficiency_percent = 0
+
+            # Return as negative for minimization (pymoo minimizes by default)
+            return -efficiency_percent
+        else:
+            # For other enclosure types, not implemented yet
+            import warnings
+            warnings.warn(f"Efficiency percent not implemented for {enclosure_type}")
+            return -1000.0
 
     except Exception:
         return -1000.0  # Large penalty on failure
