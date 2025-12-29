@@ -408,34 +408,47 @@ def calculate_f3_from_spl(
         >>> driver = bc_drivers.get_bc_8ndl51()
         >>> f3 = calculate_f3_from_spl(driver, Vb=0.020, Fb=50.0)
         >>> f3  # Actual -3dB frequency, not necessarily 50Hz
+
+    Validation:
+        Compare calculated F3 with Hornresp's -3dB frequency for identical
+        driver parameters (Vas, Qts, Fs) and enclosure parameters (Vb, Fb).
+        Expected agreement: F3 within ±5 Hz of Hornresp for standard alignments.
+        Note: Absolute F3 values may differ due to response shape differences
+        (documented in docs/validation/ported_box_f3_fix.md), but F3 trends
+        with Vb should match Hornresp: larger boxes → lower F3.
     """
     import numpy as np
 
     # Calculate SPL response across frequency range
+    # Small (1973), Eq. 13: 4th-order vented box transfer function
+    # Thiele (1971), Part 2: F3 is -3dB point from reference level
     freqs = np.linspace(f_min, f_max, num_points)
     spl_values = []
 
     for f in freqs:
         try:
+            # Small (1973), Eq. 20: Normalized pressure response
             spl = calculate_spl_ported_transfer_function(
                 f, driver, Vb, Fb, voltage=2.83, measurement_distance=1.0
             )
             spl_values.append(spl)
-        except:
+        except Exception:
+            # If SPL calculation fails, use 0 to avoid corrupting peak detection
             spl_values.append(0)
 
     spl_values = np.array(spl_values)
 
     # Find peak in bass region
+    # Thiele (1971), Part 2, Table 1: Reference level for F3 calculation
     peak_idx = np.argmax(spl_values)
     peak_spl = spl_values[peak_idx]
 
     # Normalize to peak
+    # Thiele (1971), Part 2: F3 defined as -3dB from peak response
     spl_norm = spl_values - peak_spl
 
     # Find -3dB point: the LOWEST frequency where response is within 3dB of peak
-    # Search from high to low frequency to find where it drops below -3dB
-    # This is the F3 (bass extension frequency)
+    # Thiele (1971), Part 2: For vented boxes, F3 is lower -3dB frequency
     above_3db = spl_norm >= -3.0
 
     if np.any(above_3db):
