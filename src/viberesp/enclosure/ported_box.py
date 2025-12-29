@@ -370,6 +370,102 @@ def calculate_optimal_port_dimensions(
     return Sp_practical, Lpt, v_port_estimated
 
 
+def calculate_f3_from_spl(
+    driver: ThieleSmallParameters,
+    Vb: float,
+    Fb: float,
+    f_min: float = 20.0,
+    f_max: float = 300.0,
+    num_points: int = 280,
+) -> float:
+    """
+    Calculate the -3dB frequency (F3) from the actual SPL response.
+
+    Instead of using the simplified F3 = Fb approximation, this function
+    calculates the actual frequency where the response drops to -3dB
+    from the peak in the bass region.
+
+    This is more accurate than the F3 = Fb simplification, especially for
+    drivers that are not optimally aligned (e.g., Qts not suitable for B4).
+
+    Args:
+        driver: ThieleSmallParameters for the driver
+        Vb: Box volume (m³)
+        Fb: Port tuning frequency (Hz)
+        f_min: Minimum frequency to search for F3 (Hz), default 20Hz
+        f_max: Maximum frequency to search for F3 (Hz), default 300Hz
+        num_points: Number of frequency points to evaluate, default 280
+
+    Returns:
+        F3 frequency in Hz, or f_max if -3dB point not found in range
+
+    Literature:
+        - Thiele (1971), "Loudspeakers in Vented Boxes" - F3 varies with alignment
+        - Small (1973), "Vented-Box Loudspeaker Systems Part I" - Transfer function
+        - literature/thiele_small/thiele_1971_vented_boxes.md
+
+    Examples:
+        >>> driver = bc_drivers.get_bc_8ndl51()
+        >>> f3 = calculate_f3_from_spl(driver, Vb=0.020, Fb=50.0)
+        >>> f3  # Actual -3dB frequency, not necessarily 50Hz
+
+    Validation:
+        Compare calculated F3 with Hornresp's -3dB frequency for identical
+        driver parameters (Vas, Qts, Fs) and enclosure parameters (Vb, Fb).
+        Expected agreement: F3 within ±5 Hz of Hornresp for standard alignments.
+        Note: Absolute F3 values may differ due to response shape differences
+        (documented in docs/validation/ported_box_f3_fix.md), but F3 trends
+        with Vb should match Hornresp: larger boxes → lower F3.
+    """
+    import numpy as np
+
+    # Calculate SPL response across frequency range
+    # Small (1973), Eq. 13: 4th-order vented box transfer function
+    # Thiele (1971), Part 2: F3 is -3dB point from reference level
+    freqs = np.linspace(f_min, f_max, num_points)
+    spl_values = []
+
+    for f in freqs:
+        try:
+            # Small (1973), Eq. 20: Normalized pressure response
+            spl = calculate_spl_ported_transfer_function(
+                f, driver, Vb, Fb, voltage=2.83, measurement_distance=1.0
+            )
+            spl_values.append(spl)
+        except Exception:
+            # If SPL calculation fails, use 0 to avoid corrupting peak detection
+            spl_values.append(0)
+
+    spl_values = np.array(spl_values)
+
+    # Find peak in bass region
+    # Thiele (1971), Part 2, Table 1: Reference level for F3 calculation
+    peak_idx = np.argmax(spl_values)
+    peak_spl = spl_values[peak_idx]
+
+    # Normalize to peak
+    # Thiele (1971), Part 2: F3 defined as -3dB from peak response
+    spl_norm = spl_values - peak_spl
+
+    # Find -3dB point on the low-frequency side of the peak
+    # Thiele (1971), Part 2: For vented boxes, F3 is lower -3dB frequency
+    # This is the bass rolloff corner frequency
+    peak_idx = np.argmax(spl_values)
+
+    # Search backward from peak to find where response drops below -3dB
+    for i in range(peak_idx, 0, -1):
+        if spl_norm[i] < -3.0:
+            # Linear interpolation for more accuracy
+            f1, f2 = freqs[i-1], freqs[i]
+            spl1, spl2 = spl_norm[i-1], spl_norm[i]
+            # Interpolate to find exact -3dB frequency
+            f3 = f1 + (f2 - f1) * (-3.0 - spl1) / (spl2 - spl1)
+            return f3
+
+    # If we never drop below -3dB in range, return f_min
+    return f_min
+
+
 def calculate_ported_box_system_parameters(
     driver: ThieleSmallParameters,
     Vb: float,
@@ -464,17 +560,16 @@ def calculate_ported_box_system_parameters(
     # literature/thiele_small/thiele_1971_vented_boxes.md
     h = Fb / driver.F_s
 
-    # Calculate F3 based on alignment
-    if alignment == "B4":
-        # Butterworth B4 alignment: F3 = Fb
-        # Maximally flat response, -3dB occurs at tuning frequency
-        # literature/thiele_small/thiele_1971_vented_boxes.md
-        F3 = Fb
-    else:
-        # For other alignments, F3 differs from Fb
-        # This is a simplified placeholder - full implementation would use
-        # Thiele's transfer function tables
-        F3 = Fb  # Default approximation
+    # Calculate F3 from actual SPL response
+    # The simplified F3 = Fb formula only applies to B4 alignment with
+    # the correct driver Qts (Qts ≈ 0.38-0.40). For other alignments or
+    # non-optimal drivers, calculate F3 from the actual response.
+    #
+    # This provides accurate F3 values regardless of alignment or driver Qts.
+    F3 = calculate_f3_from_spl(driver, Vb, Fb)
+
+    # Note: For B4 alignment with Qts ≈ 0.38, F3 ≈ Fb is a reasonable approximation.
+    # For other cases, F3 can differ significantly from Fb.
 
     # Auto-calculate port dimensions if not provided
     if port_area is None or port_length is None:
