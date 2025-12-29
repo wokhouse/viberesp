@@ -1076,17 +1076,17 @@ def export_multisegment_horn_to_hornresp(
     id_hash = abs(hash(driver_name)) % 100000
     id_value = f"{id_hash / 100:.2f}"
 
-    # Hornresp format uses "Exp" for exponential segment length (not L12, L23, etc.)
-    # The format is: S1, S2, Exp, F12 for each segment
+    # Hornresp format uses L12, L23, L34, L45 for segment lengths
+    # The format is: S1, S2, L12, F12 for each segment
     horn_section = f"""|HORN PARAMETER VALUES:
 
 S1 = {s1:.2f}
 S2 = {s2:.2f}
-Exp = {l12:.2f}
+L12 = {l12:.2f}
 F12 = {f12:.4f}
 S2 = {s2:.2f}
 S3 = {s3:.2f}
-Exp = {l23:.2f}
+L23 = {l23:.2f}
 F23 = {f23:.4f}
 S3 = {s3:.2f}
 S4 = {s4:.2f}

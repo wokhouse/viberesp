@@ -425,10 +425,10 @@ class DesignAssistant:
                 constraint_list.append("port_velocity")
             if enclosure_type == "exponential_horn":
                 # Default horn constraints
-                constraint_list = ["mouth_size", "flare_constant_limits"]
+                constraint_list.extend(["mouth_size", "flare_constant_limits"])
             if enclosure_type == "multisegment_horn":
                 # Default multisegment horn constraints
-                constraint_list = ["segment_continuity", "flare_constant_limits"]
+                constraint_list.extend(["segment_continuity", "flare_constant_limits"])
 
         # Setup problem
         try:
