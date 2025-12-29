@@ -16,6 +16,7 @@ Literature:
 import numpy as np
 
 from viberesp.driver.parameters import ThieleSmallParameters
+from viberesp.optimization.parameters.exponential_horn_params import calculate_horn_volume
 
 
 def objective_enclosure_volume(
@@ -38,8 +39,9 @@ def objective_enclosure_volume(
         design_vector: Enclosure parameters
             - Sealed: [Vb] (m³)
             - Ported: [Vb, Fb, port_area, port_length] (m³, Hz, m², m)
+            - Exponential horn: [throat_area, mouth_area, length, V_rc] (m², m², m, m³)
         driver: ThieleSmallParameters instance (for S_d in port area calc)
-        enclosure_type: Type of enclosure ("sealed", "ported")
+        enclosure_type: Type of enclosure ("sealed", "ported", "exponential_horn")
 
     Returns:
         Total volume in m³ (lower is better)
@@ -48,6 +50,9 @@ def objective_enclosure_volume(
         For ported boxes, this includes the box volume plus port volume
         displacement with a 20% safety factor for bracing and internal
         displacement.
+        For exponential horns, this includes the horn internal volume
+        (calculated analytically from the exponential profile) plus the
+        rear chamber volume.
 
     Examples:
         >>> driver = get_bc_8ndl51()
@@ -80,6 +85,20 @@ def objective_enclosure_volume(
         else:
             # Port dimensions not provided, just return box volume
             return Vb
+
+    elif enclosure_type == "exponential_horn":
+        # Horn volume + rear chamber volume
+        throat_area = design_vector[0]
+        mouth_area = design_vector[1]
+        length = design_vector[2]
+        V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+
+        # Calculate horn volume analytically
+        # For exponential horn: V_horn = (S₂ - S₁) / m where m = ln(S₂/S₁)/L
+        v_horn = calculate_horn_volume(throat_area, mouth_area, length)
+
+        # Total volume = horn + rear chamber
+        return v_horn + V_rc
 
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")

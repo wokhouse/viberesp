@@ -1,0 +1,123 @@
+ID = 185.68
+
+Comment = Multi-obj optimization (WITH target band 500-5000 Hz). Flatness=2.60dB, Fc=2031Hz. Best compromise design.
+
+|RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
+
+Ang = 2.0 x Pi
+Eg = 2.83
+Rg = 0.00
+Cir = 25.12
+
+|HORN PARAMETER VALUES:
+
+S1 = 2.36
+S2 = 102.13
+Exp = 10.00
+F12 = 2056.7301
+S2 = 102.13
+S3 = 495.48
+Exp = 11.87
+F23 = 726.3113
+S3 = 495.48
+S4 = 0.00
+L34 = 0.00
+F34 = 0.0000
+S4 = 0.00
+S5 = 0.00
+L45 = 0.00
+F45 = 0.0000
+
+|TRADITIONAL DRIVER PARAMETER VALUES:
+
+Sd = 8.00
+Bl = 12.00
+Cms = 5.00E-05
+Rms = 3.00
+Mmd = 8.00
+Le = 0.10
+Re = 6.50
+Nd = 1
+
+|ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
+
+Re' = 0.00
+Leb = 0.00
+Le = 0.00
+Ke = 0.00
+
+|ADVANCED DRIVER PARAMETER VALUES FOR MASS-INDUCTANCE MODEL:
+
+Red = 0.00
+Les = 0.00
+Kes = 0.00
+Cr = 0.00
+
+|PASSIVE RADIATOR PARAMETER VALUES:
+
+Mmpr = 0.00
+Cmpr = 0.00
+Rmpr = 0.00
+Sdp = 0.00
+
+|CHAMBER PARAMETER VALUES:
+
+Vrc = 3.49
+Lrc = 15.15
+Fr = 0.00
+Tal = 0.00
+Vtc = 0.00
+Atc = 0.00
+
+|MAXIMUM SPL PARAMETER VALUES:
+
+Pn = 0.00
+
+|ABSORBENT FILLING MATERIAL PARAMETER VALUES:
+
+Qa = 0.00
+
+|ACTIVE BAND PASS FILTER PARAMETER VALUES:
+
+Fa1 = 0.00
+FB1 = 0.00
+Fa2 = 0.00
+FB2 = 0.00
+
+|PASSIVE FILTER PARAMETER VALUES:
+
+Leh = 0.00
+Reh = 0.00
+Ch = 0.00
+Rch = 0.00
+
+|EQUALISER FILTER PARAMETER VALUES:
+
+Fke = 0.00
+Tke = 0.00
+Fqe = 0.00
+Qke = 0.00
+
+|STATUS FLAGS:
+
+IK = 0
+IR = 0
+IL = 0
+IP = 0
+IS = 0
+IT = 0
+IV = 0
+IQ = 0
+IF = 0
+I_eq = 0
+
+|OTHER SETTINGS:
+
+Filter Type Index = 0
+Filter Input Index = 0
+Filter Output Index = 0
+
+Filter Type = 1
+
+MEH Configuration = 0
+ME Amplifier Polarity Value = 1

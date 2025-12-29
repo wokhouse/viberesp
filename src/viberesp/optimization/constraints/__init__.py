@@ -20,6 +20,9 @@ from viberesp.optimization.constraints.performance import (
     constraint_f3_target,
     constraint_qtc_range,
     constraint_volume_limit,
+    constraint_horn_cutoff_frequency,
+    constraint_mouth_size,
+    constraint_flare_constant_limits,
 )
 
 __all__ = [
@@ -29,4 +32,7 @@ __all__ = [
     "constraint_f3_target",
     "constraint_qtc_range",
     "constraint_volume_limit",
+    "constraint_horn_cutoff_frequency",
+    "constraint_mouth_size",
+    "constraint_flare_constant_limits",
 ]

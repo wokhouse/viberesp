@@ -22,6 +22,7 @@ import numpy as np
 from numpy.typing import NDArray
 from viberesp.simulation.horn_theory import (
     exponential_horn_throat_impedance,
+    multsegment_horn_throat_impedance,
     circular_piston_radiation_impedance,
     MediumProperties,
 )
@@ -192,7 +193,7 @@ def rear_chamber_impedance(
 
 def horn_system_acoustic_impedance(
     frequencies: FloatArray,
-    horn: 'ExponentialHorn',
+    horn: 'ExponentialHorn | MultiSegmentHorn',
     V_tc: float = 0.0,
     A_tc: Optional[float] = None,
     V_rc: float = 0.0,
@@ -204,6 +205,8 @@ def horn_system_acoustic_impedance(
 
     Combines throat chamber, horn throat impedance, and rear chamber impedance
     to calculate the total acoustic load on the driver.
+
+    Supports both single-segment ExponentialHorn and multi-segment MultiSegmentHorn.
 
     Literature:
         - Olson (1947), Chapter 8 - Complete horn driver systems
@@ -224,7 +227,7 @@ def horn_system_acoustic_impedance(
 
     Args:
         frequencies: Array of frequencies [Hz]
-        horn: ExponentialHorn geometry parameters
+        horn: ExponentialHorn or MultiSegmentHorn geometry parameters
         V_tc: Throat chamber volume [m³], default 0 (no throat chamber)
         A_tc: Throat chamber area [m²], defaults to horn.throat_area
         V_rc: Rear chamber volume [m³], default 0 (no rear chamber)
@@ -263,9 +266,18 @@ def horn_system_acoustic_impedance(
         A_tc = horn.throat_area
 
     # Calculate horn throat impedance (T-matrix method)
-    Z_horn_throat = exponential_horn_throat_impedance(
-        frequencies, horn, medium, radiation_angle
-    )
+    # Check horn type and use appropriate impedance calculation
+    horn_type = type(horn).__name__
+    if horn_type == "MultiSegmentHorn":
+        # Multi-segment horn: chain T-matrices for each segment
+        Z_horn_throat = multsegment_horn_throat_impedance(
+            frequencies, horn, medium
+        )
+    else:
+        # Single-segment exponential horn
+        Z_horn_throat = exponential_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
 
     # Add throat chamber compliance (series element)
     if V_tc > 0:
@@ -369,9 +381,12 @@ def horn_electrical_impedance(
         Compare with Hornresp electrical impedance export.
         Expected: <2% magnitude, <5° phase for frequencies > F_s/2
     """
-    # Validate inputs
-    if frequency <= 0:
-        raise ValueError(f"Frequency must be > 0, got {frequency} Hz")
+    # Validate inputs (handle both scalar and array inputs)
+    if np.any(frequency <= 0):
+        if np.isscalar(frequency):
+            raise ValueError(f"Frequency must be > 0, got {frequency} Hz")
+        else:
+            raise ValueError(f"All frequencies must be > 0, min={np.min(frequency)} Hz")
 
     # Local import to avoid circular dependency
     from viberesp.driver.parameters import ThieleSmallParameters

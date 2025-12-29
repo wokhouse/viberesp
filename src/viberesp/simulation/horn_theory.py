@@ -408,3 +408,100 @@ def exponential_horn_throat_impedance(
     z_throat = throat_impedance_from_tmatrix(z_mouth, a, b, c, d)
 
     return z_throat
+
+
+def multsegment_horn_throat_impedance(
+    frequencies: FloatArray,
+    horn: 'MultiSegmentHorn',
+    medium: Optional[MediumProperties] = None,
+    radiation_angle: float = 2 * np.pi
+) -> ComplexArray:
+    """Calculate throat impedance of multi-segment horn using T-matrix chaining.
+
+    A multi-segment horn consists of multiple exponential segments connected
+    in series. The overall T-matrix is the product of individual segment T-matrices:
+
+        T_total = T_1 · T_2 · ... · T_n
+
+    This allows approximating arbitrary horn profiles by using segments with
+    different flare constants.
+
+    Literature:
+        - Kolbrek Part 1 - T-matrix chaining for compound horns
+        - Olson (1947), Chapter 8 - Compound and stepped horns
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Args:
+        frequencies: Array of frequencies [Hz]
+        horn: MultiSegmentHorn geometry with list of HornSegment objects
+        medium: Acoustic medium properties (uses default if None)
+        radiation_angle: Solid angle of radiation [steradians]
+            - 4π: free field (pulsating sphere)
+            - 2π: half-space (piston in infinite baffle) [default]
+            - π: quarter-space
+            - π/2: eighth-space
+
+    Returns:
+        Complex acoustic impedance at throat [Pa·s/m³]
+        Array shape matches input frequencies
+
+    Notes:
+        - T-matrices are chained from mouth to throat (reverse order)
+        - Each segment is treated as an exponential horn with its own flare constant
+        - Mouth radiation impedance calculated only for final segment mouth
+        - For radiation_angle != 2π, effective mouth area is adjusted
+
+    Examples:
+        >>> import numpy as np
+        >>> from viberesp.simulation.types import HornSegment, MultiSegmentHorn
+        >>> segment1 = HornSegment(throat_area=0.001, mouth_area=0.01, length=0.3)
+        >>> segment2 = HornSegment(throat_area=0.01, mouth_area=0.1, length=0.6)
+        >>> horn = MultiSegmentHorn(segments=[segment1, segment2])
+        >>> freqs = np.array([100.0, 500.0, 1000.0, 5000.0])
+        >>> z_throat = multsegment_horn_throat_impedance(freqs, horn)
+        >>> z_throat.shape
+        (4,)
+
+    Validation:
+        Compare with Hornresp multi-segment horn simulation.
+        Expected tolerances:
+        - f > 2×f_c_min: <1% magnitude, <2° phase
+        - Near cutoff: <3% magnitude, <5° phase
+        where f_c_min is the minimum cutoff frequency among all segments
+    """
+    if medium is None:
+        medium = MediumProperties()
+
+    frequencies = np.atleast_1d(frequencies).astype(float)
+
+    # Adjust effective area for radiation angle (Hornresp convention)
+    # S_eff = 2π·S_mouth/radiation_angle
+    effective_mouth_area = 2 * np.pi * horn.mouth_area / radiation_angle
+
+    # Calculate mouth radiation impedance (only for final mouth)
+    z_mouth = circular_piston_radiation_impedance(
+        frequencies, effective_mouth_area, medium
+    )
+
+    # Chain T-matrices from mouth to throat
+    # Start with mouth impedance, work backwards through segments
+    z_current = z_mouth
+
+    # Process segments in reverse order (mouth to throat)
+    for segment in reversed(horn.segments):
+        # Create ExponentialHorn for this segment to reuse existing T-matrix code
+        from viberesp.simulation.types import ExponentialHorn
+        segment_horn = ExponentialHorn(
+            throat_area=segment.throat_area,
+            mouth_area=segment.mouth_area,
+            length=segment.length
+            # flare_constant calculated automatically
+        )
+
+        # Calculate T-matrix for this segment
+        a, b, c, d = exponential_horn_tmatrix(frequencies, segment_horn, medium)
+
+        # Transform impedance through this segment
+        z_current = throat_impedance_from_tmatrix(z_current, a, b, c, d)
+
+    return z_current
