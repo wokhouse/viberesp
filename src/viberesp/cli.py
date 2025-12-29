@@ -104,31 +104,112 @@ def driver_import(name, M_ms, C_ms, R_ms, R_e, L_e, B_L, S_d, output):
 @driver.command(name="list")
 def driver_list():
     """
-    List available B&C driver fixtures.
+    List all available drivers.
 
-    Shows the 4 B&C drivers included for validation testing:
-    - 8NDL51-8 (8" midrange)
-    - 12NDL76-4 (12" mid-woofer)
-    - 15DS115-8 (15" subwoofer)
-    - 18PZW100-8 (18" subwoofer)
+    Shows all available drivers from YAML definitions including
+    B&C drivers and test cases for validation.
     """
-    click.echo("\nAvailable B&C Driver Fixtures:")
-    click.echo("=" * 60)
+    from viberesp.driver import load_driver, list_drivers
 
-    drivers = [
-        ("BC_8NDL51", "8\" Midrange", "66 Hz", "5.3 Ω", "215 cm²"),
-        ("BC_12NDL76", "12\" Mid-Woofer", "50 Hz", "3.1 Ω", "522 cm²"),
-        ("BC_15DS115", "15\" Subwoofer", "33 Hz", "4.9 Ω", "860 cm²"),
-        ("BC_18PZW100", "18\" Subwoofer", "37 Hz", "5.1 Ω", "1250 cm²"),
-    ]
+    drivers = list_drivers()
 
-    for name, description, fs, re, sd in drivers:
-        click.echo(f"\n{name} - {description}")
-        click.echo(f"  F_s: {fs},  R_e: {re},  S_d: {sd}")
+    click.echo(f"\nAvailable Drivers ({len(drivers)}):")
+    click.echo("=" * 70)
 
-    click.echo("\n" + "=" * 60)
-    click.echo("\nUse these driver names with 'viberesp export' command:")
-    click.echo("  Example: viberesp export BC_12NDL76 -o output.txt")
+    # Group by type (B&C vs Test)
+    bc_drivers = {k: v for k, v in drivers.items() if k.startswith("BC_")}
+    test_drivers = {k: v for k, v in drivers.items() if k.startswith("TC")}
+
+    if bc_drivers:
+        click.echo("\nB&C Speakers:")
+        click.echo("-" * 70)
+        for name, desc in sorted(bc_drivers.items()):
+            # Load driver to get key specs
+            driver = load_driver(name)
+            click.echo(f"\n{name} - {desc}")
+            click.echo(f"  F_s: {driver.F_s:.1f} Hz,  Q_ts: {driver.Q_ts:.2f},  "
+                      f"V_as: {driver.V_as*1000:.1f} L")
+            click.echo(f"  R_e: {driver.R_e:.1f} Ω,  S_d: {driver.S_d*10000:.0f} cm²")
+
+    if test_drivers:
+        click.echo("\n\nTest Cases (for validation):")
+        click.echo("-" * 70)
+        for name, desc in sorted(test_drivers.items()):
+            driver = load_driver(name)
+            click.echo(f"\n{name} - {desc}")
+            click.echo(f"  F_s: {driver.F_s:.1f} Hz,  S_d: {driver.S_d*10000:.1f} cm²")
+
+    click.echo("\n" + "=" * 70)
+    click.echo("\nUse driver names with:")
+    click.echo("  'viberesp export <driver>'          - Export to Hornresp format")
+    click.echo("  'viberesp driver info <driver>'     - Show detailed driver info")
+    click.echo("\nExample: viberesp export BC_12NDL76 -o output.txt")
+
+
+@driver.command(name="info")
+@click.argument("driver_name")
+def driver_info(driver_name: str):
+    """
+    Show detailed information about a driver.
+
+    Displays complete driver parameters including datasheet specifications,
+    physical parameters, and literature references.
+
+    Examples:
+        viberesp driver info BC_8NDL51
+        viberesp driver info TC2
+    """
+    from viberesp.driver import get_driver_info
+
+    try:
+        info = get_driver_info(driver_name)
+    except FileNotFoundError:
+        click.echo(f"Error: Driver '{driver_name}' not found.")
+        click.echo("\nUse 'viberesp driver list' to see available drivers.")
+        return
+
+    click.echo(f"\n{info['name']}")
+    if info.get('manufacturer'):
+        click.echo(f"Manufacturer: {info['manufacturer']}")
+    if info.get('model'):
+        click.echo(f"Model: {info['model']}")
+    click.echo(f"Description: {info['description']}")
+    click.echo("=" * 70)
+
+    # Datasheet specifications
+    if 'datasheet' in info:
+        click.echo("\nDatasheet Specifications:")
+        ds = info['datasheet']
+        for key, value in sorted(ds.items()):
+            click.echo(f"  {key}: {value}")
+
+    # Physical parameters
+    if 'parameters' in info:
+        click.echo("\nPhysical Parameters:")
+        params = info['parameters']
+        click.echo(f"  M_md:  {params['M_md']:.6f} kg  # Driver mass only (excludes radiation mass)")
+        click.echo(f"  C_ms:  {params['C_ms']:.6e} m/N # Compliance")
+        click.echo(f"  R_ms:  {params['R_ms']:.2f} N·s/m  # Mechanical resistance")
+        click.echo(f"  R_e:   {params['R_e']:.2f} Ω    # Voice coil DC resistance")
+        click.echo(f"  L_e:   {params['L_e']:.6f} H    # Voice coil inductance")
+        click.echo(f"  BL:    {params['BL']:.2f} T·m   # Force factor")
+        click.echo(f"  S_d:   {params['S_d']:.6f} m²   # Effective piston area")
+        if 'X_max' in params and params['X_max'] is not None:
+            click.echo(f"  X_max: {params['X_max']:.6f} m   # Maximum linear excursion")
+
+    # Notes
+    if 'notes' in info:
+        click.echo("\nNotes:")
+        for line in info['notes'].strip().split('\n'):
+            click.echo(f"  {line}")
+
+    # Literature
+    if 'literature' in info:
+        click.echo("\nLiterature:")
+        for ref in info['literature']:
+            click.echo(f"  - {ref}")
+
+    click.echo("=" * 70)
 
 
 @validate.command(name="list")
