@@ -753,13 +753,14 @@ def export_front_loaded_horn_to_hornresp(
             comment = f"{driver_name}: Front-loaded horn (fc={fc_hz:.0f}Hz)"
 
     # Build chamber section
+    # Hornresp expects Vtc in cm³ (not liters), Vrc in liters, Atc in cm²
     chamber_section = f"""|CHAMBER PARAMETER VALUES:
 
 Vrc = {V_rc_liters:.2f}
 Lrc = {lrc_value:.2f}
 Fr = 0.00
 Tal = 0.00
-Vtc = {V_tc_liters:.2f}
+Vtc = {V_tc_liters * 1000:.2f}
 Atc = {atc_cm2:.2f}"""
 
     # Build content
@@ -963,16 +964,22 @@ def export_multisegment_horn_to_hornresp(
     driver_name: str,
     output_path: str,
     comment: Optional[str] = None,
+    V_tc_liters: float = 0.0,
+    A_tc_cm2: Optional[float] = None,
+    V_rc_liters: float = 0.0,
+    L_rc_cm: Optional[float] = None,
     radiation_angle: float = 6.283185307179586,  # 2π
 ) -> None:
-    """Export a multi-segment horn to Hornresp format.
+    """Export a multi-segment horn to Hornresp format with chambers.
 
     Generates a .txt file in Hornresp native format for a multi-segment
-    horn-loaded system with up to 4 segments (Hornresp limit).
+    horn-loaded system with up to 4 segments (Hornresp limit), plus
+    optional throat and rear chambers.
 
     Literature:
         - Hornresp User Manual - Multi-segment horn parameter format
         - Hornresp supports up to 4 conic/exponential segments (S1-S5)
+        - Olson (1947), Chapter 8 - Horn driver system parameters
         - https://www.hornresp.net/
 
     Args:
@@ -981,6 +988,10 @@ def export_multisegment_horn_to_hornresp(
         driver_name: Name/identifier for the system
         output_path: Path to output .txt file
         comment: Optional comment/description
+        V_tc_liters: Throat chamber volume in liters (default: 0 = no chamber)
+        A_tc_cm2: Throat chamber area in cm² (defaults to horn throat area)
+        V_rc_liters: Rear chamber volume in liters (default: 0 = no chamber)
+        L_rc_cm: Rear chamber depth in cm (optional, auto-calculated if None)
         radiation_angle: Solid angle of radiation (steradians)
             - 2π: half-space (infinite baffle) [default]
             - 4π: full-space (free field)
@@ -995,7 +1006,13 @@ def export_multisegment_horn_to_hornresp(
         >>> segment1 = HornSegment(throat_area=0.001, mouth_area=0.01, length=0.3)
         >>> segment2 = HornSegment(throat_area=0.01, mouth_area=0.1, length=0.6)
         >>> horn = MultiSegmentHorn(segments=[segment1, segment2])
+        >>> # Export without chambers
         >>> export_multisegment_horn_to_hornresp(driver, horn, "test_horn", "test.txt")
+        >>> # Export with throat chamber
+        >>> export_multisegment_horn_to_hornresp(
+        ...     driver, horn, "test_horn", "test.txt",
+        ...     V_tc_liters=0.05, A_tc_cm2=5.0
+        ... )
     """
 
     # Convert driver to Hornresp format
@@ -1050,52 +1067,125 @@ def export_multisegment_horn_to_hornresp(
         s2 = area_to_cm2(segments[0].mouth_area)
         l12 = length_to_cm(segments[0].length)
         # Convert dimensionless flare constant m (m^-1) to Hornresp F12 (Hz)
-        # F(Hz) = c * m / (2π)
-        f12 = (c * segments[0].flare_constant) / (2.0 * math.pi)
+        # CRITICAL: Hornresp uses F = c * m / (4π), not 2π!
+        # This is different from Olson's cutoff frequency formula
+        f12 = (c * segments[0].flare_constant) / (4.0 * math.pi)
 
     if num_segments >= 2:
         s3 = area_to_cm2(segments[1].mouth_area)
         l23 = length_to_cm(segments[1].length)
         # Convert dimensionless flare constant m (m^-1) to Hornresp F23 (Hz)
-        f23 = (c * segments[1].flare_constant) / (2.0 * math.pi)
+        f23 = (c * segments[1].flare_constant) / (4.0 * math.pi)
 
     if num_segments >= 3:
         s4 = area_to_cm2(segments[2].mouth_area)
         l34 = length_to_cm(segments[2].length)
         # Convert dimensionless flare constant m (m^-1) to Hornresp F34 (Hz)
-        f34 = (c * segments[2].flare_constant) / (2.0 * math.pi)
+        f34 = (c * segments[2].flare_constant) / (4.0 * math.pi)
 
     if num_segments >= 4:
         s5 = area_to_cm2(segments[3].mouth_area)
         l45 = length_to_cm(segments[3].length)
         # Convert dimensionless flare constant m (m^-1) to Hornresp F45 (Hz)
-        f45 = (c * segments[3].flare_constant) / (2.0 * math.pi)
+        f45 = (c * segments[3].flare_constant) / (4.0 * math.pi)
 
     # Generate file content
     comment_text = comment or f"{driver_name} multi-segment horn from viberesp"
     id_hash = abs(hash(driver_name)) % 100000
     id_value = f"{id_hash / 100:.2f}"
 
-    # Hornresp format uses L12, L23, L34, L45 for segment lengths
-    # The format is: S1, S2, L12, F12 for each segment
+    # CRITICAL: Multi-segment horns use 'Exp' parameter for LENGTH in cm for active segments!
+    # Inactive segments (zero area) use L34, L45 format instead.
+    # Format: S1, S2, Exp, F12 | S2, S3, Exp, F23 | S3=0, S4=0, L34, F34 | S4=0, S5=0, L45, F45
+    # Note: 'Exp' is reused by Hornresp - for single-seg it's flare constant,
+    #       for multi-seg it's the segment LENGTH in cm!
+    # CRITICAL: For inactive segment sections, S3/S4 must be ZERO (not mouth area)
     horn_section = f"""|HORN PARAMETER VALUES:
 
 S1 = {s1:.2f}
 S2 = {s2:.2f}
-L12 = {l12:.2f}
-F12 = {f12:.4f}
+Exp = {l12:.2f}
+F12 = {f12:.2f}
 S2 = {s2:.2f}
 S3 = {s3:.2f}
-L23 = {l23:.2f}
-F23 = {f23:.4f}
-S3 = {s3:.2f}
-S4 = {s4:.2f}
+Exp = {l23:.2f}
+F23 = {f23:.2f}
+S3 = 0.00
+S4 = 0.00
 L34 = {l34:.2f}
-F34 = {f34:.4f}
-S4 = {s4:.2f}
-S5 = {s5:.2f}
+F34 = {f34:.2f}
+S4 = 0.00
+S5 = 0.00
 L45 = {l45:.2f}
-F45 = {f45:.4f}"""
+F45 = {f45:.2f}"""
+
+    # Calculate chamber parameters
+    # Get throat area (first segment throat)
+    s1_cm2 = area_to_cm2(segments[0].throat_area)
+
+    # Set throat chamber area (default to horn throat area)
+    if A_tc_cm2 is None:
+        atc_cm2 = s1_cm2
+    else:
+        atc_cm2 = A_tc_cm2
+
+    # Calculate rear chamber depth if not provided
+    # Use tolerance to treat very small volumes as "no rear chamber"
+    VRC_TOLERANCE = 0.005  # 5 mL or less is treated as no rear chamber
+    has_rear_chamber = V_rc_liters > VRC_TOLERANCE
+
+    if has_rear_chamber and L_rc_cm is None:
+        # Vb is in liters, convert to cm³
+        vrc_cm3 = V_rc_liters * 1000.0
+
+        # Calculate physical constraints
+        piston_radius_cm = math.sqrt(driver.S_d / math.pi) * 100.0
+        piston_area_cm2 = driver.S_d * 10000.0
+
+        # Constraint 1: Minimum depth for magnet structure clearance
+        lrc_min = 2.0 * piston_radius_cm
+
+        # Constraint 2: Maximum depth for driver to fit through opening
+        lrc_max = vrc_cm3 / piston_area_cm2
+
+        # Check if box is physically realizable
+        if lrc_min > lrc_max + 0.1:
+            min_vrc_liters = (lrc_min * piston_area_cm2) / 1000.0
+            raise ValueError(
+                f"Rear chamber volume {V_rc_liters:.1f}L is too small for driver. "
+                f"Minimum volume to fit driver: {min_vrc_liters:.1f}L\n"
+                f"  - Piston diameter: {2*piston_radius_cm:.1f} cm\n"
+                f"  - Piston area: {piston_area_cm2:.0f} cm²\n"
+                f"  - Min depth for magnet: {lrc_min:.1f} cm\n"
+                f"  - Max depth for fit: {lrc_max:.1f} cm"
+            )
+
+        # Cube-shaped chamber
+        lrc_cube = vrc_cm3 ** (1.0/3.0)
+
+        # Use cube depth, clamped to valid range
+        lrc_value = max(lrc_min, min(lrc_cube, lrc_max))
+    else:
+        # No rear chamber or Lrc provided
+        lrc_value = L_rc_cm if L_rc_cm else 0.0
+        # If volume is below tolerance, treat it as zero
+        if not has_rear_chamber:
+            V_rc_liters = 0.0
+
+    # Validate rear chamber parameters
+    if has_rear_chamber and lrc_value <= 0:
+        raise ValueError(f"Lrc must be > 0 for rear chamber, got {lrc_value}")
+
+    # Build chamber section
+    # Hornresp expects Vtc in cm³ (not liters), Vrc in liters, Atc in cm²
+    chamber_section = f"""|CHAMBER PARAMETER VALUES:
+
+Vrc = {V_rc_liters:.2f}
+Lrc = {lrc_value:.2f}
+Fr = 0.00
+Tal = 0.00
+Vtc = {V_tc_liters * 1000:.2f}
+Atc = {atc_cm2:.2f}"""
 
     content = f"""ID = {id_value}
 
@@ -1106,7 +1196,7 @@ Comment = {comment_text}
 Ang = {ang_value} x Pi
 Eg = 2.83
 Rg = 0.00
-Cir = 0.00
+Cir = 0.42
 
 {horn_section}
 
@@ -1118,71 +1208,108 @@ Re' = 0.00
 Leb = 0.00
 Le = 0.00
 Ke = 0.00
+Rss = 0.00
 
-|ADVANCED DRIVER PARAMETER VALUES FOR MASS-INDUCTANCE MODEL:
+|ADVANCED DRIVER PARAMETER VALUES FOR FREQUENCY-DEPENDENT DAMPING MODEL:
 
-Red = 0.00
-Les = 0.00
-Kes = 0.00
-Cr = 0.00
+Rms = 0.00
+Ams = 0.00
 
-|PASSIVE RADIATOR PARAMETER VALUES:
+|PASSIVE RADIATOR PARAMETER VALUE:
 
-Mmpr = 0.00
-Cmpr = 0.00
-Rmpr = 0.00
-Sdp = 0.00
+Added Mass = 0.00
 
-|CHAMBER PARAMETER VALUES:
+{chamber_section}
 
-Vrc = 0.00
-Lrc = 0.00
-Fr = 0.00
-Tal = 0.00
-Vtc = 0.00
-Atc = 0.00
+Acoustic Path Length = 0.0
 
 |MAXIMUM SPL PARAMETER VALUES:
 
-Pn = 0.00
+Pamp = 100
+Vamp = 25
+Iamp = 4
+Pmax = 100
+Xmax = 5.0
+
+Maximum SPL Setting = 3
 
 |ABSORBENT FILLING MATERIAL PARAMETER VALUES:
 
-Qa = 0.00
+Fr1 = 0.00
+Fr2 = 0.00
+Fr3 = 0.00
+Fr4 = 0.00
+
+Tal1 = 100
+Tal2 = 100
+Tal3 = 100
+Tal4 = 100
 
 |ACTIVE BAND PASS FILTER PARAMETER VALUES:
 
-Fa1 = 0.00
-FB1 = 0.00
-Fa2 = 0.00
-FB2 = 0.00
+High Pass Frequency = 0
+High Pass Slope = 1
+Low Pass Frequency = 0
+Low Pass Slope = 1
+
+Butterworth High Pass Order = 1
+Butterworth Low Pass Order = 1
+Linkwitz-Riley High Pass Order = 2
+Linkwitz-Riley Low Pass Order = 2
+Bessel High Pass Order = 1
+Bessel Low Pass Order = 1
+
+2nd Order High Pass Q = 0.5
+2nd Order Low Pass Q = 0.5
+4th Order High Pass Q = 0.5
+4th Order Low Pass Q = 0.5
+
+Active Filter Alignment = 1
+Active Filter On / Off Switch = 1
 
 |PASSIVE FILTER PARAMETER VALUES:
 
-Leh = 0.00
-Reh = 0.00
-Ch = 0.00
-Rch = 0.00
+Series / Parallel 1 = S
+Series / Parallel 2 = S
+Series / Parallel 3 = S
+Series / Parallel 4 = S
 
 |EQUALISER FILTER PARAMETER VALUES:
 
-Fke = 0.00
-Tke = 0.00
-Fqe = 0.00
-Qke = 0.00
+Band 1 Frequency = 0
+Band 1 Q Factor = 0.01
+Band 1 Gain = 0.0
+Band 1 Type = -1
+Band 2 Frequency = 0
+Band 2 Q Factor = 0.01
+Band 2 Gain = 0.0
+Band 2 Type = -1
+Band 3 Frequency = 0
+Band 3 Q Factor = 0.01
+Band 3 Gain = 0.0
+Band 3 Type = -1
+Band 4 Frequency = 0
+Band 4 Q Factor = 0.01
+Band 4 Gain = 0.0
+Band 4 Type = -1
+Band 5 Frequency = 0
+Band 5 Q Factor = 0.01
+Band 5 Gain = 0.0
+Band 5 Type = -1
+Band 6 Frequency = 0
+Band 6 Q Factor = 0.01
+Band 6 Gain = 0.0
+Band 6 Type = -1
 
 |STATUS FLAGS:
 
-IK = 0
-IR = 0
-IL = 0
-IP = 0
-IS = 0
-IT = 0
-IV = 0
-IQ = 0
-IF = 0
-I_eq = 0
+Auto Path Flag = 0
+Lossy Inductance Model Flag = 0
+Semi-Inductance Model Flag = 0
+Damping Model Flag = 0
+Closed Mouth Flag = 0
+Continuous Flag = 1
+End Correction Flag = 1
 
 |OTHER SETTINGS:
 

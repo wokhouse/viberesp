@@ -26,14 +26,14 @@ def get_exponential_horn_parameter_space(
     """
     Get parameter space for exponential horn optimization.
 
-    Optimizes 4 parameters:
+    Optimizes 5 parameters:
     - throat_area: Horn throat area (driver coupling)
     - mouth_area: Horn mouth area (radiation)
     - length: Horn axial length
+    - V_tc: Throat chamber volume (compliance)
     - V_rc: Rear chamber volume (compliance)
 
     Fixed parameters (not optimized):
-    - V_tc: Throat chamber volume (fixed at 0 for front-loaded horns)
     - radiation_angle: 2π (half-space)
 
     Literature:
@@ -80,6 +80,9 @@ def get_exponential_horn_parameter_space(
         mouth_max = 1.0  # m² (radius ~56 cm)
         length_min = 1.5  # m (bass horns are long)
         length_max = 3.0  # m (practical limit)
+        # Throat chamber: Bass horns typically use direct coupling or small chamber
+        V_tc_min = 0.0  # No throat chamber (direct coupling preferred for bass)
+        V_tc_max = 0.00002  # 20 cm³ (small chamber, max 25 cm length for smallest throat)
         V_rc_min = 0.5 * V_as
         V_rc_max = 2.0 * V_as
 
@@ -95,6 +98,14 @@ def get_exponential_horn_parameter_space(
         mouth_max = 0.06  # m² (600 cm², radius ~13.8 cm)
         length_min = 0.3  # m (compact midrange)
         length_max = 1.0  # m (larger midrange)
+        # Throat chamber: Practical limits for compression driver phase plugs
+        # Length should be 2-8 cm for typical compression drivers
+        # Volume = length × area, so V_tc depends on throat area
+        # For throat_min (1.6 cm²): V_tc_max = 8 cm × 1.6 ≈ 12.8 cm³
+        # For throat_max (4.0 cm²): V_tc_max = 8 cm × 4.0 ≈ 32 cm³
+        # Set conservative bound: 0-15 cm³ (max 9.4 cm length for smallest throat)
+        V_tc_min = 0.0  # No throat chamber (direct coupling)
+        V_tc_max = 0.000015  # 15 cm³ (practical for compression driver phase plugs)
         V_rc_min = 0.0  # No rear chamber
         V_rc_max = 1.0 * V_as  # Optional rear chamber
 
@@ -108,6 +119,11 @@ def get_exponential_horn_parameter_space(
         mouth_max = 0.2  # m² (radius ~25 cm)
         length_min = 0.5  # m
         length_max = 1.5  # m
+        # Throat chamber: Practical limits for fullrange drivers
+        # Length 2-8 cm, so for 1-5 cm² throat: V_tc up to 40 cm³
+        # Set conservative bound for practical phase plug geometry
+        V_tc_min = 0.0
+        V_tc_max = 0.00002  # 20 cm³ (practical for fullrange)
         V_rc_min = 0.0
         V_rc_max = 1.5 * V_as
 
@@ -143,6 +159,13 @@ def get_exponential_horn_parameter_space(
             description="Horn axial length"
         ),
         ParameterRange(
+            name="V_tc",
+            min_value=V_tc_min,
+            max_value=V_tc_max,
+            units="m³",
+            description="Throat chamber volume (compliance)"
+        ),
+        ParameterRange(
             name="V_rc",
             min_value=V_rc_min,
             max_value=V_rc_max,
@@ -158,6 +181,7 @@ def get_exponential_horn_parameter_space(
             "throat_area": (0.15 * S_d, 0.25 * S_d),
             "mouth_area": (0.3, 0.7),
             "length": (2.0, 2.5),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.8 * V_as, 1.2 * V_as),
         },
         "midrange_horn": {
@@ -166,12 +190,14 @@ def get_exponential_horn_parameter_space(
             "throat_area": (0.3 * S_d, 0.4 * S_d),
             "mouth_area": (0.04, 0.055),
             "length": (0.5, 0.8),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.0, 0.2 * V_as),
         },
         "fullrange_horn": {
             "throat_area": (0.2 * S_d, 0.3 * S_d),
             "mouth_area": (0.05, 0.15),
             "length": (0.8, 1.2),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.3 * V_as, 0.8 * V_as),
         },
     }

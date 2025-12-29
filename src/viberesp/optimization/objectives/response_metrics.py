@@ -277,11 +277,12 @@ def objective_response_flatness(
                 throat_area = design_vector[0]
                 mouth_area = design_vector[1]
                 length = design_vector[2]
-                V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+                V_tc = design_vector[3] if len(design_vector) >= 4 else 0.0
+                V_rc = design_vector[4] if len(design_vector) >= 5 else 0.0
 
                 # Create horn system
                 horn = ExponentialHorn(throat_area, mouth_area, length)
-                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
                 spl = flh.spl_response(freq, voltage=voltage)
@@ -297,8 +298,9 @@ def objective_response_flatness(
                 horn = MultiSegmentHorn(segments=segments)
 
                 # Create front-loaded horn
+                V_tc = params.get('V_tc', 0.0)
                 V_rc = params['V_rc']
-                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
                 spl = flh.spl_response(freq, voltage=voltage)
@@ -453,11 +455,12 @@ def objective_response_slope(
                 throat_area = design_vector[0]
                 mouth_area = design_vector[1]
                 length = design_vector[2]
-                V_rc = design_vector[3] if len(design_vector) >= 4 else 0.0
+                V_tc = design_vector[3] if len(design_vector) >= 4 else 0.0
+                V_rc = design_vector[4] if len(design_vector) >= 5 else 0.0
 
                 # Create horn system
                 horn = ExponentialHorn(throat_area, mouth_area, length)
-                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
                 spl = flh.spl_response(freq, voltage=voltage)
@@ -473,8 +476,9 @@ def objective_response_slope(
                 horn = MultiSegmentHorn(segments=segments)
 
                 # Create front-loaded horn
+                V_tc = params.get('V_tc', 0.0)
                 V_rc = params['V_rc']
-                flh = FrontLoadedHorn(driver, horn, V_rc=V_rc)
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
                 spl = flh.spl_response(freq, voltage=voltage)
