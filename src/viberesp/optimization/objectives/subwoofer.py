@@ -25,8 +25,10 @@ from typing import Tuple, Dict, List, Optional
 from dataclasses import dataclass
 
 from viberesp.driver.parameters import ThieleSmallParameters
+from viberesp.enclosure.ported_box_vector_sum import (
+    calculate_spl_ported_vector_sum_array,
+)
 from viberesp.enclosure.ported_box import (
-    calculate_spl_ported_transfer_function,
     calculate_optimal_port_dimensions,
     calculate_ported_box_system_parameters,
 )
@@ -150,30 +152,25 @@ def calculate_subwoofer_objectives(
         # Log-spaced frequencies from 10 Hz to 200 Hz
         freq_points = np.logspace(np.log10(10), np.log10(200), 200)
 
-    # Calculate SPL response
-    frequencies = []
-    spl_values = []
-
-    for freq in freq_points:
-        # Use improved model with HF roll-off
-        spl = calculate_spl_ported_transfer_function(
-            frequency=freq,
-            driver=driver,
-            Vb=Vb,
-            Fb=Fb,
-            voltage=voltage,
-            measurement_distance=measurement_distance,
-            Qp=7.0,
-            QL=7.0,
-            QA=100.0,
-            include_hf_rolloff=True,  # Critical for accurate subwoofer response
-        )
-
-        frequencies.append(freq)
-        spl_values.append(spl)
-
-    frequencies = np.array(frequencies)
-    spl_values = np.array(spl_values)
+    # Calculate SPL response using electro-mechanical coupling model
+    # This replaces the legacy transfer_function with the recommended vector_sum_array
+    # The new model naturally includes HF rolloff via voice coil inductance (Le)
+    # and provides better accuracy through proper electro-mechanical coupling.
+    #
+    # Performance improvement: Process entire frequency array at once instead of loop.
+    frequencies = freq_points
+    spl_values = calculate_spl_ported_vector_sum_array(
+        frequencies=frequencies,
+        driver=driver,
+        Vb=Vb,
+        Fb=Fb,
+        port_area=port_area,
+        port_length=port_length,
+        voltage=voltage,
+        measurement_distance=measurement_distance,
+        QL=7.0,  # Box leakage losses (Qp and QA absorbed into QL)
+        end_correction_factor=0.732,  # Port end correction (replaces Qp)
+    )
 
     # Helper function to calculate flatness (standard deviation)
     def calc_flatness(f_min: float, f_max: float) -> float:
