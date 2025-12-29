@@ -31,18 +31,18 @@ def get_multisegment_horn_parameter_space(
     """
     Get parameter space for multi-segment horn optimization.
 
-    For a 2-segment horn, optimizes 6 parameters:
+    For a 2-segment horn, optimizes 7 parameters:
     - throat_area: Horn throat area (driver coupling)
     - middle_area: Area at segment junction (segment 1 mouth = segment 2 throat)
     - mouth_area: Horn mouth area (radiation)
     - length1: Length of segment 1 (throat → middle)
     - length2: Length of segment 2 (middle → mouth)
+    - V_tc: Throat chamber volume (compliance)
     - V_rc: Rear chamber volume (compliance)
 
-    For a 3-segment horn, optimizes 8 parameters (add area2, length3).
+    For a 3-segment horn, optimizes 9 parameters (add area2, length3).
 
     Fixed parameters (not optimized):
-    - V_tc: Throat chamber volume (fixed at 0 for front-loaded horns)
     - radiation_angle: 2π (half-space)
 
     The flare constants m1, m2 are calculated from geometry:
@@ -101,6 +101,9 @@ def get_multisegment_horn_parameter_space(
         mouth_max = 1.5  # m²
         length_min = 1.5  # m
         length_max = 3.0  # m
+        # Throat chamber: Bass horns typically use direct coupling or small chamber
+        V_tc_min = 0.0  # No throat chamber (direct coupling preferred for bass)
+        V_tc_max = 0.00002  # 20 cm³ (small chamber, max 25 cm length for smallest throat)
         V_rc_min = 0.5 * V_as
         V_rc_max = 2.0 * V_as
 
@@ -118,6 +121,11 @@ def get_multisegment_horn_parameter_space(
         mouth_max = 0.06  # m² (600 cm², radius ~13.8 cm)
         length_min = 0.15  # m (each segment minimum 15 cm)
         length_max = 0.6  # m (each segment maximum 60 cm, total up to 1.2 m)
+        # Throat chamber: Practical limits for compression driver phase plugs
+        # Length should be 2-8 cm for typical compression drivers
+        # Set conservative bound: 0-15 cm³ (max 9.4 cm length for smallest throat)
+        V_tc_min = 0.0  # No throat chamber (direct coupling)
+        V_tc_max = 0.000015  # 15 cm³ (practical for compression driver phase plugs)
         V_rc_min = 0.0  # No rear chamber
         V_rc_max = 1.0 * V_as  # Optional rear chamber
 
@@ -132,6 +140,9 @@ def get_multisegment_horn_parameter_space(
         mouth_max = 0.2  # m² (radius ~25 cm)
         length_min = 0.2  # m
         length_max = 0.8  # m
+        # Throat chamber: Practical limits for fullrange drivers
+        V_tc_min = 0.0
+        V_tc_max = 0.00002  # 20 cm³ (practical for fullrange)
         V_rc_min = 0.0
         V_rc_max = 1.5 * V_as
 
@@ -179,6 +190,13 @@ def get_multisegment_horn_parameter_space(
             description="Segment 2 length (middle → mouth)"
         ),
         ParameterRange(
+            name="V_tc",
+            min_value=V_tc_min,
+            max_value=V_tc_max,
+            units="m³",
+            description="Throat chamber volume (compliance)"
+        ),
+        ParameterRange(
             name="V_rc",
             min_value=V_rc_min,
             max_value=V_rc_max,
@@ -213,6 +231,7 @@ def get_multisegment_horn_parameter_space(
             "mouth_area": (0.5, 1.0),
             "length1": (1.0, 1.5),
             "length2": (1.0, 1.5),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.8 * V_as, 1.2 * V_as),
         },
         "midrange_horn": {
@@ -222,6 +241,7 @@ def get_multisegment_horn_parameter_space(
             "mouth_area": (0.045, 0.055),
             "length1": (0.18, 0.25),  # Short throat segment
             "length2": (0.35, 0.50),  # Longer mouth segment
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.0, 0.2 * V_as),
         },
         "fullrange_horn": {
@@ -230,6 +250,7 @@ def get_multisegment_horn_parameter_space(
             "mouth_area": (0.08, 0.15),
             "length1": (0.3, 0.5),
             "length2": (0.4, 0.7),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.3 * V_as, 0.8 * V_as),
         },
     }
@@ -244,6 +265,7 @@ def get_multisegment_horn_parameter_space(
             "length1": (0.15, 0.25),
             "length2": (0.20, 0.30),
             "length3": (0.25, 0.40),
+            "V_tc": (0.0, 0.2 * V_tc_max),
             "V_rc": (0.0, 0.2 * V_as),
         }
 
@@ -277,7 +299,7 @@ def decode_multisegment_design(
 
     Args:
         design: Optimization array [throat_area, middle_area, mouth_area,
-                length1, length2, V_rc] for 2-segment, or with additional
+                length1, length2, V_tc, V_rc] for 2-segment, or with additional
                 [area2, length3] for 3-segment
         driver: ThieleSmallParameters for the driver
         num_segments: Number of segments (2 or 3)
@@ -296,7 +318,7 @@ def decode_multisegment_design(
         [19.27, 3.57]
     """
     if num_segments == 2:
-        throat_area, middle_area, mouth_area, length1, length2, V_rc = design
+        throat_area, middle_area, mouth_area, length1, length2, V_tc, V_rc = design
 
         # Build segment list
         segments = [
@@ -311,7 +333,7 @@ def decode_multisegment_design(
 
     elif num_segments == 3:
         (throat_area, middle_area, area2, mouth_area,
-         length1, length2, length3, V_rc) = design
+         length1, length2, length3, V_tc, V_rc) = design
 
         # Build segment list
         segments = [
@@ -333,6 +355,7 @@ def decode_multisegment_design(
         'throat_area': throat_area,
         'mouth_area': mouth_area,
         'segments': segments,
+        'V_tc': V_tc,
         'V_rc': V_rc,
         'flare_constants': flare_constants,
         'total_length': sum(seg[2] for seg in segments),

@@ -325,4 +325,214 @@ print(f"Max efficiency: {np.max(efficiency['efficiency']*100):.1f}%")
 print("Exported to exports/horn_validation.txt")
 ```
 
+## Multi-Segment Horn Export
+
+### CRITICAL Format Differences
+
+Multi-segment horns use **different parameter names** than single-segment horns. Hornresp reuses parameter names in different contexts:
+
+| Parameter | Single-Segment | Multi-Segment Active | Multi-Segment Inactive |
+|-----------|---------------|---------------------|----------------------|
+| Length | `L12` | `Exp` | `L34`, `L45` |
+| Flare constant | `Exp = 50.00` | N/A | N/A |
+| Segment areas | S1, S2 | S1, S2, S3, S4, S5 | S3=0, S4=0 |
+
+**Key Insight**: `Exp` parameter has different meanings:
+- **Single-segment**: `Exp` = flare constant (typically 50.00)
+- **Multi-segment active**: `Exp` = segment LENGTH in cm
+- **Multi-segment inactive**: Use `L34`, `L45` instead of `Exp`
+
+### Multi-Segment Format Example
+
+**For a 2-segment horn**:
+```
+|HORN PARAMETER VALUES:
+
+S1 = 1.84
+S2 = 241.20
+Exp = 33.74          ← Active segment 1: LENGTH in cm
+F12 = 394.66         ← 2 decimal places
+S2 = 241.20
+S3 = 405.13
+Exp = 59.85          ← Active segment 2: LENGTH in cm
+F23 = 23.65          ← 2 decimal places
+S3 = 0.00            ← Inactive: ZERO (not repeated mouth area!)
+S4 = 0.00
+L34 = 0.00           ← Inactive: Use L34 (not Exp)
+F34 = 0.00
+S4 = 0.00
+S5 = 0.00
+L45 = 0.00           ← Inactive: Use L45 (not Exp)
+F45 = 0.00
+```
+
+### Export Function for Multi-Segment
+
+```python
+from viberesp.simulation import MultiSegmentHorn, HornSegment
+from viberesp.hornresp import export_multisegment_horn_to_hornresp
+
+# Create multi-segment horn
+segments = [
+    HornSegment(throat_area=0.000184, mouth_area=0.02412, length=0.337, m=7.2),
+    HornSegment(throat_area=0.02412, mouth_area=0.04051, length=0.598, m=1.7),
+]
+horn = MultiSegmentHorn(segments)
+
+# Export to Hornresp
+export_multisegment_horn_to_hornresp(
+    driver=driver,
+    horn=horn,
+    driver_name="TC2_2Segment",
+    output_path="tc2_2seg.txt",
+    V_tc_liters=0.014,    # Throat chamber
+    A_tc_cm2=None,        # Auto = throat area
+    V_rc_liters=0.004,    # Rear chamber
+    L_rc_cm=None          # Auto-calculate
+)
+```
+
+### Critical Multi-Segment Rules
+
+#### 1. Active Segments: Use `Exp` for Length
+```
+S1 = <throat>
+S2 = <middle>
+Exp = <length_cm>    ← Use "Exp", NOT "L12"
+F12 = <frequency>
+```
+
+#### 2. Inactive Segments: Zero Areas + `L34`/`L45`
+```
+S3 = 0.00            ← CRITICAL: Must be 0.00
+S4 = 0.00
+L34 = 0.00           ← Use "L34", NOT "Exp"
+F34 = 0.00
+```
+
+#### 3. F12/F23 Formula: Use 4π NOT 2π
+
+```python
+# WRONG (Olson's theoretical cutoff):
+f12 = (c * flare_constant) / (2 * math.pi)
+
+# CORRECT (Hornresp's F parameter):
+f12 = (c * flare_constant) / (4 * math.pi)
+```
+
+**Why the difference?** Hornresp's F12/F23 parameters are half the theoretical cutoff frequency. This has been verified against actual Hornresp output.
+
+#### 4. Precision: 2 Decimals for F12/F23
+```python
+# WRONG:
+F12 = {f12:.4f}  # Outputs 394.6578
+
+# CORRECT:
+F12 = {f12:.2f}  # Outputs 394.66
+```
+
+#### 5. Vtc Unit: cm³ NOT liters
+```python
+# WRONG:
+Vtc = {V_tc_liters:.2f}  # Exports 0.01 (interpreted as 0.01 cm³)
+
+# CORRECT:
+Vtc = {V_tc_liters * 1000:.2f}  # Exports 12.89 (12.89 cm³)
+```
+
+### Common Multi-Segment Pitfalls
+
+#### ❌ Error: Repeating Mouth Area for Inactive Segments
+```
+S3 = 405.13          ← Wrong! This is mouth area from segment 2
+S4 = 0.00
+L34 = 0.00
+```
+**Result**: Hornresp gives "S4 = 0.00" import error
+
+#### ✓ Correct: Zero for Inactive Segments
+```
+S3 = 0.00            ← Correct!
+S4 = 0.00
+L34 = 0.00
+```
+
+#### ❌ Error: Using L12/L23 for Multi-Segment
+```
+S1 = 1.84
+S2 = 241.20
+L12 = 33.74          ← Wrong! L12 is for single-segment only
+F12 = 394.66
+```
+**Result**: Hornresp may not recognize the format
+
+#### ✓ Correct: Using Exp for Multi-Segment
+```
+S1 = 1.84
+S2 = 241.20
+Exp = 33.74          ← Correct! Exp = length in cm
+F12 = 394.66
+```
+
+#### ❌ Error: Using Exp for Inactive Segments
+```
+S3 = 0.00
+S4 = 0.00
+Exp = 0.00           ← Wrong! Use L34 for inactive
+F34 = 0.00
+```
+
+#### ✓ Correct: Using L34/L45 for Inactive
+```
+S3 = 0.00
+S4 = 0.00
+L34 = 0.00           ← Correct!
+F34 = 0.00
+```
+
+### Validation Checklist for Multi-Segment
+
+Before exporting a multi-segment horn, verify:
+
+- [ ] Active segments (1-N) use `Exp` for length parameter
+- [ ] Inactive segments (N+1 to 4) use `L34`, `L45` for length
+- [ ] Inactive segments have `S3=0.00`, `S4=0.00` (not repeated areas)
+- [ ] F12/F23/F34/F45 use formula: `F = c*m/(4π)` (not 2π)
+- [ ] F12/F23/F34/F45 have 2 decimal places (not 4)
+- [ ] Vtc is in cm³: `V_tc_liters * 1000`
+- [ ] Vrc is in liters with 2 decimal places
+- [ ] All areas in cm² (×10000 from m²)
+- [ ] All lengths in cm (×100 from m)
+
+### Reference Files
+
+- **Correct format**: `imports/tc2_multiseg.txt`
+- **Hornresp re-export**: `imports/tc2_optimized_multisegment_horn.txt`
+- **Format analysis**: `docs/validation/multisegment_hornresp_format_discrepancies.md`
+- **Comparison**: `docs/validation/multisegment_hornresp_comparison.md`
+
+### Implementation Reference
+
+**File**: `src/viberesp/hornresp/export.py`
+
+**Key sections**:
+- Lines 961-1250: `export_multisegment_horn_to_hornresp()`
+- Lines 1069-1090: Flare constant conversion (uses 4π)
+- Lines 1102-1119: Horn section formatting
+
+**Critical code patterns**:
+
+```python
+# Line 1072: Correct F12 formula (4π not 2π)
+f12 = (c * segments[0].flare_constant) / (4.0 * math.pi)
+
+# Lines 1112-1114: Inactive segment format
+S3 = 0.00      ← Hardcoded zero
+S4 = 0.00
+L34 = {l34:.2f} ← Use L34, not Exp
+
+# Line 763: Vtc conversion (cm³ not liters)
+Vtc = {V_tc_liters * 1000:.2f}
+```
+
 This completes the documentation for Hornresp export functionality.
