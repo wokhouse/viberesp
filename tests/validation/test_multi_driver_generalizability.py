@@ -11,7 +11,8 @@ sys.path.insert(0, 'src')
 
 import numpy as np
 from viberesp.driver import load_driver
-from viberesp.enclosure.ported_box import calculate_spl_ported_with_end_correction
+from viberesp.enclosure.ported_box_vector_sum import calculate_spl_ported_vector_sum_array
+from viberesp.simulation.constants import SPEED_OF_SOUND
 
 
 def parse_hornresp_sim(filepath):
@@ -58,11 +59,18 @@ def test_driver(driver_name, Vb, port_area_cm2, port_length_cm, hornresp_sim_fil
     hr_spl_norm = normalize_to_passband(hr_freq, hr_spl)
     hr_peak_freq, hr_peak_spl = find_peak(hr_freq, hr_spl_norm)
 
-    # Calculate viberesp
+    # Calculate Fb from port dimensions
+    port_area_m2 = port_area_cm2 * 1e-4
+    port_length_m = port_length_cm / 100
+    port_radius = np.sqrt(port_area_m2 / np.pi)
+    L_eff = port_length_m + (0.732 * port_radius)
+    Fb = (SPEED_OF_SOUND / (2 * np.pi)) * np.sqrt(port_area_m2 / ((Vb / 1000) * L_eff))
+
+    # Calculate viberesp (convert units: L→m³, cm²→m², cm→m)
     freqs = np.linspace(20, 200, 1000)
-    vb_spl = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        end_correction_factor=end_correction
+    vb_spl = calculate_spl_ported_vector_sum_array(
+        freqs, driver, Vb / 1000, Fb, port_area_m2, port_length_m,
+        end_correction_factor=end_correction, QL=7.0
     )
 
     vb_peak_freq, vb_peak_spl = find_peak(freqs, vb_spl)

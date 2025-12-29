@@ -17,7 +17,7 @@ sys.path.insert(0, 'src')
 import numpy as np
 import pytest
 from viberesp.driver import load_driver
-from viberesp.enclosure.ported_box import calculate_spl_ported_with_end_correction
+from viberesp.enclosure.ported_box_vector_sum import calculate_spl_ported_vector_sum_array
 
 
 def test_ported_box_spl_with_end_correction():
@@ -47,12 +47,18 @@ def test_ported_box_spl_with_end_correction():
     port_area_cm2 = 41.34  # cm²
     port_length_cm = 3.80  # cm
     end_correction_factor = 1.2  # Tuned to match Hornresp's 52.5 Hz peak
+    # Calculate Fb from port dimensions
+    from viberesp.simulation.constants import SPEED_OF_SOUND
+    port_radius = np.sqrt(port_area_cm2 * 1e-4 / np.pi)
+    port_length_m = port_length_cm / 100
+    L_eff = port_length_m + (0.732 * port_radius)  # Using default end_correction_factor
+    Fb = (SPEED_OF_SOUND / (2 * np.pi)) * np.sqrt((port_area_cm2 * 1e-4) / ((Vb / 1000) * L_eff))
 
-    # Calculate SPL response
+    # Calculate SPL response (convert units: L→m³, cm²→m², cm→m)
     freqs = np.linspace(20, 150, 1000)
-    spl = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        end_correction_factor=end_correction_factor
+    spl = calculate_spl_ported_vector_sum_array(
+        freqs, driver, Vb / 1000, Fb, port_area_cm2 * 1e-4, port_length_m,
+        end_correction_factor=end_correction_factor, QL=7.0
     )
 
     # Find peak
@@ -123,18 +129,26 @@ def test_ported_box_no_end_correction():
     Vb = 49.3
     port_area_cm2 = 41.34
     port_length_cm = 3.80
+    port_area_m2 = port_area_cm2 * 1e-4
+    port_length_m = port_length_cm / 100
+
+    # Calculate Fb from port dimensions
+    from viberesp.simulation.constants import SPEED_OF_SOUND
+    port_radius = np.sqrt(port_area_m2 / np.pi)
+    L_eff = port_length_m + (0.732 * port_radius)
+    Fb = (SPEED_OF_SOUND / (2 * np.pi)) * np.sqrt(port_area_m2 / ((Vb / 1000) * L_eff))
 
     # No end correction
     freqs = np.linspace(20, 150, 1000)
-    spl_no_correction = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        end_correction_factor=0.0
+    spl_no_correction = calculate_spl_ported_vector_sum_array(
+        freqs, driver, Vb / 1000, Fb, port_area_m2, port_length_m,
+        end_correction_factor=0.0, QL=7.0
     )
 
     # With end correction (1.2×r to match Hornresp)
-    spl_with_correction = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        end_correction_factor=1.2
+    spl_with_correction = calculate_spl_ported_vector_sum_array(
+        freqs, driver, Vb / 1000, Fb, port_area_m2, port_length_m,
+        end_correction_factor=1.2, QL=7.0
     )
 
     peak_no_correction = freqs[np.argmax(spl_no_correction)]
@@ -175,20 +189,29 @@ def test_ported_box_normalization():
     Vb = 49.3
     port_area_cm2 = 41.34
     port_length_cm = 3.80
+    port_area_m2 = port_area_cm2 * 1e-4
+    port_length_m = port_length_cm / 100
+
+    # Calculate Fb from port dimensions
+    from viberesp.simulation.constants import SPEED_OF_SOUND
+    port_radius = np.sqrt(port_area_m2 / np.pi)
+    L_eff = port_length_m + (0.732 * port_radius)
+    Fb = (SPEED_OF_SOUND / (2 * np.pi)) * np.sqrt(port_area_m2 / ((Vb / 1000) * L_eff))
 
     freqs = np.linspace(20, 150, 1000)
 
-    # Normalized response (includes -7.65 dB calibration)
-    spl_normalized = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        normalize=True
+    # Calculate SPL response
+    spl = calculate_spl_ported_vector_sum_array(
+        freqs, driver, Vb / 1000, Fb, port_area_m2, port_length_m, QL=7.0
     )
 
-    # Non-normalized response
-    spl_absolute = calculate_spl_ported_with_end_correction(
-        freqs, driver, Vb, port_area_cm2, port_length_cm,
-        normalize=False
-    )
+    # Normalize to passband (80-100 Hz)
+    mask_passband = (freqs >= 80) & (freqs <= 100)
+    mean_passband = np.mean(spl[mask_passband])
+    spl_normalized = spl - mean_passband
+
+    # Non-normalized response (absolute values)
+    spl_absolute = spl
 
     # Check that normalized passband has consistent reference
     # After calibration, the passband is shifted by -7.65 dB from 0
@@ -224,23 +247,32 @@ def test_ported_box_input_validation():
 
     port_area_cm2 = 41.34
     port_length_cm = 3.80
+    port_area_m2 = port_area_cm2 * 1e-4
+    port_length_m = port_length_cm / 100
+    Vb_m3 = 49.3 / 1000
+
+    # Calculate Fb from port dimensions
+    from viberesp.simulation.constants import SPEED_OF_SOUND
+    port_radius = np.sqrt(port_area_m2 / np.pi)
+    L_eff = port_length_m + (0.732 * port_radius)
+    Fb = (SPEED_OF_SOUND / (2 * np.pi)) * np.sqrt(port_area_m2 / (Vb_m3 * L_eff))
 
     # Invalid Vb
-    with pytest.raises(ValueError, match="Box volume Vb must be > 0"):
-        calculate_spl_ported_with_end_correction(
-            freqs, driver, Vb=0, port_area_cm2=port_area_cm2, port_length_cm=port_length_cm
+    with pytest.raises(ValueError, match="Box volume must be > 0"):
+        calculate_spl_ported_vector_sum_array(
+            freqs, driver, Vb=0, Fb=Fb, port_area=port_area_m2, port_length=port_length_m, QL=7.0
         )
 
     # Invalid port area
     with pytest.raises(ValueError, match="Port area must be > 0"):
-        calculate_spl_ported_with_end_correction(
-            freqs, driver, Vb=49.3, port_area_cm2=0, port_length_cm=port_length_cm
+        calculate_spl_ported_vector_sum_array(
+            freqs, driver, Vb=Vb_m3, Fb=Fb, port_area=0, port_length=port_length_m, QL=7.0
         )
 
     # Invalid port length
     with pytest.raises(ValueError, match="Port length must be > 0"):
-        calculate_spl_ported_with_end_correction(
-            freqs, driver, Vb=49.3, port_area_cm2=port_area_cm2, port_length_cm=0
+        calculate_spl_ported_vector_sum_array(
+            freqs, driver, Vb=Vb_m3, Fb=Fb, port_area=port_area_m2, port_length=0, QL=7.0
         )
 
     print("\n✓ Input validation test passed\n")

@@ -53,6 +53,12 @@ def calculate_spl_ported_vector_sum(
         - Small (1973), Eq. 20 - Port volume velocity calculation
         - Research brief: tasks/ported_box_transfer_function_research_brief.md
 
+    Validation:
+        Compare with Hornresp's ported box SPL calculation for identical parameters.
+        Expected agreement: <1% deviation in passband (80-200 Hz), <2% deviation
+        near port tuning frequency (±½ octave around Fb). Peak SPL should match
+        within ±0.5 dB. Test case: BC_8NDL51 driver with Vb=Vas, Fb=Fs, QL=7.
+
     Key Fix:
         Up = -Ud * (Z_box / Z_box_branch)
 
@@ -118,12 +124,13 @@ def calculate_spl_ported_vector_sum(
     omega = 2 * math.pi * frequency
     s = 1j * omega
 
-    # CRITICAL FIX #2: Derive Mms from Fs and Cms for consistency
-    # This ensures the impedance minimum occurs exactly at Fs
-    # Small (1973): Mms = 1/(ωs² × Cms)
+    # CRITICAL FIX #2: Use driver's Mms directly (includes radiation mass loading)
+    # Small (1973): Mms = M_md + 2*M_rad (total moving mass)
+    # Note: driver.M_ms already includes radiation mass calculated in
+    # ThieleSmallParameters.__post_init__() using calculate_resonance_with_radiation_mass()
+    Mms = driver.M_ms  # kg (Total moving mass including air load)
     w0 = 2 * math.pi * driver.F_s
     Cms = driver.V_as / (rho * c**2 * Sd**2)  # m/N
-    Mms = 1.0 / (w0**2 * Cms)  # kg (Total moving mass including air load)
 
     # Calculate MECHANICAL damping only (not electromagnetic)
     # Use Qms if available, otherwise estimate from Qts
@@ -257,6 +264,20 @@ def calculate_spl_ported_vector_sum_array(
     """
     Vectorized version of calculate_spl_ported_vector_sum for frequency arrays.
 
+    This function implements the same acoustic model as the single-frequency
+    version but processes multiple frequencies efficiently using NumPy arrays.
+
+    Literature:
+        - Beranek (1954), Eq. 8.16 - Sign convention for rear radiation
+        - Small (1973), Eq. 20 - Port volume velocity calculation
+        - Research brief: tasks/ported_box_transfer_function_research_brief.md
+
+    Validation:
+        Compare with Hornresp's ported box SPL calculation for identical parameters.
+        Expected agreement: <1% deviation in passband (80-200 Hz), <2% deviation
+        near port tuning frequency (±½ octave around Fb). Peak SPL should match
+        within ±0.5 dB. Test case: BC_8NDL51 driver with Vb=Vas, Fb=Fs, QL=7.
+
     Args:
         frequencies: Array of frequencies (Hz)
         driver: ThieleSmallParameters instance
@@ -298,10 +319,13 @@ def calculate_spl_ported_vector_sum_array(
     omega = 2 * np.pi * frequencies
     s = 1j * omega
 
-    # Derive Mms from Fs and Cms for consistency
+    # Use driver's Mms directly (includes radiation mass loading)
+    # Small (1973): Mms = M_md + 2*M_rad (total moving mass)
+    # Note: driver.M_ms already includes radiation mass calculated in
+    # ThieleSmallParameters.__post_init__() using calculate_resonance_with_radiation_mass()
+    Mms = driver.M_ms  # kg (Total moving mass including air load)
     w0 = 2 * np.pi * driver.F_s
-    Cms = driver.V_as / (rho * c**2 * Sd**2)
-    Mms = 1.0 / (w0**2 * Cms)
+    Cms = driver.V_as / (rho * c**2 * Sd**2)  # m/N
 
     # Calculate MECHANICAL damping only (not electromagnetic)
     # Use Qms if available, otherwise estimate from Qts
@@ -361,8 +385,8 @@ def calculate_spl_ported_vector_sum_array(
     # Pressure response
     P_response = np.abs(s * Q_total)
 
-    # Convert to SPL
+    # Convert to SPL (handle zero/negative pressure safely)
     p_ref = 20e-6
-    spl = 20 * np.log10(P_response / p_ref, where=P_response > 0)
+    spl = np.where(P_response > 0, 20 * np.log10(P_response / p_ref), -np.inf)
 
     return spl

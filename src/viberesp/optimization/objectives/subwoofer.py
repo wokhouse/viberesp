@@ -84,6 +84,13 @@ def calculate_subwoofer_objectives(
         - Small (1973) - Vented-box system Q and response shape
         - literature/thiele_small/thiele_1971_vented_boxes.md
 
+    Validation:
+        Verify F3 calculation matches Thiele's alignment tables for B4, QB3, BB4.
+        Confirm flatness calculations produce correct rankings when comparing
+        known good designs (e.g., B4 should have minimal passband ripple).
+        Test case: BC_15DS115 with Vb=Vas, Fb=Fs should produce F3 ≈ 28 Hz
+        with bass_flatness < 3.0 dB.
+
     Args:
         Vb: Box volume (m³)
         Fb: Port tuning frequency (Hz)
@@ -232,6 +239,12 @@ def objective_subwoofer_flatness(
         - Multi-objective optimization theory (weighted sum method)
         - Thiele (1971) - Alignment trade-offs
 
+    Validation:
+        Verify weighted sum correctly prioritizes bass flatness as the primary
+        objective (40% weight). Test that designs with better bass flatness
+        score lower even if other objectives are worse. Confirm normalization
+        keeps all objectives in similar ranges (0-1) to prevent domination.
+
     Args:
         design_vector: [Vb, Fb] where Vb in m³, Fb in Hz
         driver: ThieleSmallParameters instance
@@ -315,6 +328,12 @@ def objective_b4_alignment_error(
         - Thiele (1971), Table 1 - Alignment constants
         - Small (1973) - Butterworth response conditions
         - literature/thiele_small/thiele_1971_vented_boxes.md
+
+    Validation:
+        Perfect B4 alignment (Vb=Vas, Fb=Fs) should return error=0.0.
+        Designs far from B4 should return proportionally larger errors.
+        Test case: BC_15DS115 with Vb=Vas*1.5, Fb=Fs*1.2 should return
+        error > 0.5 (significant deviation from ideal).
 
     Args:
         design_vector: [Vb, Fb] where Vb in m³, Fb in Hz
