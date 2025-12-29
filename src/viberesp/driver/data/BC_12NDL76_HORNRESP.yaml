@@ -1,0 +1,54 @@
+name: "BC_12NDL76_HORNRESP"
+manufacturer: "B&C Speakers (Hornresp Parameters)"
+model: "12NDL76-4 (Hornresp Measured)"
+description: "12 inch Mid-Woofer driver - Parameters from Hornresp simulation file"
+
+# These parameters match imports/12ndl76_params.txt exactly
+# Used for validating electro-mechanical coupling against Hornresp
+
+datasheet:
+  fs: 50  # Hz
+  re: 6.1  # Ohms (Hornresp value)
+  qts: 0.21
+  qes: 0.22
+  qms: 4.19
+  vas: 71.9  # L (Hornresp value)
+  sd: 522  # cm²
+  bl: 13.9  # T·m (Hornresp value)
+  cms: 0.00019  # m/N
+  rms: 1.52  # N·s/m (Hornresp value)
+  le: 1.4  # mH (Hornresp value)
+  xmax: 7  # mm
+
+# Physical parameters (from Hornresp 12ndl76_params.txt)
+parameters:
+  M_md: 0.0678  # kg - driver mass (Hornresp value: 67.80g)
+  C_ms: 0.00019  # m/N - compliance
+  R_ms: 1.52  # N·s/m - mechanical resistance (Hornresp value)
+  R_e: 6.1  # Ohms - voice coil DC resistance (Hornresp value)
+  L_e: 1.4e-3  # H - voice coil inductance (Hornresp value)
+  BL: 13.9  # T·m - force factor (Hornresp value)
+  S_d: 0.0522  # m² - effective area
+  X_max: 0.007  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  These parameters are taken directly from the Hornresp parameter file
+  imports/12ndl76_params.txt to enable validation matching.
+
+  CRITICAL: These are DIFFERENT from the datasheet values!
+  - Datasheet: BL=20.1, Re=5.3, Le=1.0, Mmd=39.9g
+  - Hornresp:  BL=13.9, Re=6.1, Le=1.4, Mmd=67.8g
+
+  The Hornresp values may be:
+  1. Measured parameters (not datasheet specs)
+  2. Adjusted for Hornresp's modeling methodology
+  3. From a different production batch
+
+  Use this driver ONLY for validation against the specific Hornresp
+  simulation in imports/12ndl76_sim.txt.
+
+# Literature references
+literature:
+  - "Hornresp parameter file: imports/12ndl76_params.txt"
+  - "Hornresp simulation: imports/12ndl76_sim.txt"

@@ -1,5 +1,5 @@
-ID = 15PS100_B4
-Comment = "BC_15PS100 B4 alignment: Vb=Vas=105.5L, Fb=Fs=37.3Hz, Port=optimal"
+ID = 12NDL76_B4
+Comment = "BC_12NDL76 B4 alignment: Vb=Vas=71.9L, Fb=Fs=50Hz, Port=optimal"
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 Ang = 2.0 x Pi
@@ -26,13 +26,13 @@ L45 = 0.00
 F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
-Sd = 855.00
-Bl = 14.60
-Cms = 3.50E-04
-Rms = 2.30
-Mmd = 55.20
-Le = 1.50
-Re = 6.30
+Sd = 522.00
+Bl = 13.90
+Cms = 3.00E-04
+Rms = 2.23
+Mmd = 67.80
+Le = 1.40
+Re = 6.10
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -46,8 +46,8 @@ Rss = 0.00
 Rms = 0.00
 
 |CHAMBER PARAMETER VALUES:
-Vrc = 105.50
-Ap = 300.00
+Vrc = 71.90
+Ap = 200.00
 Lpt = 20.00
 Vtc = 0.00
 Th = 0.00
