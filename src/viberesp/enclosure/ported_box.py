@@ -653,17 +653,22 @@ def calculate_spl_ported_transfer_function(
 
     Transfer Function Form:
         The normalized pressure response for a vented box is a 4th-order
-        high-pass filter with the form:
+        high-pass filter per Small (1973), Equation 20:
 
-        G(s) = K × (s²T_B² + sT_B/Q_B + 1) / D'(s)
+        G(s) = s⁴T_B²T_S² / D(s)
 
-        where D'(s) is the 4th-order denominator polynomial (same as impedance):
+        where D(s) is the 4th-order denominator polynomial:
 
-        D'(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_B + T_BT_S²/Q_T) +
-                s²[(α+1)T_B² + T_BT_S/(Q_B×Q_T) + T_S²] +
-                s(T_B/Q_B + T_S/Q_T) + 1
+        D(s) = s⁴T_B²T_S² + s³(T_B²T_S/Q_B + T_BT_S²/Q_T) +
+               s²[(α+1)T_B² + T_BT_S/(Q_B×Q_T) + T_S²] +
+               s(T_B/Q_B + T_S/Q_T) + 1
 
-        and:
+        NOTE: The numerator s⁴T_B²T_S² ensures proper high-frequency
+        asymptotic behavior (G(s) → 1 as s → ∞). The alternative form
+        (s²T_B² + sT_B/Q_B + 1) is from the impedance equation (Small
+        Eq. 16), NOT the SPL transfer function.
+
+        Parameters:
         - T_S = 1/ω_S = 1/(2πF_S) - driver time constant
         - T_B = 1/ω_B = 1/(2πF_B) - box (port) time constant
         - α = V_as/V_B - compliance ratio
@@ -843,6 +848,15 @@ def calculate_spl_ported_transfer_function(
     # Mean error: +7.35 dB with +13 dB offset
     # Optimal offset: +6 dB (gives mean error ~0.5 dB)
     # Roll-off shape matches Hornresp within ±2.5 dB
+    #
+    # Additional validation: BC_15DS115 ported box (see docs/validation/)
+    # Optimal offset for BC_15DS115: +3 dB (low-Qts driver)
+    #
+    # NOTE: Calibration offset is DRIVER-SPECIFIC, not universal.
+    # Different drivers may require different offsets based on their parameters.
+    # Using +6 dB here (optimal for BC_18RBX100) as the default.
+    # Future work: Implement driver-specific calibration lookup table.
+    # See: docs/validation/ported_box_validation_investigation.md (Option 3)
     CALIBRATION_OFFSET_DB = 6.0
     spl_ref += CALIBRATION_OFFSET_DB
 
