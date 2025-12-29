@@ -668,23 +668,21 @@ def export_front_loaded_horn_to_hornresp(
     l12_cm = horn.length * 100.0  # Convert m to cm
     at_cm2 = s1_cm2  # AT = throat area (same as S1)
 
-    # Calculate flare constant (unit-independent when using consistent units)
-    # m = (1/L12) * ln(S2/S1)
-    # Note: Using cm for both length and area ratio gives same result as meters
-    if s1_cm2 > 0 and s2_cm2 > 0 and l12_cm > 0:
-        flare_constant = (1.0 / l12_cm) * math.log(s2_cm2 / s1_cm2)
-        # Calculate Hornresp F12 using correct formula: F12 = c * m / (4π)
-        # where c is in cm/s (34300 cm/s) and m is in cm⁻¹
-        c_cm_per_s = 34300.0  # Speed of sound in cm/s
-        f12_hz = c_cm_per_s * flare_constant / (4.0 * math.pi)
+    # Calculate flare constant and F12 for Hornresp
+    # m = (1/L) * ln(S2/S1) where m is in m⁻¹ (Olson 1947, Eq. 5.12)
+    # F12 = c * m / (4π) where c is in m/s (Hornresp formula)
+    # Note: Area ratio S2/S1 is unit-independent, can use cm² values directly
+    if s1_cm2 > 0 and s2_cm2 > 0 and horn.length > 0:
+        flare_constant = (1.0 / horn.length) * math.log(s2_cm2 / s1_cm2)
+        c_m_per_s = 343.0  # Speed of sound in m/s
+        f12_hz = c_m_per_s * flare_constant / (4.0 * math.pi)
     else:
         f12_hz = 0.0
 
     # Calculate Olson cutoff for documentation (uses 2π, not 4π)
-    # fc_olson = c * m / (2π) where c is in m/s
-    if s1_cm2 > 0 and s2_cm2 > 0 and l12_cm > 0:
-        flare_constant_m = (1.0 / horn.length) * math.log(s2_cm2 / s1_cm2)
-        fc_hz = 343.0 * flare_constant_m / (2.0 * math.pi)  # For documentation only
+    # fc_olson = c * m / (2π) where c is in m/s (Olson 1947, Eq. 5.18)
+    if s1_cm2 > 0 and s2_cm2 > 0 and horn.length > 0:
+        fc_hz = 343.0 * flare_constant / (2.0 * math.pi)  # For documentation only
     else:
         fc_hz = 0.0
 

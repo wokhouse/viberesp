@@ -89,8 +89,8 @@ class TestExportFrontLoadedHorn:
 
             content = output_path.read_text()
 
-            # Check throat chamber parameters
-            assert "Vtc = 0.05" in content
+            # Check throat chamber parameters (Vtc in cm³ for Hornresp)
+            assert "Vtc = 50.00" in content  # 0.05 L = 50 cm³
             assert "Atc = 5.00" in content
 
             # Rear chamber should be 0
@@ -137,8 +137,8 @@ class TestExportFrontLoadedHorn:
 
             content = output_path.read_text()
 
-            # Check both chambers
-            assert "Vtc = 0.05" in content
+            # Check both chambers (Vtc in cm³ for Hornresp)
+            assert "Vtc = 50.00" in content  # 0.05 L = 50 cm³
             assert "Atc = 5.00" in content
             assert "Vrc = 2.00" in content
             assert "Lrc = 12.60" in content
