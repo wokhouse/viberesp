@@ -31,12 +31,7 @@ from viberesp.validation.compare import (
     compare_electrical_impedance_phase,
     generate_validation_report,
 )
-from viberesp.driver.bc_drivers import (
-    get_bc_8ndl51,
-    get_bc_12ndl76,
-    get_bc_15ds115,
-    get_bc_18pzw100,
-)
+from viberesp.driver import load_driver
 
 # Leach (2002) model parameters for BC 8NDL51
 # These values account for eddy current losses in the voice coil former
@@ -55,7 +50,7 @@ class TestInfiniteBaffleValidationBC8NDL51:
     @pytest.fixture
     def bc_8ndl51_driver(self):
         """Get BC 8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     @pytest.fixture
     def bc_8ndl51_hornresp_data(self):

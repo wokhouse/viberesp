@@ -627,22 +627,11 @@ def export(driver_name, output):
         $ viberesp export BC_12NDL76 -o exports/
         $ viberesp export BC_12NDL76 -o bc_12ndl76.txt
     """
-    # Import driver factory functions
-    from viberesp.driver.bc_drivers import (
-        get_bc_8ndl51, get_bc_12ndl76, get_bc_15ds115, get_bc_18pzw100
-    )
+    # Import driver loader
+    from viberesp.driver import load_driver
 
-    # Map driver names to factory functions
-    driver_map = {
-        "BC_8NDL51": get_bc_8ndl51,
-        "BC_12NDL76": get_bc_12ndl76,
-        "BC_15DS115": get_bc_15ds115,
-        "BC_18PZW100": get_bc_18pzw100,
-    }
-
-    # Get driver from factory function
-    driver_factory = driver_map[driver_name]
-    driver = driver_factory()
+    # Load driver
+    driver = load_driver(driver_name)
 
     # Determine output path
     output_path = Path(output)
@@ -879,17 +868,15 @@ def export_all(output):
         $ viberesp export-all
         $ viberesp export-all -o hornresp_inputs/
     """
-    # Import driver factory functions
-    from viberesp.driver.bc_drivers import (
-        get_bc_8ndl51, get_bc_12ndl76, get_bc_15ds115, get_bc_18pzw100
-    )
+    # Import driver loader
+    from viberesp.driver import load_driver
 
     # Create list of all drivers
     drivers = [
-        (get_bc_8ndl51(), "BC_8NDL51"),
-        (get_bc_12ndl76(), "BC_12NDL76"),
-        (get_bc_15ds115(), "BC_15DS115"),
-        (get_bc_18pzw100(), "BC_18PZW100"),
+        (load_driver("BC_8NDL51"), "BC_8NDL51"),
+        (load_driver("BC_12NDL76"), "BC_12NDL76"),
+        (load_driver("BC_15DS115"), "BC_15DS115"),
+        (load_driver("BC_18PZW100"), "BC_18PZW100"),
     ]
 
     # Batch export

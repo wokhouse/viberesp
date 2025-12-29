@@ -1,0 +1,48 @@
+name: "BC_15DS115"
+manufacturer: "B&C Speakers"
+model: "15DS115-8"
+description: "15 inch Subwoofer driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 33  # Hz
+  re: 4.9  # Ohms
+  qts: 0.17
+  qes: 0.18
+  qms: 5.2
+  vas: 94  # dm³ (94 L)
+  sd: 855  # cm²
+  bl: 38.7  # T·m
+  cms: 0.25  # mm/N
+  rms: 10.15  # N·s/m
+  le: 4.5  # mH
+  xmax: 16.5  # mm
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.064860  # kg - driver mass only (calculated to match datasheet Fs)
+  C_ms: 0.00025  # m/N - compliance
+  R_ms: 10.15  # N·s/m - mechanical resistance
+  R_e: 4.9  # Ohms - voice coil DC resistance
+  L_e: 4.5e-3  # H - voice coil inductance
+  BL: 38.7  # T·m - force factor
+  S_d: 0.0855  # m² - effective area
+  X_max: 0.0165  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  WARNING: The datasheet Mms value (254g) is NOT consistent with the
+  datasheet Fs (33 Hz) and Cms (0.25 mm/N). Using the datasheet Fs and Cms,
+  the theoretical M_ms should be 93g, not 254g (63% error in datasheet).
+
+  This implementation uses the datasheet Cms and Fs values, calculating
+  M_md = 64.86g (driver mass only) to produce the correct resonance.
+  Radiation mass at 33 Hz is ~28.2g, giving M_ms = 93g total.
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 15DS115 datasheet"

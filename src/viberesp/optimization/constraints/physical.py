@@ -49,7 +49,7 @@ def constraint_max_displacement(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_8ndl51()  # X_max = 7mm
+        >>> driver = load_driver("BC_8NDL51")  # X_max = 7mm
         >>> # Small sealed box - should violate displacement constraint
         >>> violation = constraint_max_displacement(
         ...     np.array([0.005]), driver, "sealed"
@@ -153,7 +153,7 @@ def constraint_port_velocity(
         pymoo expects constraints to be ≤ 0 (negative = satisfied)
 
     Examples:
-        >>> driver = get_bc_12ndl76()
+        >>> driver = load_driver("BC_12NDL76")
         >>> # Small port area - should violate velocity constraint
         >>> violation = constraint_port_velocity(
         ...     np.array([0.050, 40.0, 0.0005, 0.1]),  # Tiny port

@@ -17,12 +17,7 @@ from viberesp.driver.radiation_mass import (
     calculate_radiation_mass,
     calculate_resonance_with_radiation_mass,
 )
-from viberesp.driver.bc_drivers import (
-    get_bc_8ndl51,
-    get_bc_12ndl76,
-    get_bc_15ds115,
-    get_bc_18pzw100,
-)
+from viberesp.driver import load_driver
 from viberesp.simulation.constants import AIR_DENSITY, SPEED_OF_SOUND
 
 
@@ -246,7 +241,7 @@ class TestDriverResonanceMatching:
         Hornresp F_s: 64.2 Hz
         Target: <0.5 Hz error
         """
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
 
         # F_s is calculated during __post_init__ using iterative solver
         F_s_expected = 64.2  # Hz (from Hornresp)
@@ -261,7 +256,7 @@ class TestDriverResonanceMatching:
         Hornresp F_s: 44.9 Hz
         Target: <0.5 Hz error
         """
-        driver = get_bc_12ndl76()
+        driver = load_driver("BC_12NDL76")
 
         F_s_expected = 44.9  # Hz (from Hornresp)
 
@@ -275,7 +270,7 @@ class TestDriverResonanceMatching:
         Hornresp F_s: 19.0 Hz
         Target: <0.5 Hz error
         """
-        driver = get_bc_15ds115()
+        driver = load_driver("BC_15DS115")
 
         F_s_expected = 19.0  # Hz (from Hornresp)
 
@@ -304,9 +299,9 @@ class TestDriverResonanceMatching:
         bring all drivers to within 0.5 Hz of Hornresp F_s values.
         """
         drivers = [
-            ("BC_8NDL51", get_bc_8ndl51(), 64.2),
-            ("BC_12NDL76", get_bc_12ndl76(), 44.9),
-            ("BC_15DS115", get_bc_15ds115(), 19.0),
+            ("BC_8NDL51", load_driver("BC_8NDL51"), 64.2),
+            ("BC_12NDL76", load_driver("BC_12NDL76"), 44.9),
+            ("BC_15DS115", load_driver("BC_15DS115"), 19.0),
             ("BC_18PZW100", get_bc_18pzw100(), 23.9),
         ]
 
@@ -335,7 +330,7 @@ class TestRadiationMassValues:
 
         Expected: ~3.7g radiation mass (14% of total mass)
         """
-        driver = get_bc_8ndl51()
+        driver = load_driver("BC_8NDL51")
 
         M_rad = driver.M_ms - driver.M_md
         radiation_fraction = M_rad / driver.M_ms
@@ -354,7 +349,7 @@ class TestRadiationMassValues:
 
         Expected: ~13.4g radiation mass (20% of total mass)
         """
-        driver = get_bc_12ndl76()
+        driver = load_driver("BC_12NDL76")
 
         M_rad = driver.M_ms - driver.M_md
         radiation_fraction = M_rad / driver.M_ms
@@ -373,7 +368,7 @@ class TestRadiationMassValues:
 
         Expected: ~28g radiation mass (10% of total mass)
         """
-        driver = get_bc_15ds115()
+        driver = load_driver("BC_15DS115")
 
         M_rad = driver.M_ms - driver.M_md
         radiation_fraction = M_rad / driver.M_ms
@@ -413,9 +408,9 @@ class TestRadiationMassValues:
         though the fractional contribution varies.
         """
         drivers = [
-            ("BC_8NDL51", get_bc_8ndl51()),
-            ("BC_12NDL76", get_bc_12ndl76()),
-            ("BC_15DS115", get_bc_15ds115()),
+            ("BC_8NDL51", load_driver("BC_8NDL51")),
+            ("BC_12NDL76", load_driver("BC_12NDL76")),
+            ("BC_15DS115", load_driver("BC_15DS115")),
             ("BC_18PZW100", get_bc_18pzw100()),
         ]
 

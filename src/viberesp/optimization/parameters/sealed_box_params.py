@@ -37,7 +37,7 @@ def get_sealed_box_parameter_space(
         EnclosureParameterSpace for sealed box
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> space = get_sealed_box_parameter_space(driver)
         >>> space.get_bounds_dict()
         {'Vb': (0.00202, 0.0505)}  # m³

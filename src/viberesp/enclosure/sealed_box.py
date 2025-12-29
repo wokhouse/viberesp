@@ -95,8 +95,8 @@ def calculate_sealed_box_system_parameters(
         ValueError: If Vb <= 0
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()  # Fs=64Hz, Qts=0.37, Vas=14L
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")  # Fs=64Hz, Qts=0.37, Vas=14L
         >>> params = calculate_sealed_box_system_parameters(driver, Vb=0.010)
         >>> params.Fc  # System resonance
         99.4...  # Hz (higher than Fs due to small box)
@@ -272,8 +272,8 @@ def calculate_spl_from_transfer_function(
         ValueError: If frequency <= 0, Vb <= 0, or invalid driver
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> spl = calculate_spl_from_transfer_function(100, driver, Vb=0.010)
         >>> spl  # SPL at 1m for 10L sealed box (no HF roll-off)
         68.5...  # dB
@@ -485,8 +485,8 @@ def sealed_box_electrical_impedance(
         ValueError: If frequency <= 0, Vb <= 0, or invalid driver
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
-        >>> driver = get_bc_8ndl51()
+        >>> from viberesp.driver import load_driver
+        >>> driver = load_driver("BC_8NDL51")
         >>> result = sealed_box_electrical_impedance(100, driver, Vb=0.010)
         >>> result['Fc']  # System resonance for 10L box
         99.4...  # Hz

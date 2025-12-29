@@ -33,13 +33,7 @@ from viberesp.validation.compare import (
     compare_spl,
     generate_validation_report,
 )
-from viberesp.driver.bc_drivers import get_bc_8ndl51, get_bc_15ps100
-
-
-# Test configuration for BC_8NDL51
-Vb_LITERS_8NDL51 = 31.65  # Box volume for Qtc=0.707 Butterworth alignment
-Vb_M3_8NDL51 = Vb_LITERS_8NDL51 / 1000.0  # Convert to m³
-EXPECTED_FC_8NDL51 = 86.1  # Expected system resonance (Hz)
+from viberesp.driver import load_driver
 EXPECTED_QTC_8NDL51 = 0.707  # Expected system Q
 F_MASS_8NDL51 = 450.0  # Mass break frequency (Hz) for HF roll-off (optimized for Hornresp validation)
 
@@ -63,7 +57,7 @@ class TestSealedBoxSystemParameters:
     @pytest.fixture
     def bc_8ndl51_driver(self):
         """Get BC 8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     def test_fc_calculation_bc8ndl51(self, bc_8ndl51_driver):
         """
@@ -135,7 +129,7 @@ class TestSealedBoxElectricalImpedanceBC8NDL51:
     @pytest.fixture
     def bc_8ndl51_driver(self):
         """Get BC 8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     @pytest.fixture
     def hornresp_data(self, bc_8ndl51_driver):
@@ -503,7 +497,7 @@ class TestSealedBoxCornerCases:
     @pytest.fixture
     def bc_8ndl51_driver(self):
         """Get BC 8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     def test_impedance_peak_at_Fc(self, bc_8ndl51_driver):
         """
@@ -570,7 +564,7 @@ class TestSealedBoxQtcAlignmentsBC8NDL51:
     @pytest.fixture
     def bc_8ndl51_driver(self):
         """Get BC_8NDL51 driver parameters."""
-        return get_bc_8ndl51()
+        return load_driver("BC_8NDL51")
 
     @pytest.mark.parametrize("qtc,vb_liters,expected_fc,alignment", [
         (0.65, 87.83, 79.2, "Near Butterworth"),

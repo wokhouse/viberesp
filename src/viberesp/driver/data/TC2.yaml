@@ -1,0 +1,57 @@
+name: "TC2"
+manufacturer: "Test Case"
+model: "Compression Driver"
+description: "TC2 compression driver (midrange horn) for validation"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 251  # Hz (approximately)
+  re: 6.5  # Ohms
+  sd: 8.0  # cm²
+  mmd: 0.008  # kg (driver mass only, no radiation mass)
+  cms: 5.00e-5  # m/N
+  rms: 3.0  # N·s/m
+  le: 0.1  # mH
+  bl: 12.0  # T·m
+
+# Horn specifications (TC2)
+horn:
+  throat_area: 5.0  # cm²
+  mouth_area: 200.0  # cm²
+  length: 0.5  # m
+  cutoff_frequency: 404  # Hz (approximately)
+  throat_chamber_volume: 0  # L
+  rear_chamber_volume: 0  # L
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.008  # kg - driver mass only (no radiation mass)
+  C_ms: 5.0e-5  # m/N - compliance
+  R_ms: 3.0  # N·s/m - mechanical resistance
+  R_e: 6.5  # Ohms - voice coil DC resistance
+  L_e: 0.1e-3  # H - voice coil inductance
+  BL: 12.0  # T·m - force factor
+  S_d: 0.0008  # m² - diaphragm area
+  # X_max: not specified
+
+# Notes and warnings
+notes: |
+  TC2 compression driver (midrange horn).
+
+  Test case for validating horn simulation and optimization against Hornresp.
+  This driver represents a compression driver loaded by an exponential horn
+  with no throat or rear chambers.
+
+  Parameters from: tests/validation/horn_theory/exp_midrange_tc2/horn_params.txt
+
+  Horn specifications (TC2):
+  - Throat area (S1): 5.0 cm²
+  - Mouth area (S2): 200.0 cm²
+  - Length (L12): 0.5 m
+  - Cutoff frequency: ~404 Hz
+  - No throat chamber (Vtc = 0)
+  - No rear chamber (Vrc = 0)
+
+# Literature references
+literature:
+  - "Hornresp validation data: tests/validation/horn_theory/exp_midrange_tc2/"

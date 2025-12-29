@@ -17,13 +17,13 @@ from viberesp.driver.parameters import ThieleSmallParameters
 
 def get_driver_factory(driver_name: str) -> Callable[[], ThieleSmallParameters]:
     """
-    Map driver name to factory function.
+    Map driver name to loader function.
 
     Args:
         driver_name: Driver name (e.g., "BC_8NDL51")
 
     Returns:
-        Factory function that creates ThieleSmallParameters instance
+        Loader function that creates ThieleSmallParameters instance
 
     Raises:
         ValueError: If driver name not recognized
@@ -34,30 +34,16 @@ def get_driver_factory(driver_name: str) -> Callable[[], ThieleSmallParameters]:
         >>> print(driver.F_s)
         75.0
     """
-    from viberesp.driver.bc_drivers import (
-        get_bc_8ndl51,
-        get_bc_12ndl76,
-        get_bc_15ds115,
-        get_bc_18pzw100,
-    )
-
-    driver_map: Dict[str, Callable[[], ThieleSmallParameters]] = {
-        "BC_8NDL51": get_bc_8ndl51,
-        "BC_12NDL76": get_bc_12ndl76,
-        "BC_15DS115": get_bc_15ds115,
-        "BC_18PZW100": get_bc_18pzw100,
-    }
+    from viberesp.driver import load_driver
 
     # Normalize driver name (uppercase, remove spaces)
     normalized_name = driver_name.upper().strip()
 
-    if normalized_name not in driver_map:
-        raise ValueError(
-            f"Unknown driver: {driver_name}. "
-            f"Available drivers: {', '.join(driver_map.keys())}"
-        )
+    # Return a lambda that loads the driver
+    def _load():
+        return load_driver(normalized_name)
 
-    return driver_map[normalized_name]
+    return _load
 
 
 def parse_config_path(config_path: str) -> Tuple[str, Dict[str, float]]:

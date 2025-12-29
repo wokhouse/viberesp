@@ -1,0 +1,48 @@
+name: "BC_18PZW100"
+manufacturer: "B&C Speakers"
+model: "18PZW100-8"
+description: "18 inch Subwoofer driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 37  # Hz
+  re: 5.1  # Ohms
+  qts: 0.36
+  qes: 0.38
+  qms: 7.9
+  vas: 186  # dm³ (186 L)
+  sd: 1210  # cm²
+  bl: 25.5  # T·m
+  cms: 0.17  # mm/N
+  rms: 6.15  # N·s/m
+  le: 1.58  # mH
+  xmax: 8  # mm
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.061494  # kg - driver mass only (calculated to match datasheet Fs)
+  C_ms: 0.00017  # m/N - compliance
+  R_ms: 6.15  # N·s/m - mechanical resistance
+  R_e: 5.1  # Ohms - voice coil DC resistance
+  L_e: 1.58e-3  # H - voice coil inductance
+  BL: 25.5  # T·m - force factor
+  S_d: 0.1210  # m² - effective area
+  X_max: 0.008  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  WARNING: The datasheet Mms value (209g) is NOT consistent with the
+  datasheet Fs (37 Hz) and Cms (0.17 mm/N). Using the datasheet Fs and Cms,
+  the theoretical M_ms should be 109g, not 209g (48% error in datasheet).
+
+  This implementation uses the datasheet Cms and Fs values, calculating
+  M_md = 61.49g (driver mass only) to produce the correct resonance.
+  Radiation mass at 37 Hz is ~47.4g, giving M_ms = 109g total.
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 18PZW100 datasheet"

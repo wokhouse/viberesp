@@ -1,0 +1,49 @@
+name: "BC_8NDL51"
+manufacturer: "B&C Speakers"
+model: "8NDL51-8"
+description: "8 inch Midrange driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 75  # Hz
+  re: 2.6  # Ohms
+  qes: 0.64
+  qms: 5.22
+  qts: 0.57
+  vas: 10.1  # dm³ (10.1 L)
+  sd: 220  # cm²
+  eta0: 0.73  # %
+  xmax: 7  # mm
+  mms: 0.027  # kg (total moving mass, includes radiation mass)
+  bl: 7.3  # T·m
+  le: 0.15  # mH
+  cms: 0.150  # mm/N
+  rms: 2.44  # N·s/m
+  ebp: 117  # Hz
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.026286  # kg - driver mass only (calculated to match datasheet Fs)
+  C_ms: 1.503e-4  # m/N - compliance (calculated from Vas)
+  R_ms: 2.44  # N·s/m - mechanical resistance (calculated from Qms)
+  R_e: 2.6  # Ohms - voice coil DC resistance
+  L_e: 0.15e-3  # H - voice coil inductance
+  BL: 7.3  # T·m - force factor
+  S_d: 0.0220  # m² - effective area
+  X_max: 0.007  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  The datasheet reports Mms = 27g, but this is not entirely consistent with
+  the datasheet Fs (75 Hz) and Cms (0.150 mm/N). Using the datasheet Fs and
+  Cms values, the theoretical M_ms should be 30.0g, giving M_md = 26.29g
+  (driver mass only) after subtracting radiation mass (~3.7g at 75 Hz).
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 8NDL51 datasheet"
+  - "https://www.bcspeakers.com/"

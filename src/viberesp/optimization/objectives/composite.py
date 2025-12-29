@@ -66,7 +66,7 @@ class EnclosureOptimizationProblem(Problem):
         num_segments: Number of segments for multisegment_horn (2 or 3)
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> problem = EnclosureOptimizationProblem(
         ...     driver=driver,
         ...     enclosure_type="sealed",

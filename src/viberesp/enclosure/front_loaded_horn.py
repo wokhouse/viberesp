@@ -63,9 +63,9 @@ class FrontLoadedHorn:
             - 2π: half-space (piston in infinite baffle) [default]
 
     Examples:
-        >>> from viberesp.driver.bc_drivers import get_bc_8ndl51
+        >>> from viberesp.driver import load_driver
         >>> from viberesp.simulation.types import ExponentialHorn
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> horn = ExponentialHorn(0.001, 0.01, 0.3)
         >>> flh = FrontLoadedHorn(driver, horn)
         >>> result = flh.electrical_impedance(500)

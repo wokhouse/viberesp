@@ -55,7 +55,7 @@ def objective_enclosure_volume(
         rear chamber volume.
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> # 10L sealed box
         >>> objective_enclosure_volume(np.array([0.010]), driver, "sealed")
         0.010  # m³
@@ -134,7 +134,7 @@ def objective_external_height(
         may vary based on construction method.
 
     Examples:
-        >>> driver = get_bc_8ndl51()
+        >>> driver = load_driver("BC_8NDL51")
         >>> # 20L box as a cube
         >>> h = objective_external_height(
         ...     np.array([0.020]), driver, "sealed", aspect_ratio=1.0
@@ -187,7 +187,7 @@ def objective_footprint_area(
         Footprint area in m² (lower is better)
 
     Examples:
-        >>> driver = get_bc_12ndl76()
+        >>> driver = load_driver("BC_12NDL76")
         >>> # 30L box with square footprint
         >>> area = objective_footprint_area(
         ...     np.array([0.030]), driver, "sealed", aspect_ratio=1.0

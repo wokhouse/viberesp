@@ -10,11 +10,7 @@ Usage:
 """
 
 from pathlib import Path
-from viberesp.driver.bc_drivers import get_bc_8ndl51
-from viberesp.hornresp.export import export_to_hornresp
-
-# Driver parameters
-driver = get_bc_8ndl51()
+from viberesp.driver import load_driver
 
 # Sealed box design (fixed)
 Vb_liters = 10.0  # 10L box

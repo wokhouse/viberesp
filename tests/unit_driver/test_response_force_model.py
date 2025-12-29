@@ -14,13 +14,7 @@ import math
 import cmath
 import pytest
 
-from viberesp.driver.bc_drivers import get_bc_8ndl51
-from viberesp.driver.response import direct_radiator_electrical_impedance
-from viberesp.driver.electrical_impedance import electrical_impedance_bare_driver
-from viberesp.simulation.constants import SPEED_OF_SOUND, AIR_DENSITY
-
-
-def test_force_calculation_uses_active_current_at_high_frequency():
+from viberesp.driver import load_driver:
     """Test that force calculation uses I_active at high frequencies.
 
     At 20 kHz, voice coil inductance causes current to lag voltage by ~85°.
@@ -30,7 +24,7 @@ def test_force_calculation_uses_active_current_at_high_frequency():
     and uses only the active (in-phase) component of current.
     """
     # Get driver parameters
-    driver = get_bc_8ndl51()
+    driver = load_driver("BC_8NDL51")
     freq = 20000  # 20 kHz
     voltage = 2.83
 
@@ -94,7 +88,7 @@ def test_force_calculation_at_low_frequency():
 
     This test verifies that low-frequency performance is maintained.
     """
-    driver = get_bc_8ndl51()
+    driver = load_driver("BC_8NDL51")
     freq = 100  # 100 Hz
     voltage = 2.83
 
@@ -141,7 +135,7 @@ def test_i_active_reduces_high_frequency_spl():
 
     Note: The reduction is negative (SPL goes down), so we expect < -10 dB.
     """
-    driver = get_bc_8ndl51()
+    driver = load_driver("BC_8NDL51")
     freq = 10000  # 10 kHz
     voltage = 2.83
 
@@ -227,7 +221,7 @@ def test_low_frequency_regression(freq):
     This is a regression test to ensure the I_active implementation
     doesn't break low-frequency accuracy.
     """
-    driver = get_bc_8ndl51()
+    driver = load_driver("BC_8NDL51")
     voltage = 2.83
 
     # Calculate result with I_active model

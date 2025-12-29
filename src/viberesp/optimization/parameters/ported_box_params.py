@@ -39,7 +39,7 @@ def get_ported_box_parameter_space(
         EnclosureParameterSpace for ported box
 
     Examples:
-        >>> driver = get_bc_12ndl76()
+        >>> driver = load_driver("BC_12NDL76")
         >>> space = get_ported_box_parameter_space(driver)
         >>> bounds = space.get_bounds_dict()
         >>> bounds['Vb']     # (0.0365, 0.1825) m³
