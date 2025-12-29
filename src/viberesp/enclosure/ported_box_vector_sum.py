@@ -139,10 +139,14 @@ def calculate_spl_ported_vector_sum(
     # Z_driver = s·Mms + Rms + 1/(s·Cms)
     Z_driver = s * Mms + Rms + 1.0 / (s * Cms)
 
-    # CRITICAL FIX #3: Use near-lossless damping to match Hornresp
-    # QL = 100 instead of 7-15 to prevent over-damping
-    # Gemini Research: "Hornresp idealizes QL > 50-100"
-    QL_effective = 100.0
+    # CRITICAL FIX #3: Use QL parameter for enclosure losses
+    # QL represents box leakage and absorption losses:
+    # - QL = 5-10: Typical box with some absorption
+    # - QL = 10-20: Well-sealed box, minimal absorption
+    # - QL = 100+: Near-lossless (Hornresp approximation)
+    # For validation against Hornresp, use QL=100 (lossless)
+    # For real designs, use QL=7-15 (typical box losses)
+    QL_effective = QL
 
     # Port parameters with end correction
     r_port = math.sqrt(port_area / math.pi)
@@ -288,6 +292,7 @@ def calculate_spl_ported_vector_sum_array(
     Sd = driver.S_d
     BL = driver.BL
     Re = driver.R_e
+    Le = driver.L_e  # Voice coil inductance
 
     # Frequency domain
     omega = 2 * np.pi * frequencies
@@ -298,37 +303,62 @@ def calculate_spl_ported_vector_sum_array(
     Cms = driver.V_as / (rho * c**2 * Sd**2)
     Mms = 1.0 / (w0**2 * Cms)
 
-    # Mechanical damping
-    Rms_total = (w0 * Mms) / driver.Q_ts
+    # Calculate MECHANICAL damping only (not electromagnetic)
+    # Use Qms if available, otherwise estimate from Qts
+    if hasattr(driver, 'Q_ms') and driver.Q_ms > 0:
+        Rms = (w0 * Mms) / driver.Q_ms
+    else:
+        # Fallback: Estimate Qms ≈ 5.0 if not specified
+        Rms = (w0 * Mms) / 5.0
 
-    # Driver mechanical impedance
-    Z_driver = s * Mms + Rms_total + 1.0 / (s * Cms)
+    # Driver mechanical impedance (mechanical damping only)
+    Z_driver = s * Mms + Rms + 1.0 / (s * Cms)
 
-    # Port parameters
+    # Port parameters with end correction
     r_port = np.sqrt(port_area / np.pi)
     L_eff = port_length + (end_correction_factor * r_port)
     wb = 2 * np.pi * Fb
 
-    # Box mechanical parameters
+    # Box mechanical parameters (acoustic → mechanical domain)
     Cab = Vb / (rho * c**2 * Sd**2)
     Map = (rho * L_eff * Sd**2) / port_area
+
+    # Box leakage resistance (using QL parameter)
     Ral = (wb * Map) / QL
 
-    # Box impedances
+    # Box impedances (mechanical domain)
     Z_box_branch = s * Map + Ral
-    Z_box = 1.0 / (s * Cab + 1.0 / Z_box_branch)
-    Z_total = Z_driver + Z_box
+    Z_air_spring = 1.0 / (s * Cab)
 
-    # Driving force and volume velocities
-    Force = (BL * voltage) / Re
-    Ud = Force / Z_total
+    # Parallel combination of port and air spring
+    Z_box = (Z_box_branch * Z_air_spring) / (Z_box_branch + Z_air_spring)
 
-    # CRITICAL: Negative sign for port (driven by rear wave -Ud)
-    # Up = -Ud × (Z_box / Z_box_branch)
+    # Total mechanical impedance seen by driver
+    Z_mech_total = Z_driver + Z_box
+
+    # Electro-mechanical coupling (includes back-EMF)
+    # Back-EMF reflects mechanical impedance to electrical domain
+    Z_back_emf = (BL ** 2) / Z_mech_total
+
+    # Total electrical impedance (includes voice coil inductance)
+    Z_electrical_total = Re + (s * Le) + Z_back_emf
+
+    # Input current (not constant force!)
+    Current = voltage / Z_electrical_total
+
+    # Force from current
+    Force = BL * Current
+
+    # Driver volume velocity (outward positive)
+    Ud = Force / Z_mech_total
+
+    # Port volume velocity with correct sign (driven by rear wave)
     Up = -Ud * (Z_box / Z_box_branch)
 
-    # Total pressure
+    # Total volume velocity (vector sum)
     Q_total = Ud + Up
+
+    # Pressure response
     P_response = np.abs(s * Q_total)
 
     # Convert to SPL
