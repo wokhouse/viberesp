@@ -425,7 +425,7 @@ def objective_response_slope(
         for seg in horn.segments:
             if hasattr(seg, 'flare_constant'):  # HornSegment
                 if seg.flare_constant > 0:
-                    fc_values.append((c * seg.flare_constant) / (2 * np.pi))
+                    fc_values.append((c * seg.flare_constant / 2.0) / (2 * np.pi))
             elif hasattr(seg, 'm'):  # HyperbolicHorn
                 if seg.m > 0:
                     fc_values.append((c * seg.m * 2) / (2 * np.pi))  # Convert amplitude to intensity flare
@@ -739,7 +739,7 @@ def objective_wavefront_sphericity(
     if m_max > 0:
         # Reference wavefront radius (would be constant for tractrix)
         # Using the largest flare constant (most restrictive segment)
-        f_c = (SPEED_OF_SOUND * m_max) / (2 * np.pi)
+        f_c = (SPEED_OF_SOUND * m_max / 2.0) / (2 * np.pi)
         R_reference = SPEED_OF_SOUND / (2 * np.pi * f_c) if f_c > 0 else total_length
     else:
         R_reference = total_length
@@ -755,14 +755,14 @@ def objective_wavefront_sphericity(
         # Find which segment contains position x
         cumulative_length = 0.0
         segment_idx = 0
-        for seg_idx, seg in enumerate(segments):
+        for seg_idx, seg in enumerate(horn.segments):
             if x <= cumulative_length + seg.length:
                 segment_idx = seg_idx
                 break
             cumulative_length += seg.length
 
         # Local flare constant at this position
-        m_local = segments[segment_idx].flare_constant
+        m_local = horn.segments[segment_idx].flare_constant
 
         # For exponential horn, local wavefront radius ≈ 1/m
         # For tractrix (spherical wave), this would be constant = R_reference
