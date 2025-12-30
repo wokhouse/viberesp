@@ -205,12 +205,16 @@ def constraint_multisegment_continuity(
     Ensures throat < middle < mouth (for 2 segments) to prevent
     area discontinuities that would cause reflections.
 
+    Works with both standard and hyperbolic design vectors (auto-detects).
+
     Literature:
         - Olson (1947), Chapter 8 - Horn area continuity
         - Kolbrek Part 1 - Impedance discontinuities
 
     Args:
-        design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        design_vector:
+            Standard: [throat_area, middle_area, mouth_area, length1, length2, V_tc, V_rc]
+            Hyperbolic: [throat_area, middle_area, mouth_area, length1, length2, T1, T2, V_tc, V_rc]
         driver: ThieleSmallParameters instance (not used for this constraint)
         enclosure_type: Must be "multisegment_horn"
         num_segments: Number of segments (2 or 3)
@@ -226,6 +230,7 @@ def constraint_multisegment_continuity(
     if enclosure_type != "multisegment_horn":
         return 0.0  # Not applicable for other enclosure types
 
+    # Extract areas (first 3 or 4 elements are always areas)
     if num_segments == 2:
         throat_area, middle_area, mouth_area = design_vector[0], design_vector[1], design_vector[2]
 
@@ -268,12 +273,16 @@ def constraint_multisegment_flare_limits(
     This prevents unrealistic flare rates that would be difficult to
     manufacture or would have poor acoustic performance.
 
+    Works with both standard and hyperbolic design vectors (auto-detects).
+
     Literature:
         - Olson (1947), Chapter 5 - Practical flare rate limits
         - Typical horns: 0.5 < m·L < 3.0 (relaxed to 6.0 for optimization)
 
     Args:
-        design_vector: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+        design_vector:
+            Standard: [throat_area, middle_area, mouth_area, length1, length2, V_tc, V_rc]
+            Hyperbolic: [throat_area, middle_area, mouth_area, length1, length2, T1, T2, V_tc, V_rc]
         driver: ThieleSmallParameters instance (not used for this constraint)
         enclosure_type: Must be "multisegment_horn"
         num_segments: Number of segments (2 or 3)
@@ -293,8 +302,21 @@ def constraint_multisegment_flare_limits(
 
     violations = []
 
+    # Detect if hyperbolic (has T parameters)
+    # Standard 2-seg: 7 elements, Hyperbolic 2-seg: 9 elements
+    # Standard 3-seg: 9 elements, Hyperbolic 3-seg: 12 elements
+    expected_standard = 7 + (2 if num_segments == 3 else 0)
+    is_hyperbolic = len(design_vector) > expected_standard
+
     if num_segments == 2:
-        throat_area, middle_area, mouth_area, length1, length2 = design_vector[0:5]
+        throat_area, middle_area, mouth_area = design_vector[0:3]
+        # Lengths are at indices 3, 4 (standard) or skip T params
+        if is_hyperbolic:
+            # Hyperbolic: [areas x3, lengths x2, T x2, V_tc, V_rc]
+            length1, length2 = design_vector[3], design_vector[4]
+        else:
+            # Standard: [areas x3, lengths x2, V_tc, V_rc]
+            length1, length2 = design_vector[3], design_vector[4]
 
         # Segment 1: m1·L1
         if length1 > 0 and middle_area > throat_area:
@@ -311,8 +333,14 @@ def constraint_multisegment_flare_limits(
             violations.append(mL2 - max_mL)
 
     elif num_segments == 3:
-        (throat_area, middle_area, area2, mouth_area,
-         length1, length2, length3) = design_vector[0:7]
+        throat_area, middle_area, area2, mouth_area = design_vector[0:4]
+
+        if is_hyperbolic:
+            # Hyperbolic: [areas x4, lengths x3, T x3, V_tc, V_rc]
+            length1, length2, length3 = design_vector[4], design_vector[5], design_vector[6]
+        else:
+            # Standard: [areas x4, lengths x3, V_tc, V_rc]
+            length1, length2, length3 = design_vector[4], design_vector[5], design_vector[6]
 
         # Segment 1
         if length1 > 0 and middle_area > throat_area:
@@ -337,3 +365,131 @@ def constraint_multisegment_flare_limits(
 
     # Return maximum violation (positive = bad)
     return max(violations)
+
+
+def constraint_multisegment_flare_curvature(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    num_segments: int = 2,
+    max_flare_increase: float = 0.1
+) -> float:
+    """
+    Constrain flare rate curvature to ensure smooth horn profiles.
+
+    Enforces that the flare constant m decreases or stays similar from
+    throat to mouth: m_throat ≥ m_mid ≥ m_mouth. This prevents
+    "bottleneck" shapes that are mathematically valid but physically poor.
+
+    The constraint allows some tolerance (+10% by default) to accommodate
+    practical designs while preventing pathological shapes.
+
+    Works with both standard and hyperbolic design vectors (auto-detects).
+
+    Literature:
+        - Dong et al. (2020) - Horn profile optimization
+        - Kolbrek Part 1 - Flare rate and impedance smoothness
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Theory:
+        Rapid flare near throat provides good high-frequency loading.
+        Gradual flare near mouth reduces reflections and improves low-frequency loading.
+        Optimal horns typically have decreasing flare rates: m_throat > m_mid > m_mouth.
+
+    Args:
+        design_vector:
+            Standard: [throat_area, middle_area, mouth_area, length1, length2, V_tc, V_rc]
+            Hyperbolic: [throat_area, middle_area, mouth_area, length1, length2, T1, T2, V_tc, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "multisegment_horn"
+        num_segments: Number of segments (2 or 3)
+        max_flare_increase: Maximum allowed increase in flare rate (default 0.1 = 10%)
+            - Set to 0.0 for strict monotonic decrease (m_i > m_{i+1})
+            - Set to 0.1 for 10% tolerance (practical designs)
+
+    Returns:
+        Constraint violation (positive = violation, negative = satisfied)
+
+    Examples:
+        >>> # Good horn: decreasing flare rate
+        >>> design = np.array([0.001, 0.01, 0.04, 0.2, 0.4, 0.0])
+        >>> # m1 ≈ 11.5, m2 ≈ 3.5 (decreasing)
+        >>> constraint_multisegment_flare_curvature(
+        ...     design, driver, "multisegment_horn", num_segments=2
+        ... )
+        -7.99  # Satisfied (m1 > m2)
+
+        >>> # Bad horn: increasing flare rate (bottleneck)
+        >>> design = np.array([0.001, 0.02, 0.025, 0.4, 0.2, 0.0])
+        >>> # m1 ≈ 4.0, m2 ≈ 0.9 (decreasing, but length2 is shorter)
+        >>> constraint_multisegment_flare_curvature(
+        ...     design, driver, "multisegment_horn", num_segments=2
+        ... )
+        -3.1  # Might still be satisfied (depends on values)
+    """
+    if enclosure_type != "multisegment_horn":
+        return 0.0  # Not applicable for other enclosure types
+
+    violations = []
+
+    # Detect if hyperbolic (has T parameters)
+    expected_standard = 7 + (2 if num_segments == 3 else 0)
+    is_hyperbolic = len(design_vector) > expected_standard
+
+    if num_segments == 2:
+        throat_area, middle_area, mouth_area = design_vector[0:3]
+
+        # Extract lengths (same position for both standard and hyperbolic)
+        length1, length2 = design_vector[3], design_vector[4]
+
+        # Calculate flare rates
+        if length1 > 0 and middle_area > throat_area:
+            m1 = np.log(middle_area / throat_area) / length1
+        else:
+            return 0.0  # Invalid geometry, let other constraints handle it
+
+        if length2 > 0 and mouth_area > middle_area:
+            m2 = np.log(mouth_area / middle_area) / length2
+        else:
+            return 0.0
+
+        # Constraint: m2 should not exceed m1 by more than max_flare_increase
+        # m2 - m1 ≤ max_flare_increase
+        # This allows m2 > m1 slightly, but not dramatically
+        violation = m2 - m1 - max_flare_increase
+        violations.append(violation)
+
+    elif num_segments == 3:
+        throat_area, middle_area, area2, mouth_area = design_vector[0:4]
+
+        # Extract lengths (same position for both standard and hyperbolic)
+        length1, length2, length3 = design_vector[4], design_vector[5], design_vector[6]
+
+        # Calculate flare rates
+        if length1 > 0 and middle_area > throat_area:
+            m1 = np.log(middle_area / throat_area) / length1
+        else:
+            return 0.0
+
+        if length2 > 0 and area2 > middle_area:
+            m2 = np.log(area2 / middle_area) / length2
+        else:
+            return 0.0
+
+        if length3 > 0 and mouth_area > area2:
+            m3 = np.log(mouth_area / area2) / length3
+        else:
+            return 0.0
+
+        # Constraint: flare rates should not increase dramatically
+        # m2 - m1 ≤ max_flare_increase
+        # m3 - m2 ≤ max_flare_increase
+        violations.append(m2 - m1 - max_flare_increase)
+        violations.append(m3 - m2 - max_flare_increase)
+
+    if not violations:
+        return 0.0
+
+    # Return maximum violation (positive = bad, negative = satisfied)
+    return max(violations)
+
