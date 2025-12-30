@@ -311,10 +311,12 @@ class TestCutoffFrequency:
         # Check cutoff frequency is positive and reasonable
         assert fc > 0
 
-        # Olson (1947), Eq. 5.18: f_c = c·m/(2π)
+        # Kolbrek convention: f_c = c·m_olson/(4π) where m_olson = ln(S₂/S₁)/L
+        # This matches Hornresp's F12 parameter
         # Verify against direct calculation
         medium = MediumProperties()
-        expected_fc = (medium.c * horn.flare_constant) / (2 * math.pi)
+        m_olson = np.log(horn.mouth_area / horn.throat_area) / horn.length
+        expected_fc = (medium.c * m_olson) / (4 * math.pi)
         assert_allclose(fc, expected_fc, rtol=1e-6)
 
 
