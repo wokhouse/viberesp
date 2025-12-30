@@ -4,7 +4,7 @@ Comment = Qtc=0.707 Butterworth alignment - Vb=31.65L
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 0.5 x Pi
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00

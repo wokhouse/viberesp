@@ -917,43 +917,29 @@ def calculate_spl_ported_transfer_function(
     P_ref = (voltage ** 2) / R_nominal
 
     # Reference SPL at measurement distance
-    # p_rms = √(η × P_ref × ρ₀ × c / (4π × r²))
+    # RADIATION SPACE: Half-space (2π steradians) - infinite baffle mounting
+    # This is the standard test condition for direct radiator loudspeakers
+    # Matches Hornresp default: Ang = 2.0 x Pi
+    #
+    # Pressure calculation: p_rms = √(η × P_ref × ρ₀ × c / (2π × r²))
     # SPL = 20·log₁₀(p_rms / p_ref) where p_ref = 20 μPa
-    # Kinsler et al. (1982), Chapter 4
+    #
+    # Literature:
+    # - Kinsler et al. (1982), Chapter 4 - Acoustic radiation fundamentals
+    # - Beranek (1954), Eq. 5.20 - Half-space radiation impedance
+    # - Small (1972) - Standard infinite baffle assumption
     p_ref = 20e-6  # Reference pressure: 20 μPa
     pressure_rms = math.sqrt(eta * P_ref * air_density * speed_of_sound /
-                             (4 * math.pi * measurement_distance ** 2))
+                             (2 * math.pi * measurement_distance ** 2))
 
     # Reference SPL (flat response at high frequencies)
     spl_ref = 20 * math.log10(pressure_rms / p_ref) if pressure_rms > 0 else 0
 
-    # CALIBRATION: Adjust reference SPL to match Hornresp
-    # Calibration factor determined from validation tests against Hornresp
-    #
-    # With the CORRECTED efficiency formula (Small 1973, Eq. 25), the
-    # CORRECTED transfer function numerator (s⁴T_B²T_S²), and
-    # high-frequency roll-off using f_mass ≈ f_le (second-order filter),
-    # the calibration offset is approximately +6 dB.
-    #
-    # This offset accounts for:
-    # - Half-space vs full-space radiation (2π vs 4π steradians ≈ -3 dB)
-    # - Differences between Small's theory assumptions and Hornresp implementation
-    # - Mass-controlled and inductance roll-off at high frequencies
-    #
-    # Validation: BC_18RBX100 (with HF roll-off, f_mass = f_le)
-    # Mean error: +7.35 dB with +13 dB offset
-    # Optimal offset: +6 dB (gives mean error ~0.5 dB)
-    # Roll-off shape matches Hornresp within ±2.5 dB
-    #
-    # Additional validation: BC_15DS115 ported box (see docs/validation/)
-    # Optimal offset for BC_15DS115: +3 dB (low-Qts driver)
-    #
-    # NOTE: Calibration offset is DRIVER-SPECIFIC, not universal.
-    # Different drivers may require different offsets based on their parameters.
-    # Using +6 dB here (optimal for BC_18RBX100) as the default.
-    # Future work: Implement driver-specific calibration lookup table.
-    # See: docs/validation/ported_box_validation_investigation.md (Option 3)
-    CALIBRATION_OFFSET_DB = 6.0
+    # NO CALIBRATION OFFSET NEEDED
+    # Viberesp uses standard half-space (2π steradians) radiation
+    # This matches B&C datasheet and IEEE/IEC measurement standards
+    # Previous calibration offsets were compensating for non-standard Hornresp configurations
+    CALIBRATION_OFFSET_DB = 0.0
     spl_ref += CALIBRATION_OFFSET_DB
 
     # Apply transfer function to get frequency-dependent SPL

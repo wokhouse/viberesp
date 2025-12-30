@@ -1,10 +1,10 @@
-ID = 472.78
+ID = 778.97
 
-Comment = Qtc=0.8 (slight overdamp): Vb=14.66L, Fc=97.5Hz
+Comment = Sealed box 10.0L, f_mass=450Hz for HF rolloff validation
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 2.0 x Pi
+Ang = 0.5 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
@@ -30,13 +30,13 @@ F45 = 0.00
 
 |TRADITIONAL DRIVER PARAMETER VALUES:
 
-Sd = 220.00
-Bl = 7.30
-Cms = 1.50E-04
-Rms = 2.44
-Mmd = 26.29
-Le = 0.15
-Re = 2.60
+Sd = 217.00
+Bl = 5.80
+Cms = 8.00E-04
+Rms = 1.53
+Mmd = 26.70
+Le = 0.35
+Re = 6.30
 Nd = 1
 
 |ADVANCED DRIVER PARAMETER VALUES FOR SEMI-INDUCTANCE MODEL:
@@ -58,8 +58,8 @@ Added Mass = 0.00
 
 |CHAMBER PARAMETER VALUES:
 
-Vrc = 14.66
-Lrc = 24.47
+Vrc = 10.00
+Lrc = 21.54
 Fr = 0.00
 Tal = 0.00
 Vtc = 0.00

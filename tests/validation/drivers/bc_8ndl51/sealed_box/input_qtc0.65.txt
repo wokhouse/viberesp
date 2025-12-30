@@ -4,7 +4,7 @@ Comment = Qtc=0.65 (near Butterworth): Vb=87.83L, Fc=79.2Hz
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 0.5 x Pi
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
