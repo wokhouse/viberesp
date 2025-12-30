@@ -150,28 +150,10 @@ def objective_efficiency(
                 spl = flh.spl_response(freq, voltage=voltage)
                 result = {'SPL': spl}
             elif enclosure_type == "multisegment_horn":
-                from viberesp.optimization.parameters.multisegment_horn_params import decode_multisegment_design
-                from viberesp.simulation.types import MultiSegmentHorn, HornSegment
+                from viberesp.optimization.parameters.multisegment_horn_params import build_multisegment_horn
 
-                # Decode design vector to parameters
-                params = decode_multisegment_design(design_vector, driver, num_segments=len(design_vector) - 5)  # Subtract V_tc, V_rc
-
-                # Extract chamber volumes
-                V_tc = params.get('V_tc', 0.0)
-                V_rc = params.get('V_rc', 0.0)
-
-                # Convert segment tuples to HornSegment objects
-                # Segments from decode are (throat_area, mouth_area, length, flare_constant) tuples
-                segments = params['segments']
-                flare_constants = params['flare_constants']
-
-                horn_segments = []
-                for i, (throat, mouth, length) in enumerate(segments):
-                    m = flare_constants[i] if i < len(flare_constants) else 0
-                    horn_segments.append(HornSegment(throat, mouth, length, m))
-
-                # Create multi-segment horn
-                horn = MultiSegmentHorn(horn_segments)
+                # Build horn (handles both standard and hyperbolic designs)
+                horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
@@ -291,27 +273,10 @@ def objective_reference_sensitivity(
             spl = flh.spl_response(reference_frequency, voltage=voltage)
             result = {'SPL': spl}
         elif enclosure_type == "multisegment_horn":
-            from viberesp.optimization.parameters.multisegment_horn_params import decode_multisegment_design
-            from viberesp.simulation.types import MultiSegmentHorn, HornSegment
+            from viberesp.optimization.parameters.multisegment_horn_params import build_multisegment_horn
 
-            # Decode design vector to parameters
-            params = decode_multisegment_design(design_vector, driver, num_segments=len(design_vector) - 5)
-
-            # Extract chamber volumes
-            V_tc = params.get('V_tc', 0.0)
-            V_rc = params.get('V_rc', 0.0)
-
-            # Convert segment tuples to HornSegment objects
-            segments = params['segments']
-            flare_constants = params['flare_constants']
-
-            horn_segments = []
-            for i, (throat, mouth, length) in enumerate(segments):
-                m = flare_constants[i] if i < len(flare_constants) else 0
-                horn_segments.append(HornSegment(throat, mouth, length, m))
-
-            # Create multi-segment horn
-            horn = MultiSegmentHorn(horn_segments)
+            # Build horn (handles both standard and hyperbolic designs)
+            horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
             flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
             # Calculate SPL at reference frequency
@@ -366,27 +331,10 @@ def objective_efficiency_percent(
     """
     try:
         if enclosure_type == "multisegment_horn":
-            from viberesp.optimization.parameters.multisegment_horn_params import decode_multisegment_design
-            from viberesp.simulation.types import MultiSegmentHorn, HornSegment
+            from viberesp.optimization.parameters.multisegment_horn_params import build_multisegment_horn
 
-            # Decode design vector to parameters
-            params = decode_multisegment_design(design_vector, driver, num_segments=len(design_vector) - 5)
-
-            # Extract chamber volumes
-            V_tc = params.get('V_tc', 0.0)
-            V_rc = params.get('V_rc', 0.0)
-
-            # Convert segment tuples to HornSegment objects
-            segments = params['segments']
-            flare_constants = params['flare_constants']
-
-            horn_segments = []
-            for i, (throat, mouth, length) in enumerate(segments):
-                m = flare_constants[i] if i < len(flare_constants) else 0
-                horn_segments.append(HornSegment(throat, mouth, length, m))
-
-            # Create multi-segment horn
-            horn = MultiSegmentHorn(horn_segments)
+            # Build horn (handles both standard and hyperbolic designs)
+            horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
             flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
             # Calculate acoustic power at reference frequency

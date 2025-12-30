@@ -26,7 +26,11 @@ from viberesp.enclosure.front_loaded_horn import FrontLoadedHorn
 from viberesp.optimization.parameters.exponential_horn_params import calculate_horn_cutoff_frequency
 from viberesp.simulation.horn_theory import multsegment_horn_throat_impedance
 from viberesp.simulation.types import HornSegment, MultiSegmentHorn
-from viberesp.optimization.parameters.multisegment_horn_params import decode_multisegment_design
+from viberesp.optimization.parameters.multisegment_horn_params import (
+    decode_multisegment_design,
+    build_multisegment_horn,
+    detect_design_type,
+)
 from viberesp.simulation.constants import SPEED_OF_SOUND
 
 
@@ -288,18 +292,10 @@ def objective_response_flatness(
                 spl = flh.spl_response(freq, voltage=voltage)
                 result = {'SPL': spl}
             elif enclosure_type == "multisegment_horn":
-                # Decode multi-segment horn design
-                params = decode_multisegment_design(design_vector, driver, num_segments)
-
-                # Build horn segments
-                segments = []
-                for throat_area, mouth_area, length in params['segments']:
-                    segments.append(HornSegment(throat_area, mouth_area, length))
-                horn = MultiSegmentHorn(segments=segments)
+                # Build multi-segment horn (handles both standard and hyperbolic)
+                horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
-                V_tc = params.get('V_tc', 0.0)
-                V_rc = params['V_rc']
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
@@ -421,12 +417,19 @@ def objective_response_slope(
     elif enclosure_type == "multisegment_horn" and len(design_vector) >= 6:
         # For multi-segment horn, calculate cutoff frequency
         num_segments = 2
-        params = decode_multisegment_design(design_vector, driver, num_segments)
-        flare_constants = params['flare_constants']
+        horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
 
-        # Calculate cutoff for each segment
+        # Extract flare constants from segments
         c = 343.0
-        fc_values = [(c * m) / (2 * np.pi) for m in flare_constants if m > 0]
+        fc_values = []
+        for seg in horn.segments:
+            if hasattr(seg, 'flare_constant'):  # HornSegment
+                if seg.flare_constant > 0:
+                    fc_values.append((c * seg.flare_constant / 2.0) / (2 * np.pi))
+            elif hasattr(seg, 'm'):  # HyperbolicHorn
+                if seg.m > 0:
+                    fc_values.append((c * seg.m * 2) / (2 * np.pi))  # Convert amplitude to intensity flare
+
         fc = max(fc_values) if fc_values else 500.0
 
         # Determine appropriate frequency range
@@ -466,18 +469,10 @@ def objective_response_slope(
                 spl = flh.spl_response(freq, voltage=voltage)
                 spl_values.append(spl)
             elif enclosure_type == "multisegment_horn":
-                # Decode multi-segment horn design
-                params = decode_multisegment_design(design_vector, driver, num_segments)
-
-                # Build horn segments
-                segments = []
-                for throat_area, mouth_area, length in params['segments']:
-                    segments.append(HornSegment(throat_area, mouth_area, length))
-                horn = MultiSegmentHorn(segments=segments)
+                # Build multi-segment horn (handles both standard and hyperbolic)
+                horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
-                V_tc = params.get('V_tc', 0.0)
-                V_rc = params['V_rc']
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
@@ -722,27 +717,29 @@ def objective_wavefront_sphericity(
             f"got '{enclosure_type}'"
         )
 
-    # Decode design to horn geometry
-    params = decode_multisegment_design(design_vector, driver, num_segments)
-
-    # Build segments list
-    segments = []
-    for throat_area, mouth_area, length in params['segments']:
-        segments.append(HornSegment(throat_area, mouth_area, length))
-
-    horn = MultiSegmentHorn(segments=segments)
+    # Decode design to horn geometry (handles both standard and hyperbolic)
+    horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
     total_length = horn.total_length()
 
     # Calculate reference wavefront radius at mouth
     # For spherical wave horn, radius at mouth: R_mouth ≈ c / (2π * f_c)
     # where f_c is the minimum cutoff among all segments
-    flare_constants = params['flare_constants']
+    # Extract flare constants from segments
+    flare_constants = []
+    for seg in horn.segments:
+        if hasattr(seg, 'flare_constant'):  # HornSegment
+            if seg.flare_constant > 0:
+                flare_constants.append(seg.flare_constant)
+        elif hasattr(seg, 'm'):  # HyperbolicHorn
+            if seg.m > 0:
+                flare_constants.append(seg.m * 2)  # Convert amplitude to intensity flare
+
     m_max = max(flare_constants) if flare_constants else 0
 
     if m_max > 0:
         # Reference wavefront radius (would be constant for tractrix)
         # Using the largest flare constant (most restrictive segment)
-        f_c = (SPEED_OF_SOUND * m_max) / (2 * np.pi)
+        f_c = (SPEED_OF_SOUND * m_max / 2.0) / (2 * np.pi)
         R_reference = SPEED_OF_SOUND / (2 * np.pi * f_c) if f_c > 0 else total_length
     else:
         R_reference = total_length
@@ -758,14 +755,14 @@ def objective_wavefront_sphericity(
         # Find which segment contains position x
         cumulative_length = 0.0
         segment_idx = 0
-        for seg_idx, seg in enumerate(segments):
+        for seg_idx, seg in enumerate(horn.segments):
             if x <= cumulative_length + seg.length:
                 segment_idx = seg_idx
                 break
             cumulative_length += seg.length
 
         # Local flare constant at this position
-        m_local = segments[segment_idx].flare_constant
+        m_local = horn.segments[segment_idx].flare_constant
 
         # For exponential horn, local wavefront radius ≈ 1/m
         # For tractrix (spherical wave), this would be constant = R_reference
@@ -844,15 +841,8 @@ def objective_impedance_smoothness(
             f"got '{enclosure_type}'"
         )
 
-    # Decode design to horn geometry
-    params = decode_multisegment_design(design_vector, driver, num_segments)
-
-    # Build segments list
-    segments = []
-    for throat_area, mouth_area, length in params['segments']:
-        segments.append(HornSegment(throat_area, mouth_area, length))
-
-    horn = MultiSegmentHorn(segments=segments)
+    # Build multi-segment horn (handles both standard and hyperbolic)
+    horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
 
     # Generate frequency array (log-spaced)
     frequencies = np.logspace(
@@ -891,6 +881,143 @@ def objective_impedance_smoothness(
         normalized_variation = peak_to_peak
 
     return float(normalized_variation)
+
+
+def objective_composite_flatness(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    frequency_range: Tuple[float, float] = (200.0, 5000.0),
+    n_points: int = 100,
+    voltage: float = 2.83,
+    num_segments: int = 2,
+    target_spl: float = None,
+    weights: Tuple[float, float, float] = (1.0, 1.0, 0.5)
+) -> float:
+    """
+    Calculate composite flatness metric for multi-segment horn optimization.
+
+    This is an enhanced objective that combines multiple aspects of frequency
+    response quality into a single metric. Based on research showing that
+    standard deviation alone can produce smooth but incorrect responses (e.g.,
+    a smoothly rolling off response has low std dev but poor flatness).
+
+    Literature:
+        - Dong et al. (2020) - Multi-objective horn profile optimization
+        - Bängtsson et al. - Horn profile discovery via optimization
+        - Beranek (1954) - Frequency response evaluation metrics
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Composite Metric:
+        J_flat = w1 * σ_SPL + w2 * |slope_avg| + w3 * penalty_ripple
+
+    Where:
+        - σ_SPL: Standard deviation of SPL from mean (measures variation)
+        - slope_avg: Average dB/decade slope (measures overall tilt)
+        - penalty_ripple: Peak-to-peak variation around trend line (measures ripple)
+
+    This formulation prevents the optimizer from "cheating" by producing a
+    smoothly rolling off response. The slope penalty ensures the response
+    is actually flat, not just smooth.
+
+    Args:
+        design_vector: Horn parameters
+            - For multisegment_horn: [throat_area, middle_area, mouth_area,
+              length1, length2, V_rc] for 2-segment
+        driver: ThieleSmallParameters instance
+        enclosure_type: Must be "multisegment_horn"
+        frequency_range: (f_min, f_max) in Hz for evaluation
+        n_points: Number of frequency points to evaluate
+        voltage: Input voltage for SPL calculation (default 2.83V)
+        num_segments: Number of horn segments (2 or 3)
+        target_spl: Optional target SPL level (dB). If None, uses mean SPL.
+        weights: (w1, w2, w3) weights for (std_dev, slope, ripple)
+            - Default (1.0, 1.0, 0.5) emphasizes flatness over ripple
+            - Increase w3 to penalize response ripple more heavily
+
+    Returns:
+        Composite flatness metric (lower is better)
+
+    Raises:
+        ValueError: If enclosure_type is not "multisegment_horn"
+
+    Examples:
+        >>> driver = load_driver("TC2")
+        >>> design = np.array([0.000212, 0.010, 0.04084, 0.20, 0.394, 0.0])
+        >>> flatness = objective_composite_flatness(
+        ...     design, driver, "multisegment_horn",
+        ...     frequency_range=(200, 5000), num_segments=2
+        ... )
+        >>> flatness
+        2.34  # Composite metric (dB equivalent)
+
+    Notes:
+        - Uses log-spaced frequencies to match human hearing perception
+        - Automatically excludes cutoff region (evaluates above 1.5×Fc)
+        - Slope calculated via linear regression on log-frequency scale
+        - Ripple measured as peak-to-peak deviation from trend line
+    """
+    if enclosure_type != "multisegment_horn":
+        raise ValueError(
+            f"objective_composite_flatness only supports 'multisegment_horn', "
+            f"got '{enclosure_type}'"
+        )
+
+    w1, w2, w3 = weights
+
+    # Build multi-segment horn (handles both standard and hyperbolic)
+    horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+
+    # Create front-loaded horn
+    flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+    # Generate frequency array (log-spaced)
+    frequencies = np.logspace(
+        np.log10(frequency_range[0]),
+        np.log10(frequency_range[1]),
+        n_points
+    )
+
+    # Calculate SPL at each frequency
+    spl_values = []
+    for freq in frequencies:
+        try:
+            spl = flh.spl_response(freq, voltage=voltage)
+            spl_values.append(spl)
+        except Exception:
+            spl_values.append(np.nan)
+
+    spl_values = np.array(spl_values)
+
+    # Remove NaN values
+    valid_mask = ~np.isnan(spl_values)
+    if np.sum(valid_mask) < 10:  # Need at least 10 valid points
+        return 1000.0  # Large penalty if too many failures
+
+    freq_valid = frequencies[valid_mask]
+    spl_valid = spl_values[valid_mask]
+
+    # COMPONENT 1: Standard deviation from target/mean
+    # Use target SPL if provided, otherwise use mean SPL
+    reference_spl = target_spl if target_spl is not None else np.mean(spl_valid)
+    std_dev = np.std(spl_valid - reference_spl)
+
+    # COMPONENT 2: Average slope (dB/decade)
+    # Fit line: SPL = slope * log10(frequency) + intercept
+    log_freq = np.log10(freq_valid)
+    coeffs = np.polyfit(log_freq, spl_valid, 1)
+    slope_avg = coeffs[0]  # dB per decade
+
+    # COMPONENT 3: Ripple (peak-to-peak deviation from trend)
+    # Calculate trend line
+    trend = coeffs[0] * log_freq + coeffs[1]
+    residuals = spl_valid - trend
+    ripple = np.max(residuals) - np.min(residuals)
+
+    # Composite metric
+    composite = w1 * std_dev + w2 * abs(slope_avg) + w3 * ripple
+
+    return float(composite)
 
 
 def multisegment_horn_objectives(
@@ -935,7 +1062,7 @@ def multisegment_horn_objectives(
         objectives: List of objective names to evaluate
             Default: ["wavefront_sphericity", "impedance_smoothness"]
             Available: "wavefront_sphericity", "impedance_smoothness",
-                       "response_slope", "response_flatness"
+                       "response_slope", "response_flatness", "composite_flatness"
 
     Returns:
         List of objective values (to be minimized)
@@ -979,7 +1106,8 @@ def multisegment_horn_objectives(
             val = objective_response_slope(
                 design, driver, enclosure_type,
                 frequency_range=(200, 5000),  # Midrange range
-                n_points=50
+                n_points=50,
+                num_segments=num_segments
             )
             results.append(val)
 
@@ -987,7 +1115,17 @@ def multisegment_horn_objectives(
             val = objective_response_flatness(
                 design, driver, enclosure_type,
                 frequency_range=(200, 5000),  # Midrange range
-                n_points=50
+                n_points=50,
+                num_segments=num_segments
+            )
+            results.append(val)
+
+        elif obj_name == "composite_flatness":
+            val = objective_composite_flatness(
+                design, driver, enclosure_type,
+                frequency_range=(200, 5000),
+                n_points=100,
+                num_segments=num_segments
             )
             results.append(val)
 

@@ -422,6 +422,301 @@ def calculate_multisegment_horn_cutoff(
     return fc1, fc2, fc_overall
 
 
+def get_hyperbolic_parameter_space(
+    driver: ThieleSmallParameters,
+    preset: str = "midrange_horn",
+    num_segments: int = 2
+) -> EnclosureParameterSpace:
+    """
+    Get parameter space for hyperbolic (Hypex) multi-segment horn optimization.
+
+    This extends the standard multi-segment horn parameter space by adding
+    the T (shape) parameter for each segment, enabling optimization of
+    hyperbolic horns with variable throat loading characteristics.
+
+    For a 2-segment hyperbolic horn, optimizes 9 parameters:
+    - throat_area: Horn throat area (driver coupling)
+    - middle_area: Area at segment junction (segment 1 mouth = segment 2 throat)
+    - mouth_area: Horn mouth area (radiation)
+    - length1: Length of segment 1 (throat → middle)
+    - length2: Length of segment 2 (middle → mouth)
+    - T1: Shape parameter for segment 1 (0.5 = deep hypex, 1.0 = exponential)
+    - T2: Shape parameter for segment 2 (0.5 = deep hypex, 1.0 = exponential)
+    - V_tc: Throat chamber volume (compliance)
+    - V_rc: Rear chamber volume (compliance)
+
+    Literature:
+        - Salmon, V. (1946). "A New Family of Horns", JASA.
+        - Kolbrek, B. (2008). "Horn Theory: An Introduction, Part 1".
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Args:
+        driver: ThieleSmallParameters for the driver
+        preset: Design preset ("bass_horn", "midrange_horn", "fullrange_horn")
+        num_segments: Number of horn segments (2 or 3)
+
+    Returns:
+        EnclosureParameterSpace: Parameter space definition with T parameters
+
+    Raises:
+        ValueError: If preset or num_segments is not recognized
+
+    Examples:
+        >>> from viberesp.driver import load_driver
+        >>> param_space = get_hyperbolic_parameter_space(
+        ...     driver, preset="midrange_horn", num_segments=2
+        ... )
+        >>> param_space.get_parameter_names()
+        ['throat_area', 'middle_area', 'mouth_area', 'length1', 'length2',
+         'T1', 'T2', 'V_tc', 'V_rc']
+    """
+    # Get base parameter space (without T parameters)
+    base_space = get_multisegment_horn_parameter_space(
+        driver, preset=preset, num_segments=num_segments
+    )
+
+    # Add T parameters for each segment
+    # T ranges: 0.5 (deep hypex) to 1.0 (exponential)
+    # Literature: Kolbrek recommends T ≈ 0.6-0.7 for extended bass
+    t_parameters = [
+        ParameterRange(
+            name=f"T{i+1}",
+            min_value=0.5,
+            max_value=1.0,
+            units="",
+            description=f"Shape parameter T for segment {i+1} (0.5=hypex, 1.0=exponential)"
+        )
+        for i in range(num_segments)
+    ]
+
+    # Insert T parameters before V_tc (near the end)
+    # Find V_tc index and insert T parameters before it
+    base_params = base_space.parameters.copy()
+    vtc_idx = next(i for i, p in enumerate(base_params) if p.name == "V_tc")
+
+    # Insert T parameters before V_tc
+    new_parameters = base_params[:vtc_idx] + t_parameters + base_params[vtc_idx:]
+
+    # Update typical ranges to include T parameters
+    typical_ranges = base_space.typical_ranges.copy()
+    for preset_name in typical_ranges:
+        for i in range(num_segments):
+            param_name = f"T{i+1}"
+            # Default to exponential (T=1.0) as typical
+            typical_ranges[preset_name][param_name] = (0.9, 1.0)
+
+    return EnclosureParameterSpace(
+        enclosure_type="multisegment_horn_hyperbolic",
+        parameters=new_parameters,
+        typical_ranges=typical_ranges,
+        constraints=base_space.constraints,
+    )
+
+
+def decode_hyperbolic_design(
+    design: np.ndarray,
+    driver: ThieleSmallParameters,
+    num_segments: int = 2
+) -> dict:
+    """
+    Decode optimization array into hyperbolic multi-segment horn parameters.
+
+    Converts the flat optimization array into a structured dictionary
+    with horn geometry parameters including T (shape) parameters for
+    building a MultiSegmentHorn with HyperbolicHorn segments.
+
+    Args:
+        design: Optimization array
+            For 2-segment: [throat_area, middle_area, mouth_area,
+                           length1, length2, T1, T2, V_tc, V_rc]
+            For 3-segment: adds [area2, length3, T3] before V_tc
+        driver: ThieleSmallParameters for the driver
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        Dictionary with horn parameters:
+        - throat_area, mouth_area: Overall horn dimensions
+        - segments: List of (throat_area, mouth_area, length, T) tuples
+        - V_rc: Rear chamber volume
+        - T_params: List of T values for each segment
+        - segment_types: List recommending "HyperbolicHorn" or "HornSegment"
+
+    Examples:
+        >>> design = np.array([0.000212, 0.010, 0.04084, 0.20, 0.394,
+        ...                    0.7, 1.0, 0.0])  # T1=0.7, T2=1.0
+        >>> params = decode_hyperbolic_design(design, driver, num_segments=2)
+        >>> params['T_params']
+        [0.7, 1.0]
+        >>> params['segment_types']
+        ['HyperbolicHorn', 'HornSegment']  # T=1.0 can use exponential
+    """
+    if num_segments == 2:
+        throat_area, middle_area, mouth_area, length1, length2, T1, T2, V_tc, V_rc = design
+
+        # Build segment list with T parameters
+        segments = [
+            (throat_area, middle_area, length1, T1),  # Segment 1
+            (middle_area, mouth_area, length2, T2),     # Segment 2
+        ]
+        T_params = [T1, T2]
+
+    elif num_segments == 3:
+        (throat_area, middle_area, area2, mouth_area,
+         length1, length2, length3, T1, T2, T3, V_tc, V_rc) = design
+
+        # Build segment list with T parameters
+        segments = [
+            (throat_area, middle_area, length1, T1),  # Segment 1
+            (middle_area, area2, length2, T2),        # Segment 2
+            (area2, mouth_area, length3, T3),         # Segment 3
+        ]
+        T_params = [T1, T2, T3]
+
+    else:
+        raise ValueError(f"num_segments must be 2 or 3, got {num_segments}")
+
+    # Determine segment types based on T values
+    # T ≈ 1.0 (within 1%) can use exponential HornSegment
+    # T < 0.99 should use HyperbolicHorn
+    segment_types = []
+    for T in T_params:
+        if abs(T - 1.0) < 0.01:
+            segment_types.append("HornSegment")
+        else:
+            segment_types.append("HyperbolicHorn")
+
+    return {
+        'throat_area': throat_area,
+        'mouth_area': mouth_area,
+        'segments': segments,
+        'V_tc': V_tc,
+        'V_rc': V_rc,
+        'T_params': T_params,
+        'segment_types': segment_types,
+        'total_length': sum(seg[2] for seg in segments),
+    }
+
+
+def detect_design_type(design: np.ndarray, num_segments: int = 2) -> str:
+    """
+    Detect whether design vector is for standard or hyperbolic horn.
+
+    Args:
+        design: Optimization array
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        "hyperbolic" if T parameters are present, "standard" otherwise
+
+    Examples:
+        >>> design = np.array([0.001, 0.01, 0.1, 0.3, 0.6, 0.7, 1.0, 0.0, 0.0])
+        >>> detect_design_type(design, num_segments=2)
+        'hyperbolic'
+    """
+    # Standard 2-segment: 7 elements [throat, middle, mouth, L1, L2, V_tc, V_rc]
+    # Hyperbolic 2-segment: 9 elements [throat, middle, mouth, L1, L2, T1, T2, V_tc, V_rc]
+    # Standard 3-segment: 9 elements [throat, middle, area2, mouth, L1, L2, L3, V_tc, V_rc]
+    # Hyperbolic 3-segment: 12 elements [throat, middle, area2, mouth, L1, L2, L3, T1, T2, T3, V_tc, V_rc]
+
+    expected_standard = 7 + (2 if num_segments == 3 else 0)
+    expected_hyperbolic = expected_standard + num_segments
+
+    if len(design) == expected_hyperbolic:
+        return "hyperbolic"
+    elif len(design) == expected_standard:
+        return "standard"
+    else:
+        raise ValueError(
+            f"Design vector length {len(design)} doesn't match expected "
+            f"standard ({expected_standard}) or hyperbolic ({expected_hyperbolic}) "
+            f"for {num_segments} segments"
+        )
+
+
+def build_multisegment_horn(
+    design: np.ndarray,
+    driver: ThieleSmallParameters,
+    num_segments: int = 2
+):
+    """
+    Build MultiSegmentHorn from design vector (standard or hyperbolic).
+
+    This is a unified helper function that detects whether the design vector
+    contains T parameters for hyperbolic horns, and builds the appropriate
+    horn segments (HornSegment or HyperbolicHorn).
+
+    Literature:
+        - Salmon, V. (1946). "A New Family of Horns", JASA.
+        - Kolbrek, B. (2008). "Horn Theory: An Introduction, Part 1".
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Args:
+        design: Optimization array
+            - Standard 2-seg: [throat, middle, mouth, L1, L2, V_tc, V_rc]
+            - Hyperbolic 2-seg: [throat, middle, mouth, L1, L2, T1, T2, V_tc, V_rc]
+            - Standard 3-seg: adds [area2, L3]
+            - Hyperbolic 3-seg: adds [area2, L3, T3]
+        driver: ThieleSmallParameters (for context, not strictly needed)
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        MultiSegmentHorn instance with appropriate segment types
+
+    Raises:
+        ValueError: If design vector has invalid length
+
+    Examples:
+        >>> # Standard exponential horn
+        >>> design_std = np.array([0.001, 0.01, 0.1, 0.3, 0.6, 0.0, 0.0])
+        >>> horn = build_multisegment_horn(design_std, driver, num_segments=2)
+
+        >>> # Hyperbolic horn (T1=0.7, T2=0.9)
+        >>> design_hyp = np.array([0.001, 0.01, 0.1, 0.3, 0.6, 0.7, 0.9, 0.0, 0.0])
+        >>> horn = build_multisegment_horn(design_hyp, driver, num_segments=2)
+        >>> horn.segments[0]  # HyperbolicHorn(T=0.7)
+        >>> horn.segments[1]  # HyperbolicHorn(T=0.9)
+    """
+    from viberesp.simulation.types import HornSegment, HyperbolicHorn, MultiSegmentHorn
+
+    design_type = detect_design_type(design, num_segments)
+
+    if design_type == "hyperbolic":
+        # Use hyperbolic decode
+        params = decode_hyperbolic_design(design, driver, num_segments)
+
+        # Build segments with appropriate types
+        segments = []
+        for seg_data, seg_type in zip(params['segments'], params['segment_types']):
+            throat, mouth, length, T = seg_data
+
+            if seg_type == "HyperbolicHorn":
+                segments.append(HyperbolicHorn(throat, mouth, length, T=T))
+            else:  # HornSegment (T ≈ 1.0)
+                segments.append(HornSegment(throat, mouth, length))
+
+        # Extract chamber volumes
+        V_tc = params.get('V_tc', 0.0)
+        V_rc = params.get('V_rc', 0.0)
+
+    else:  # standard
+        # Use standard decode
+        params = decode_multisegment_design(design, driver, num_segments)
+
+        # Build segments (all HornSegment for standard)
+        segments = []
+        for throat, mouth, length in params['segments']:
+            segments.append(HornSegment(throat, mouth, length))
+
+        # Extract chamber volumes
+        V_tc = params.get('V_tc', 0.0)
+        V_rc = params.get('V_rc', 0.0)
+
+    # Create MultiSegmentHorn
+    horn = MultiSegmentHorn(segments)
+
+    return horn, V_tc, V_rc
+
+
 def calculate_multisegment_horn_volume(
     throat_area: float,
     middle_area: float,

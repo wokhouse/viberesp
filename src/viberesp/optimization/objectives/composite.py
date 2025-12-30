@@ -121,6 +121,7 @@ class EnclosureOptimizationProblem(Problem):
         objective_map = {
             "f3": objective_f3,
             "flatness": objective_response_flatness,
+            "composite_flatness": objective_response_flatness,  # Alias for now
             "efficiency": objective_efficiency,
             "size": objective_enclosure_volume,
             "wavefront_sphericity": objective_wavefront_sphericity,
@@ -147,6 +148,7 @@ class EnclosureOptimizationProblem(Problem):
                 constraint_port_velocity,
                 constraint_multisegment_continuity,
                 constraint_multisegment_flare_limits,
+                constraint_multisegment_flare_curvature,
             )
             from viberesp.optimization.constraints.performance import (
                 constraint_f3_limit,
@@ -162,6 +164,7 @@ class EnclosureOptimizationProblem(Problem):
                 "volume_limit": constraint_volume_limit,
                 "segment_continuity": constraint_multisegment_continuity,
                 "flare_constant_limits": constraint_multisegment_flare_limits,
+                "flare_curvature": constraint_multisegment_flare_curvature,
             }
 
             for constr_name in constraints:
