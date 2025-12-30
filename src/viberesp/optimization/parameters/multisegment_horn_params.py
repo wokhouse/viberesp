@@ -401,12 +401,13 @@ def calculate_multisegment_horn_cutoff(
         >>> print(f"Overall: {fc_overall:.0f} Hz")
     """
     # Segment 1 flare constant and cutoff
-    m1 = np.log(middle_area / throat_area) / length1 if length1 > 0 else 0
-    fc1 = (c * m1) / (2 * np.pi) if m1 > 0 else float('inf')
+    # Using Kolbrek convention: f_c = c·m_kolbrek/(2π) where m_kolbrek = m_olson/2
+    m1_olson = np.log(middle_area / throat_area) / length1 if length1 > 0 else 0
+    fc1 = (c * m1_olson / 2.0) / (2 * np.pi) if m1_olson > 0 else float('inf')
 
     # Segment 2 flare constant and cutoff
-    m2 = np.log(mouth_area / middle_area) / length2 if length2 > 0 else 0
-    fc2 = (c * m2) / (2 * np.pi) if m2 > 0 else float('inf')
+    m2_olson = np.log(mouth_area / middle_area) / length2 if length2 > 0 else 0
+    fc2 = (c * m2_olson / 2.0) / (2 * np.pi) if m2_olson > 0 else float('inf')
 
     # Overall cutoff is the maximum (most restrictive segment)
     fc_overall = max(fc1, fc2)

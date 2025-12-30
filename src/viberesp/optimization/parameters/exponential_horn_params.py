@@ -248,13 +248,18 @@ def calculate_horn_cutoff_frequency(throat_area: float, mouth_area: float,
     if length <= 0:
         return float('inf')
 
-    # Flare constant: m = ln(S₂/S₁) / L
+    # Flare constant: m_olson = ln(S₂/S₁) / L (area expansion)
     # Olson (1947), Chapter 5
-    flare_constant = np.log(mouth_area / throat_area) / length
+    m_olson = np.log(mouth_area / throat_area) / length
 
-    # Cutoff frequency: f_c = c·m / (2π)
-    # Olson (1947), Eq. 5.18
-    fc = (c * flare_constant) / (2 * np.pi)
+    # Pressure amplitude flare constant (Kolbrek convention)
+    # m_kolbrek = m_olson / 2
+    # The pressure varies as p(x) ∝ exp(m_olson·x/2)
+    #
+    # Cutoff frequency: f_c = c·m_kolbrek / (2π)
+    # This matches Kolbrek's convention and Hornresp's F12 parameter
+    m_kolbrek = m_olson / 2.0
+    fc = (c * m_kolbrek) / (2 * np.pi)
 
     return fc
 

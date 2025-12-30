@@ -552,10 +552,21 @@ class FrontLoadedHorn:
             >>> flh.cutoff_frequency()
             210.1...  # Hz
         """
-        # Olson (1947), Eq. 5.18: f_c = c·m/(2π)
-        # Use default medium if not specified
+        # Kolbrek convention: f_c = c·m_kolbrek/(2π)
+        # where m_kolbrek = m_olson/2 (pressure amplitude flare constant)
+        # This matches Hornresp's F12 parameter
+        #
+        # Note: Olson (1947), Eq. 5.18 gives f_c = c·m_olson/(2π)
+        # where m_olson is the area flare constant. The pressure amplitude
+        # varies as p(x) ∝ exp(m_olson·x/2), so the effective propagation
+        # constant uses m_kolbrek = m_olson/2.
+        #
+        # Literature:
+        # - Kolbrek, "Horn Loudspeaker Simulation Part 1"
+        # - Olson (1947), Eq. 5.18 (area flare constant)
         medium = MediumProperties()
-        fc = (medium.c * self.horn.flare_constant) / (2 * math.pi)
+        m_kolbrek = self.horn.flare_constant / 2.0  # Pressure amplitude flare
+        fc = (medium.c * m_kolbrek) / (2 * math.pi)
         return fc
 
     def horn_system_parameters(self) -> dict:
