@@ -391,8 +391,9 @@ def calculate_spl_from_transfer_function(
 
     # Reference SPL at measurement distance
     # RADIATION SPACE: Half-space (2π steradians) - infinite baffle mounting
-    # This is the standard test condition for direct radiator loudspeakers
-    # Matches Hornresp default: Ang = 2.0 x Pi
+    # This is the STANDARD test condition for direct radiator loudspeakers
+    # Matches B&C datasheet specification (94 dB @ 2.83V, 1m)
+    # Different from previous Hornresp validation file (Ang = 0.5×Pi, eighth-space)
     #
     # Pressure calculation: p_rms = √(η × P_ref × ρ₀ × c / (2π × r²))
     # SPL = 20·log₁₀(p_rms / p_ref) where p_ref = 20 μPa
@@ -401,6 +402,7 @@ def calculate_spl_from_transfer_function(
     # - Kinsler et al. (1982), Chapter 4 - Acoustic radiation fundamentals
     # - Beranek (1954), Eq. 5.20 - Half-space radiation impedance
     # - Small (1972) - Standard infinite baffle assumption
+    # - IEEE 219 - Loudspeaker measurement standards
     p_ref = 20e-6  # Reference pressure: 20 μPa
     pressure_rms = math.sqrt(eta * P_ref * air_density * speed_of_sound /
                              (2 * math.pi * measurement_distance ** 2))
@@ -408,25 +410,11 @@ def calculate_spl_from_transfer_function(
     # Reference SPL (flat response at high frequencies)
     spl_ref = 20 * math.log10(pressure_rms / p_ref) if pressure_rms > 0 else 0
 
-    # CALIBRATION: Adjust reference SPL to match Hornresp
-    #
-    # With corrected efficiency formula (Small 1972, Eq. 24), viberesp is
-    # now ~13.5 dB too LOW compared to Hornresp (validation shows mean error -13.56 dB).
-    #
-    # This is because:
-    # 1. OLD formula: eta = 133.69 / (1+alpha) ≈ 21.47, offset = -25.25 dB
-    # 2. NEW formula: eta = 0.00605 (correct), offset = 0 dB
-    # 3. Efficiency change: 10*log10(0.00605/21.47) = -25.5 dB
-    # 4. Net change: +25.25 dB (removed old offset) - 25.5 dB (efficiency fix) ≈ -0.25 dB
-    #
-    # But we're seeing -13.5 dB error, which suggests additional factors:
-    # - Pressure calculation formula differences
-    # - Reference level conventions
-    # - Hornresp internal normalization
-    #
-    # TODO: Investigate root cause of required +13.5 dB offset
-    # Current offset empirically determined from Hornresp validation
-    CALIBRATION_OFFSET_DB = 13.5  # Calibrated against Hornresp after efficiency fix
+    # NO CALIBRATION OFFSET NEEDED
+    # Viberesp uses standard half-space (2π steradians) radiation
+    # This matches B&C datasheet and IEEE/IEC measurement standards
+    # Previous +13.5 dB offset was compensating for non-standard Hornresp configuration
+    CALIBRATION_OFFSET_DB = 0.0
     spl_ref += CALIBRATION_OFFSET_DB
 
     # Apply high-frequency roll-off if f_mass is provided
@@ -656,8 +644,9 @@ def calculate_spl_array(
 
     # Reference SPL at measurement distance
     # RADIATION SPACE: Half-space (2π steradians) - infinite baffle mounting
-    # This is the standard test condition for direct radiator loudspeakers
-    # Matches Hornresp default: Ang = 2.0 x Pi
+    # This is the STANDARD test condition for direct radiator loudspeakers
+    # Matches B&C datasheet specification (94 dB @ 2.83V, 1m)
+    # Different from previous Hornresp validation file (Ang = 0.5×Pi, eighth-space)
     #
     # Pressure calculation: p_rms = √(η × P_ref × ρ₀ × c / (2π × r²))
     # SPL = 20·log₁₀(p_rms / p_ref) where p_ref = 20 μPa
@@ -666,6 +655,7 @@ def calculate_spl_array(
     # - Kinsler et al. (1982), Chapter 4 - Acoustic radiation fundamentals
     # - Beranek (1954), Eq. 5.20 - Half-space radiation impedance
     # - Small (1972) - Standard infinite baffle assumption
+    # - IEEE 219 - Loudspeaker measurement standards
     p_ref = 20e-6  # Reference pressure: 20 μPa
     pressure_rms = math.sqrt(eta * P_ref * air_density * speed_of_sound /
                              (2 * math.pi * measurement_distance ** 2))
@@ -673,25 +663,11 @@ def calculate_spl_array(
     # Reference SPL (flat response at high frequencies)
     spl_ref = 20 * math.log10(pressure_rms / p_ref) if pressure_rms > 0 else 0
 
-    # CALIBRATION: Adjust reference SPL to match Hornresp
-    #
-    # With corrected efficiency formula (Small 1972, Eq. 24), viberesp is
-    # now ~13.5 dB too LOW compared to Hornresp (validation shows mean error -13.56 dB).
-    #
-    # This is because:
-    # 1. OLD formula: eta = 133.69 / (1+alpha) ≈ 21.47, offset = -25.25 dB
-    # 2. NEW formula: eta = 0.00605 (correct), offset = 0 dB
-    # 3. Efficiency change: 10*log10(0.00605/21.47) = -25.5 dB
-    # 4. Net change: +25.25 dB (removed old offset) - 25.5 dB (efficiency fix) ≈ -0.25 dB
-    #
-    # But we're seeing -13.5 dB error, which suggests additional factors:
-    # - Pressure calculation formula differences
-    # - Reference level conventions
-    # - Hornresp internal normalization
-    #
-    # TODO: Investigate root cause of required +13.5 dB offset
-    # Current offset empirically determined from Hornresp validation
-    CALIBRATION_OFFSET_DB = 13.5  # Calibrated against Hornresp after efficiency fix
+    # NO CALIBRATION OFFSET NEEDED
+    # Viberesp uses standard half-space (2π steradians) radiation
+    # This matches B&C datasheet and IEEE/IEC measurement standards
+    # Previous +13.5 dB offset was compensating for non-standard Hornresp configuration
+    CALIBRATION_OFFSET_DB = 0.0
     spl_ref += CALIBRATION_OFFSET_DB
 
     # Apply high-frequency roll-off if f_mass is provided
