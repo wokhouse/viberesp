@@ -286,19 +286,13 @@ class FrontLoadedHorn:
         )
         Z_acoustic_throat = Z_front[0] + Z_rear[0]
 
-        # Transform acoustic impedance to mechanical domain
-        # IMPORTANT: For compression drivers, Z_acoustic is calculated at throat (area S1)
-        # not at diaphragm (area Sd). We must scale by throat area, not diaphragm area.
-        #
-        # Z_mechanical_acoustic = Z_acoustic_at_throat × S_throat²
-        #
-        # The compression ratio (Sd/S_throat) affects the pressure transformation, but
-        # the acoustic impedance calculation already accounts for this.
-        #
-        # Literature:
-        # - Beranek (1954), Chapter 8 - Compression driver loading
-        # - Olson (1947), Chapter 8 - Horn driver impedance transformation
-        Z_mechanical_acoustic = Z_acoustic_throat * (self.horn.throat_area ** 2)
+        # Transform acoustic impedance to mechanical domain using shared utility
+        # Import the shared function to avoid code duplication
+        from viberesp.simulation.horn_driver_integration import scale_throat_acoustic_to_mechanical
+
+        Z_mechanical_acoustic = scale_throat_acoustic_to_mechanical(
+            Z_acoustic_throat, self.horn.throat_area, self.driver.S_d
+        )
 
         # Total mechanical impedance
         Z_mechanical_total = Z_mechanical_driver + Z_mechanical_acoustic
@@ -360,7 +354,8 @@ class FrontLoadedHorn:
             # W = Re(p_m × U_m*)
             # Kolbrek, "Horn Loudspeaker Simulation Part 3"
             # Beranek (1954), Chapter 4
-            power = np.real(p_mouth_complex * np.conj(U_mouth_complex))
+            # Factor of 0.5 for RMS (peak values used in calculation)
+            power = 0.5 * np.real(p_mouth_complex * np.conj(U_mouth_complex))
 
         # Ensure non-negative (numerical errors can give tiny negative values)
         return max(0.0, power)
