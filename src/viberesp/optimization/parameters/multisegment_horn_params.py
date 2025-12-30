@@ -373,14 +373,17 @@ def calculate_multisegment_horn_cutoff(
     Calculate cutoff frequencies for each segment.
 
     Each segment has its own cutoff based on its flare constant:
-        f_c = c·m/(2π)
+        f_c = c·m_olson/(4π) (Kolbrek convention)
 
     The overall horn cutoff is the maximum of segment cutoffs
     (highest frequency = most restrictive).
 
     Literature:
-        - Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
+        - Olson (1947), Eq. 5.18 - Area expansion flare constant m = ln(S₂/S₁)/L
+        - Kolbrek (2018), Horn Theory Tutorial - Pressure amplitude convention
+          m_kolbrek = m_olson/2, f_c = c·m_kolbrek/(2π) = c·m_olson/(4π)
         - literature/horns/olson_1947.md
+        - literature/horns/kolbrek_horn_theory_tutorial.md
 
     Args:
         throat_area: Horn throat area [m²]
@@ -399,14 +402,19 @@ def calculate_multisegment_horn_cutoff(
         ... )
         >>> print(f"Segment 1: {fc1:.0f} Hz, Segment 2: {fc2:.0f} Hz")
         >>> print(f"Overall: {fc_overall:.0f} Hz")
+
+    Validation:
+        Compare with Hornresp's F12 (cutoff) parameter for each segment.
+        Expected agreement: <0.1% deviation for segments with well-defined flare constants.
     """
     # Segment 1 flare constant and cutoff
-    m1 = np.log(middle_area / throat_area) / length1 if length1 > 0 else 0
-    fc1 = (c * m1) / (2 * np.pi) if m1 > 0 else float('inf')
+    # Using Kolbrek convention: f_c = c·m_kolbrek/(2π) where m_kolbrek = m_olson/2
+    m1_olson = np.log(middle_area / throat_area) / length1 if length1 > 0 else 0
+    fc1 = (c * m1_olson / 2.0) / (2 * np.pi) if m1_olson > 0 else float('inf')
 
     # Segment 2 flare constant and cutoff
-    m2 = np.log(mouth_area / middle_area) / length2 if length2 > 0 else 0
-    fc2 = (c * m2) / (2 * np.pi) if m2 > 0 else float('inf')
+    m2_olson = np.log(mouth_area / middle_area) / length2 if length2 > 0 else 0
+    fc2 = (c * m2_olson / 2.0) / (2 * np.pi) if m2_olson > 0 else float('inf')
 
     # Overall cutoff is the maximum (most restrictive segment)
     fc_overall = max(fc1, fc2)

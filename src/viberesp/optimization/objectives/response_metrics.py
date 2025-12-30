@@ -106,7 +106,7 @@ def objective_f3(
         length = design_vector[2]
         # V_rc not used for cutoff calculation (design_vector[3])
 
-        # Calculate cutoff frequency using Olson's formula
+        # Calculate cutoff frequency using Kolbrek convention (matches Hornresp's F12)
         fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
 
         return fc  # Minimize cutoff frequency for better bass extension

@@ -223,9 +223,15 @@ def calculate_horn_cutoff_frequency(throat_area: float, mouth_area: float,
     """
     Calculate exponential horn cutoff frequency.
 
+    Uses Kolbrek's convention where the pressure amplitude flare constant is
+    half the area expansion flare constant. This matches Hornresp's F12 parameter.
+
     Literature:
-        - Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
+        - Olson (1947), Eq. 5.18 - Area expansion flare constant m = ln(S₂/S₁)/L
+        - Kolbrek (2018), Horn Theory Tutorial - Pressure amplitude convention
+          m_kolbrek = m_olson/2, f_c = c·m_kolbrek/(2π)
         - literature/horns/olson_1947.md
+        - literature/horns/kolbrek_horn_theory_tutorial.md
 
     Args:
         throat_area: Horn throat area [m²]
@@ -239,22 +245,31 @@ def calculate_horn_cutoff_frequency(throat_area: float, mouth_area: float,
     Examples:
         >>> fc = calculate_horn_cutoff_frequency(0.0005, 0.02, 0.5)
         >>> print(f"{fc:.1f} Hz")
-        404.2 Hz
+        201.4 Hz
 
     Notes:
         Below cutoff frequency, the horn does not efficiently propagate sound
         waves (evanescent modes). SPL drops rapidly below f_c.
+
+    Validation:
+        Compare with Hornresp's F12 (cutoff) parameter for identical horn geometry.
+        Expected agreement: <0.1% deviation for horns with well-defined flare constant.
     """
     if length <= 0:
         return float('inf')
 
-    # Flare constant: m = ln(S₂/S₁) / L
+    # Flare constant: m_olson = ln(S₂/S₁) / L (area expansion)
     # Olson (1947), Chapter 5
-    flare_constant = np.log(mouth_area / throat_area) / length
+    m_olson = np.log(mouth_area / throat_area) / length
 
-    # Cutoff frequency: f_c = c·m / (2π)
-    # Olson (1947), Eq. 5.18
-    fc = (c * flare_constant) / (2 * np.pi)
+    # Pressure amplitude flare constant (Kolbrek convention)
+    # m_kolbrek = m_olson / 2
+    # The pressure varies as p(x) ∝ exp(m_olson·x/2)
+    #
+    # Cutoff frequency: f_c = c·m_kolbrek / (2π)
+    # This matches Kolbrek's convention and Hornresp's F12 parameter
+    m_kolbrek = m_olson / 2.0
+    fc = (c * m_kolbrek) / (2 * np.pi)
 
     return fc
 
