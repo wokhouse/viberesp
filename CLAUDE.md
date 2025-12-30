@@ -4,13 +4,14 @@ This file contains project-specific instructions for Claude Code when working on
 
 ## Project Overview
 
-Viberesp is a CLI tool for loudspeaker enclosure design and simulation, with initial focus on **horn-loaded enclosures**. The simulation engine implements acoustic theory from first principles and validates results against Hornresp (the industry-standard horn simulation tool).
+Viberesp is a Python tool for loudspeaker enclosure design and simulation, with support for **horn-loaded enclosures, sealed boxes, and ported boxes**. The simulation engine implements acoustic theory from first principles and validates results against Hornresp (the industry-standard horn simulation tool).
 
 **Key workflow:**
-1. Import driver parameters (manual entry via CLI)
-2. Explore enclosure types and variables
-3. Export to Hornresp for validation
-4. Iterate based on validation results
+1. Import driver parameters (YAML-based definitions in `data/drivers/`)
+2. Design enclosure (sealed box, ported box, or exponential horn)
+3. Optimize design parameters using multi-objective optimization (NSGA-II)
+4. Export to Hornresp for validation
+5. Iterate based on validation results
 
 ## CRITICAL: Literature Citation Requirements
 
@@ -357,15 +358,38 @@ debug_script.py              # Wrong! → tasks/
 src/viberesp/
 ├── cli.py                   # CLI entry point (click commands)
 ├── driver/                  # Driver parameter handling
-│   └── parameters.py        # Thiele-Small parameter data structures
+│   ├── parameters.py        # Thiele-Small parameter data structures
+│   ├── response.py          # Direct radiator frequency response
+│   ├── electrical_impedance.py  # Voice coil impedance (Leach model)
+│   ├── radiation_mass.py    # Radiation mass calculations
+│   ├── radiation_impedance.py  # Radiation impedance
+│   └── loader.py            # YAML-based driver loading
 ├── simulation/              # SIMULATION CODE MUST CITE LITERATURE
-│   ├── horn_theory.py       # Horn acoustic models (cite literature/horns/)
-│   ├── electrical_analogies.py  # Circuit representations
-│   └── response.py          # Frequency response calculation
+│   ├── horn_theory.py       # Exponential horn T-matrix implementation ✅
+│   ├── horn_driver_integration.py  # Driver-horn coupling
+│   ├── types.py             # ExponentialHorn and other data types
+│   └── constants.py         # Physical constants (with citations)
+├── enclosure/               # Enclosure simulation
+│   ├── sealed_box.py        # Sealed box simulation (validated ✅)
+│   ├── ported_box.py        # Ported box simulation (validated ✅)
+│   ├── front_loaded_horn.py # Front-loaded horn simulation
+│   └── common.py            # Shared enclosure functions
+├── optimization/            # Optimization system (COMPLETE ✅)
+│   ├── api/                 # Agent-friendly Python API
+│   │   └── design_assistant.py  # DesignAssistant class
+│   ├── parameters/          # Parameter space definitions
+│   ├── objectives/          # Objective functions (with citations)
+│   ├── constraints/         # Physical and performance constraints
+│   ├── optimizers/          # NSGA-II implementation (pymoo)
+│   └── results/             # Pareto front analysis
 ├── hornresp/                # Hornresp integration
-│   └── export.py            # Export to Hornresp format
+│   ├── export.py            # Export to Hornresp format
+│   ├── query_tools.py       # Batch Hornresp sim file parsing
+│   └── results_parser.py    # Parse Hornresp .sim.txt files
 └── validation/              # Validation framework
-    └── compare.py           # Compare viberesp vs Hornresp results
+    ├── compare.py           # Compare viberesp vs Hornresp results
+    ├── paths.py             # Validation path management
+    └── commands.py          # Validation CLI commands
 ```
 
 ### Import Conventions
@@ -495,13 +519,33 @@ AIR_DENSITY = 1.18  # kg/m³
 
 ## Optimization and Exploration
 
-### Future Features (Roadmap Phases 6-7)
+### Implementation Status: Complete ✅
 
-When implementing optimization and parameter exploration:
+Viberesp has a fully functional optimization system using NSGA-II (Non-dominated Sorting Genetic Algorithm II):
+
+- **Multi-objective optimization**: `DesignAssistant.optimize_design()`
+- **Parameter sweep**: `DesignAssistant.sweep_parameter()`
+- **Design recommendations**: `DesignAssistant.recommend_design()`
+- **Pareto front analysis**: Automatic ranking and trade-off analysis
+
+**Supported Enclosure Types:**
+- Sealed box (optimize Vb for target F3, Qtc)
+- Ported box (optimize Vb, Fb, port dimensions)
+- Exponential horn (optimize throat area, mouth area, length, flare)
+
+**Available Objectives:**
+- `f3` - Minimize cutoff frequency
+- `flatness` - Minimize response deviation from flat
+- `size` - Minimize enclosure volume
+- `efficiency` - Maximize reference efficiency
+
+### When Working with Optimization Code
 
 1. Maintain citation requirements for all simulation code
 2. Optimization algorithms (pymoo) don't need citations, but objective functions do
 3. Document which literature provides the optimization criteria (e.g., "maximize efficiency at 80 Hz per Beranek Chapter 8")
+4. Constraint handling is implemented in `optimization/constraints/`
+5. Parameter spaces are defined in `optimization/parameters/`
 
 ### Parameter Sweep Conventions
 
