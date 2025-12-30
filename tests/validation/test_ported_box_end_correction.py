@@ -214,7 +214,7 @@ def test_ported_box_normalization():
     spl_absolute = spl
 
     # Check that normalized passband has consistent reference
-    # After calibration, the passband is shifted by -7.65 dB from 0
+    # After normalization to passband, mean should be ~0 dB
     mask_passband = (freqs >= 80) & (freqs <= 100)
     mean_passband = np.mean(spl_normalized[mask_passband])
 
@@ -222,20 +222,20 @@ def test_ported_box_normalization():
     print("NORMALIZATION TEST")
     print("="*80)
     print(f"Normalized passband (80-100 Hz) mean: {mean_passband:.3f} dB")
-    print(f"  Expected: ~-7.65 dB (due to calibration)")
-    print(f"  {'✓ PASS' if abs(mean_passband - (-7.65)) < 1.0 else '✗ FAIL'}")
+    print(f"  Expected: ~0 dB (normalized to passband)")
+    print(f"  {'✓ PASS' if abs(mean_passband) < 0.1 else '✗ FAIL'}")
     print()
     print(f"Absolute SPL at 100 Hz: {spl_absolute[np.argmin(np.abs(freqs - 100))]:.1f} dB")
-    print(f"  Expected: ~90-100 dB for 2.83V at 1m")
+    print(f"  Expected: ~84-94 dB for 2.83V at 1m (half-space)")
     print("="*80)
 
-    # Passband should be at approximately -7.65 dB (after calibration)
-    # Allow ±1.0 dB tolerance for numerical variations
-    assert abs(mean_passband - (-7.65)) < 1.0, f"Passband mean should be ~-7.65 dB, got {mean_passband:.3f} dB"
+    # Passband should be at approximately 0 dB (normalized)
+    # Allow ±0.1 dB tolerance for numerical variations
+    assert abs(mean_passband) < 0.1, f"Passband mean should be ~0 dB (normalized), got {mean_passband:.3f} dB"
 
-    # Absolute SPL should be reasonable (80-110 dB at 1m for 2.83V)
+    # Absolute SPL should be reasonable (74-104 dB at 1m for 2.83V with half-space radiation)
     spl_at_100 = spl_absolute[np.argmin(np.abs(freqs - 100))]
-    assert 80 < spl_at_100 < 110, f"Absolute SPL at 100 Hz should be 80-110 dB, got {spl_at_100:.1f} dB"
+    assert 74 < spl_at_100 < 104, f"Absolute SPL at 100 Hz should be 74-104 dB, got {spl_at_100:.1f} dB"
 
     print("\n✓ Normalization test passed\n")
 

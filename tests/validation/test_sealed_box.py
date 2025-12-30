@@ -34,7 +34,12 @@ from viberesp.validation.compare import (
     generate_validation_report,
 )
 from viberesp.driver import load_driver
-EXPECTED_QTC_8NDL51 = 0.707  # Expected system Q
+
+# Test configuration for BC_8NDL51
+Vb_LITERS_8NDL51 = 31.65  # Box volume for Qtc=0.707 Butterworth alignment
+Vb_M3_8NDL51 = Vb_LITERS_8NDL51 / 1000.0  # Convert to m³
+EXPECTED_FC_8NDL51 = 86.1  # Expected system resonance (Hz)
+EXPECTED_QTC_8NDL51 = 0.707  # Expected system Q (Butterworth)
 F_MASS_8NDL51 = 450.0  # Mass break frequency (Hz) for HF roll-off (optimized for Hornresp validation)
 
 # Test configuration for BC_15PS100
@@ -78,14 +83,14 @@ class TestSealedBoxSystemParameters:
             f"Fc mismatch: {params.Fc:.1f} Hz vs expected {EXPECTED_FC_8NDL51} Hz"
 
         # Check Qtc within 0.02
-        assert abs(params.Qtc - EXPECTED_QTC_8NDL51) < 0.02, \
-            f"Qtc mismatch: {params.Qtc:.3f} vs expected {EXPECTED_QTC_8NDL51:.3f}"
+        assert abs(params.Qtc_total - EXPECTED_QTC_8NDL51) < 0.02, \
+            f"Qtc mismatch: {params.Qtc_total:.3f} vs expected {EXPECTED_QTC_8NDL51:.3f}"
 
         print(f"\\nBC_8NDL51 Qtc=0.707 (Butterworth) Validation:")
         print(f"  Vb = {params.Vb*1000:.2f} L")
         print(f"  α = Vas/Vb = {params.alpha:.3f}")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {EXPECTED_FC_8NDL51} Hz)")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {EXPECTED_QTC_8NDL51:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {EXPECTED_QTC_8NDL51:.3f})")
 
     def test_fc_calculation_bc15ps100(self):
         """
@@ -99,7 +104,7 @@ class TestSealedBoxSystemParameters:
 
         Tolerance: <0.5 Hz for Fc, <0.02 for Qtc
         """
-        driver = get_bc_15ps100()
+        driver = load_driver("BC_15PS100")
         params = calculate_sealed_box_system_parameters(driver, Vb_M3_15PS100)
 
         # Check Fc within 0.5 Hz
@@ -107,14 +112,14 @@ class TestSealedBoxSystemParameters:
             f"Fc mismatch: {params.Fc:.1f} Hz vs expected {EXPECTED_FC_15PS100} Hz"
 
         # Check Qtc within 0.02
-        assert abs(params.Qtc - EXPECTED_QTC_15PS100) < 0.02, \
-            f"Qtc mismatch: {params.Qtc:.3f} vs expected {EXPECTED_QTC_15PS100:.3f}"
+        assert abs(params.Qtc_total - EXPECTED_QTC_15PS100) < 0.02, \
+            f"Qtc mismatch: {params.Qtc_total:.3f} vs expected {EXPECTED_QTC_15PS100:.3f}"
 
         print(f"\\nBC_15PS100 Qtc=0.707 (Butterworth) Validation:")
         print(f"  Vb = {params.Vb*1000:.2f} L")
         print(f"  α = Vas/Vb = {params.alpha:.3f}")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {EXPECTED_FC_15PS100} Hz)")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {EXPECTED_QTC_15PS100:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {EXPECTED_QTC_15PS100:.3f})")
 
 
 class TestSealedBoxElectricalImpedanceBC8NDL51:
@@ -316,7 +321,7 @@ class TestSealedBoxElectricalImpedanceBC15PS100:
     @pytest.fixture
     def bc_15ps100_driver(self):
         """Get BC_15PS100 driver parameters."""
-        return get_bc_15ps100()
+        return load_driver("BC_15PS100")
 
     @pytest.fixture
     def hornresp_data(self, bc_15ps100_driver):
@@ -591,14 +596,14 @@ class TestSealedBoxQtcAlignmentsBC8NDL51:
             f"Fc mismatch for Qtc={qtc}: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
 
         # Check Qtc within 0.02
-        assert abs(params.Qtc - qtc) < 0.02, \
-            f"Qtc mismatch: {params.Qtc:.3f} vs expected {qtc:.3f}"
+        assert abs(params.Qtc_total - qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc_total:.3f} vs expected {qtc:.3f}"
 
         print(f"\\nBC_8NDL51 {alignment} (Qtc={qtc:.2f}):")
         print(f"  Vb = {params.Vb*1000:.2f} L")
         print(f"  α = Vas/Vb = {params.alpha:.3f}")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {qtc:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {qtc:.3f})")
 
     def test_non_optimal_vb20L(self, bc_8ndl51_driver):
         """
@@ -614,14 +619,14 @@ class TestSealedBoxQtcAlignmentsBC8NDL51:
         expected_qtc = 0.755
         expected_fc = 92.0
 
-        assert abs(params.Qtc - expected_qtc) < 0.01, \
-            f"Qtc mismatch for Vb=20L: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Qtc_total - expected_qtc) < 0.01, \
+            f"Qtc mismatch for Vb=20L: {params.Qtc_total:.3f} vs expected {expected_qtc:.3f}"
         assert abs(params.Fc - expected_fc) < 0.5, \
             f"Fc mismatch for Vb=20L: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
 
         print(f"\\nBC_8NDL51 Non-optimal Vb=20L:")
         print(f"  Vb = {params.Vb*1000:.2f} L")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {expected_qtc:.3f})")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
 
 
@@ -644,7 +649,7 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
     @pytest.fixture
     def bc_15ps100_driver(self):
         """Get BC_15PS100 driver parameters."""
-        return get_bc_15ps100()
+        return load_driver("BC_15PS100")
 
     def test_qtc0_5_system_parameters(self, bc_15ps100_driver):
         """
@@ -658,8 +663,8 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
         expected_qtc = 0.5
         expected_fc = 42.2
 
-        assert abs(params.Qtc - expected_qtc) < 0.02, \
-            f"Qtc mismatch: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Qtc_total - expected_qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc_total:.3f} vs expected {expected_qtc:.3f}"
         assert abs(params.Fc - expected_fc) < 0.5, \
             f"Fc mismatch: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
 
@@ -667,7 +672,7 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
         print(f"  Vb = {params.Vb*1000:.2f} L (large box)")
         print(f"  α = Vas/Vb = {params.alpha:.3f}")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {expected_qtc:.3f})")
 
     def test_qtc0_97_system_parameters(self, bc_15ps100_driver):
         """
@@ -681,8 +686,8 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
         expected_qtc = 0.938
         expected_fc = 79.3
 
-        assert abs(params.Qtc - expected_qtc) < 0.02, \
-            f"Qtc mismatch: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Qtc_total - expected_qtc) < 0.02, \
+            f"Qtc mismatch: {params.Qtc_total:.3f} vs expected {expected_qtc:.3f}"
         assert abs(params.Fc - expected_fc) < 0.5, \
             f"Fc mismatch: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
 
@@ -690,7 +695,7 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
         print(f"  Vb = {params.Vb*1000:.2f} L (min practical)")
         print(f"  α = Vas/Vb = {params.alpha:.3f}")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {expected_qtc:.3f})")
 
     @pytest.mark.parametrize("vb_liters,expected_qtc,expected_fc", [
         (50.0, 0.773, 65.9),
@@ -707,13 +712,13 @@ class TestSealedBoxQtcAlignmentsBC15PS100:
         Vb_m3 = vb_liters / 1000.0
         params = calculate_sealed_box_system_parameters(bc_15ps100_driver, Vb_m3)
 
-        assert abs(params.Qtc - expected_qtc) < 0.01, \
-            f"Qtc mismatch for Vb={vb_liters}L: {params.Qtc:.3f} vs expected {expected_qtc:.3f}"
+        assert abs(params.Qtc_total - expected_qtc) < 0.01, \
+            f"Qtc mismatch for Vb={vb_liters}L: {params.Qtc_total:.3f} vs expected {expected_qtc:.3f}"
         assert abs(params.Fc - expected_fc) < 0.5, \
             f"Fc mismatch for Vb={vb_liters}L: {params.Fc:.1f} Hz vs expected {expected_fc} Hz"
 
         print(f"\\nBC_15PS100 Non-optimal Vb={vb_liters}L:")
         print(f"  Vb = {params.Vb*1000:.2f} L")
-        print(f"  Qtc = {params.Qtc:.3f} (expected {expected_qtc:.3f})")
+        print(f"  Qtc = {params.Qtc_total:.3f} (expected {expected_qtc:.3f})")
         print(f"  Fc = {params.Fc:.2f} Hz (expected {expected_fc} Hz)")
 

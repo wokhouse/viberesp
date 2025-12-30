@@ -4,7 +4,7 @@ Comment = Non-optimal volume: Vb=20L, Qtc=0.755, Fc=92.0Hz
 
 |RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
 
-Ang = 0.5 x Pi
+Ang = 2.0 x Pi
 Eg = 2.83
 Rg = 0.00
 Cir = 0.00
