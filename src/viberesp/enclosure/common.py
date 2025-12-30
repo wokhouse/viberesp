@@ -11,6 +11,7 @@ Literature:
 """
 
 import math
+from typing import Union
 
 
 def calculate_inductance_corner_frequency(
@@ -225,3 +226,127 @@ def calculate_mass_break_frequency(bl: float, re: float, mms: float) -> float:
     # The term π×Mms represents inertial load
     # Literature: docs/validation/mass_controlled_rolloff_research.md
     return (bl ** 2 / re) / (math.pi * mms)
+
+
+def calculate_inductance_transfer_function(
+    frequency: Union[float, 'np.ndarray'],
+    Le: float,
+    Re: float
+) -> complex:
+    """
+    Calculate the voice coil inductance transfer function as a complex low-pass filter.
+
+    This function implements the electrical low-pass behavior caused by voice coil
+    inductance. Above the corner frequency f_Le = Re / (2π × Le), the response
+    rolls off at -6 dB/octave due to rising impedance Z = Re + jωLe reducing current.
+
+    Literature:
+        - Leach (2002), "Introduction to Electroacoustics", Eq. 4.20
+        - Small (1972), "Direct-Radiator Loudspeaker System Analysis", JAES
+        - Research: tasks/ported_box_transfer_function_research_brief.md
+
+    Transfer Function:
+        H_le(s) = 1 / (1 + s·τ)
+
+    where:
+        - s = jω (complex frequency variable, ω = 2πf)
+        - τ = Le / Re (time constant)
+        - Corner frequency: f_Le = Re / (2π × Le)
+
+    At frequencies f << f_Le: gain ≈ 1 (0 dB, no effect)
+    At frequencies f >> f_Le: gain rolls off at -6 dB/octave
+    At frequency f = f_Le: gain = 1/√2 (-3 dB)
+
+    Args:
+        frequency: Frequency in Hz (scalar or numpy array)
+        Le: Voice coil inductance (H)
+        Re: DC voice coil resistance (Ω)
+
+    Returns:
+        Complex transfer function H_le(s) (scalar or numpy array of complex numbers)
+        Returns 1.0 (no effect) if Le <= 0 or Re <= 0
+
+    Raises:
+        ValueError: If Re <= 0
+
+    Examples:
+        >>> # At low frequency (f << f_Le): minimal effect
+        >>> H = calculate_inductance_transfer_function(100, 0.00048, 4.7)
+        >>> abs(H)
+        0.999...  # Near unity gain at 100 Hz
+
+        >>> # At corner frequency (f = f_Le): -3 dB
+        >>> f_Le = 4.7 / (2 * 3.14159 * 0.00048)  # ≈ 1558 Hz
+        >>> H = calculate_inductance_transfer_function(f_Le, 0.00048, 4.7)
+        >>> abs(H)
+        0.707...  # 1/√2 at corner frequency
+
+        >>> # At high frequency (f >> f_Le): significant roll-off
+        >>> H = calculate_inductance_transfer_function(5000, 0.00048, 4.7)
+        >>> 20 * math.log10(abs(H))
+        -10.1...  # -10 dB at 5000 Hz
+
+    Validation:
+        Compare with Hornresp inductance effects.
+        Expected: <0.5 dB deviation from Hornresp SPL above f_Le.
+        Test case: Re=4.7Ω, Le=0.48mH → f_Le≈1558Hz
+
+    Notes:
+        - This function supports both scalar and numpy array inputs for efficiency
+        - For numpy arrays, import numpy before calling this function
+        - The transfer function is applied multiplicatively: H_total = H_box × H_le
+        - This models the current reduction due to rising impedance at high frequencies
+    """
+    if Re <= 0:
+        raise ValueError(f"DC resistance Re must be > 0, got {Re} Ω")
+
+    # If inductance is zero or negative, no inductance roll-off
+    if Le <= 0:
+        # Return unity gain (no effect)
+        if hasattr(frequency, '__len__'):
+            # numpy array or list
+            try:
+                import numpy as np
+                return np.ones_like(frequency, dtype=complex)
+            except ImportError:
+                return complex(1.0, 0)
+        return complex(1.0, 0)
+
+    # Check if input is array-like (for numpy vectorization)
+    is_array = hasattr(frequency, '__len__') and not isinstance(frequency, str)
+
+    if is_array:
+        # Vectorized calculation with numpy
+        try:
+            import numpy as np
+            freq_array = np.asarray(frequency, dtype=float)
+
+            # Angular frequency: ω = 2πf
+            omega = 2 * math.pi * freq_array
+
+            # Time constant: τ = Le / Re
+            tau = Le / Re
+
+            # Complex transfer function: H_le(s) = 1 / (1 + s·τ) where s = jω
+            # H_le(jω) = 1 / (1 + jωτ)
+            # Literature: Leach (2002), Eq. 4.20
+            H_le = 1.0 / (1.0 + 1j * omega * tau)
+
+            return H_le
+        except ImportError:
+            # Fallback to scalar calculation if numpy not available
+            pass
+
+    # Scalar calculation
+    # Angular frequency: ω = 2πf
+    omega = 2 * math.pi * frequency
+
+    # Time constant: τ = Le / Re
+    tau = Le / Re
+
+    # Complex transfer function: H_le(s) = 1 / (1 + s·τ) where s = jω
+    # H_le(jω) = 1 / (1 + jωτ)
+    # Literature: Leach (2002), Eq. 4.20
+    H_le = 1.0 / (1.0 + complex(0, omega * tau))
+
+    return H_le
