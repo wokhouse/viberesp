@@ -264,7 +264,7 @@ def calculate_inductance_transfer_function(
 
     Returns:
         Complex transfer function H_le(s) (scalar or numpy array of complex numbers)
-        Returns 1.0 (no effect) if Le <= 0 or Re <= 0
+        Returns 1.0 (no effect) if Le <= 0
 
     Raises:
         ValueError: If Re <= 0
