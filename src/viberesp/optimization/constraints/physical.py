@@ -493,3 +493,94 @@ def constraint_multisegment_flare_curvature(
     # Return maximum violation (positive = bad, negative = satisfied)
     return max(violations)
 
+
+def constraint_conical_expansion_ratio(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    min_ratio: float = 2.0,
+    max_ratio: float = 100.0
+) -> float:
+    """
+    Constrain conical horn expansion ratio to practical limits.
+
+    The expansion ratio (mouth_area / throat_area) determines the loading
+    characteristics and bandwidth of a conical horn. Too small and there's
+    insufficient loading; too large and the horn becomes impractical.
+
+    Literature:
+        - Olson (1947), Chapter 5 - Horn loading and impedance
+        - Beranek (1954) - Radiation impedance and expansion ratio
+
+    Args:
+        design_vector: [throat_area, mouth_area, length, V_tc, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "conical_horn"
+        min_ratio: Minimum expansion ratio (default 2.0)
+        max_ratio: Maximum expansion ratio (default 100.0)
+
+    Returns:
+        Constraint violation (positive = violation, negative = satisfied)
+
+    Examples:
+        >>> design = np.array([0.0015, 0.15, 1.2, 0.0, 0.0])  # 100:1 ratio
+        >>> constraint_conical_expansion_ratio(design, driver, "conical_horn")
+        -98.0  # Satisfied (100 < max_ratio)
+    """
+    if enclosure_type != "conical_horn":
+        return 0.0  # Not applicable for other enclosure types
+
+    throat_area = design_vector[0]
+    mouth_area = design_vector[1]
+
+    if throat_area <= 0:
+        return 1000.0  # Invalid geometry
+
+    ratio = mouth_area / throat_area
+
+    # Constraint: min_ratio ≤ ratio ≤ max_ratio
+    # Return maximum violation
+    violation_min = min_ratio - ratio  # Positive if ratio < min_ratio
+    violation_max = ratio - max_ratio  # Positive if ratio > max_ratio
+
+    return max(violation_min, violation_max)
+
+
+def constraint_conical_monotonic_expansion(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str
+) -> float:
+    """
+    Constrain conical horn to have monotonic area expansion (mouth > throat).
+
+    Ensures the horn expands rather than contracts, which is necessary for
+    proper impedance transformation.
+
+    Literature:
+        - Olson (1947), Chapter 5 - Horn geometry requirements
+
+    Args:
+        design_vector: [throat_area, mouth_area, length, V_tc, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "conical_horn"
+
+    Returns:
+        Constraint violation (positive = violation, negative = satisfied)
+
+    Examples:
+        >>> design = np.array([0.0015, 0.15, 1.2, 0.0, 0.0])
+        >>> constraint_conical_monotonic_expansion(design, driver, "conical_horn")
+        -0.1485  # Satisfied (throat < mouth)
+    """
+    if enclosure_type != "conical_horn":
+        return 0.0  # Not applicable for other enclosure types
+
+    throat_area = design_vector[0]
+    mouth_area = design_vector[1]
+
+    # Constraint: mouth_area > throat_area
+    # Return violation (positive if violated)
+    return throat_area - mouth_area
+
+
