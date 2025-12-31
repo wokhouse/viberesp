@@ -35,6 +35,7 @@ def optimize_bass_horn_extension(
     num_segments=2,
     pop_size=100,
     n_generations=50,
+    hf_cutoff=200.0,
 ):
     """
     Optimize mixed-profile horn for bass extension.
@@ -44,6 +45,7 @@ def optimize_bass_horn_extension(
         num_segments: Number of horn segments (2 or 3)
         pop_size: Population size
         n_generations: Number of generations
+        hf_cutoff: High-frequency cutoff for passband flatness (Hz)
 
     Returns:
         result: Optimization result from pymoo
@@ -55,7 +57,8 @@ def optimize_bass_horn_extension(
     print(f"{'='*70}")
     print(f"Driver: {driver}")
     print(f"Segments: {num_segments}")
-    print(f"Objectives: f3 (minimize), efficiency (maximize)")
+    print(f"Objectives: f3 (minimize), efficiency (maximize), passband_flatness (minimize)")
+    print(f"HF Cutoff: {hf_cutoff} Hz")
     print(f"{'='*70}\n")
 
     # Get parameter space
@@ -69,16 +72,14 @@ def optimize_bass_horn_extension(
     # Define objectives optimized for BASS
     # f3: minimize -3 dB frequency (lower is better for bass)
     # efficiency: maximize acoustic efficiency (higher SPL)
-    objectives = ["f3", "efficiency"]
+    # passband_flatness: minimize SPL variation from F3 to hf_cutoff (flatter response)
+    objectives = ["f3", "efficiency", "passband_flatness"]
 
     # Define constraints
     constraints = [
         "segment_continuity",
         "flare_constant_limits",
     ]
-
-    # Wider frequency band for bass horns
-    target_band = (30, 300)
 
     # Create optimization problem
     problem = EnclosureOptimizationProblem(
@@ -88,13 +89,13 @@ def optimize_bass_horn_extension(
         parameter_bounds=parameter_bounds,
         constraints=constraints,
         num_segments=num_segments,
-        target_band=target_band,
+        hf_cutoff=hf_cutoff,
     )
 
     print(f"Optimization Problem:")
     print(f"  Objectives: {', '.join(objectives)}")
     print(f"  Constraints: {', '.join(constraints)}")
-    print(f"  Target Band: {target_band[0]}-{target_band[1]} Hz")
+    print(f"  HF Cutoff: {hf_cutoff} Hz")
     print(f"  Variables: {problem.n_var}")
     print(f"  Objectives: {problem.n_obj}")
     print(f"  Constraints: {problem.n_constr}")
@@ -114,7 +115,7 @@ def optimize_bass_horn_extension(
         "driver_name": driver.name if hasattr(driver, 'name') else "unknown",
         "num_segments": num_segments,
         "objectives": objectives,
-        "target_band": target_band,
+        "hf_cutoff": hf_cutoff,
         "pop_size": pop_size,
         "n_generations": n_generations,
         "pareto_size": len(result.F),
@@ -124,8 +125,16 @@ def optimize_bass_horn_extension(
     return result, metadata, problem
 
 
-def analyze_results(result, problem, driver):
-    """Analyze and display optimization results."""
+def analyze_results(result, problem, driver, hf_cutoff=200.0):
+    """
+    Analyze and display optimization results.
+
+    Args:
+        result: Optimization result from pymoo
+        problem: Optimization problem instance
+        driver: ThieleSmallParameters instance
+        hf_cutoff: HF cutoff frequency used for passband flatness (Hz)
+    """
     print(f"\n{'='*70}")
     print(f"Optimization Results - Bass Extension")
     print(f"{'='*70}\n")
@@ -136,8 +145,8 @@ def analyze_results(result, problem, driver):
     print(f"Total Pareto-optimal designs: {len(X)}\n")
 
     # Filter out invalid designs (penalty values)
-    # F3 penalty: 1e10, Efficiency penalty: -1000
-    valid_mask = (F[:, 0] < 1e9) & (F[:, 1] > -100)
+    # F3 penalty: 1e10, Efficiency penalty: -1000, Flatness penalty: 100
+    valid_mask = (F[:, 0] < 1e9) & (F[:, 1] > -100) & (F[:, 2] < 100)
     X_valid = X[valid_mask]
     F_valid = F[valid_mask]
 
@@ -152,13 +161,14 @@ def analyze_results(result, problem, driver):
     sorted_indices = np.argsort(f3_values)
 
     print(f"Top 10 Designs (sorted by F3 - lowest cutoff frequency):")
-    print(f"{'Rank':<6} {'F3 (Hz)':<12} {'Efficiency (%)':<18} {'Profile':<20} {'Design'}")
-    print(f"{'-'*70}")
+    print(f"{'Rank':<6} {'F3 (Hz)':<12} {'Efficiency (%)':<18} {'Flatness (dB)':<18} {'Profile':<20} {'Design'}")
+    print(f"{'-'*90}")
 
     for rank, idx in enumerate(sorted_indices[:10], 1):
         design_vector = X_valid[idx]
         f3 = F_valid[idx, 0]
         efficiency = -F_valid[idx, 1] * 100  # Convert to positive percentage
+        flatness = F_valid[idx, 2]  # Standard deviation in dB
 
         # Decode design
         params = decode_mixed_profile_design(design_vector, driver, num_segments=2)
@@ -171,22 +181,24 @@ def analyze_results(result, problem, driver):
         # Design summary
         design_str = f"S=[{params['throat_area']*10000:.0f}, {params['mouth_area']*10000:.0f}] cm², L={params['total_length']:.2f}m"
 
-        print(f"{rank:<6} {f3:<12.1f} {efficiency:<18.3f} {profile_str:<20} {design_str}")
+        print(f"{rank:<6} {f3:<12.1f} {efficiency:<18.3f} {flatness:<18.3f} {profile_str:<20} {design_str}")
 
     print()
 
-    # Find best compromise (lowest F3 with good efficiency)
-    # Normalize objectives (both minimization, so we want low values)
+    # Find best compromise (lowest F3 with good efficiency and flatness)
+    # Normalize objectives (all minimization, so we want low values)
     f3_norm = (F_valid[:, 0] - F_valid[:, 0].min()) / (F_valid[:, 0].max() - F_valid[:, 0].min() + 1e-6)
     eff_norm = (F_valid[:, 1] - F_valid[:, 1].min()) / (F_valid[:, 1].max() - F_valid[:, 1].min() + 1e-6)
+    flat_norm = (F_valid[:, 2] - F_valid[:, 2].min()) / (F_valid[:, 2].max() - F_valid[:, 2].min() + 1e-6)
 
-    # Compromise score (weighted towards F3)
-    compromise = 0.7 * f3_norm + 0.3 * eff_norm
+    # Compromise score (weighted towards F3 and flatness for bass response)
+    compromise = 0.5 * f3_norm + 0.2 * eff_norm + 0.3 * flat_norm
     best_idx = np.argmin(compromise)
 
     print(f"\nBest Compromise Design:")
     print(f"  F3: {F_valid[best_idx, 0]:.1f} Hz")
     print(f"  Efficiency: {-F_valid[best_idx, 1] * 100:.3f}%")
+    print(f"  Passband Flatness: {F_valid[best_idx, 2]:.3f} dB")
     print(f"  Parameters: {X_valid[best_idx]}")
 
     # Save best design
@@ -198,7 +210,8 @@ def analyze_results(result, problem, driver):
         f.write(f"{'='*70}\n\n")
         f.write(f"Objectives:\n")
         f.write(f"  F3: {F_valid[best_idx, 0]:.1f} Hz\n")
-        f.write(f"  Efficiency: {-F_valid[best_idx, 1] * 100:.3f}%\n\n")
+        f.write(f"  Efficiency: {-F_valid[best_idx, 1] * 100:.3f}%\n")
+        f.write(f"  Passband Flatness: {F_valid[best_idx, 2]:.3f} dB (std dev from F3 to {hf_cutoff} Hz)\n\n")
 
         params = decode_mixed_profile_design(X_valid[best_idx], driver, num_segments=2)
         f.write(f"Parameters:\n")
@@ -218,16 +231,21 @@ def main():
     # Load BC_18RBX100
     driver = load_driver("BC_18RBX100")
 
+    # Define HF cutoff for passband flatness evaluation
+    # This defines the upper frequency of the subwoofer's operating range
+    hf_cutoff = 200.0  # Hz (typical for subwoofers)
+
     # Run optimization
     result, metadata, problem = optimize_bass_horn_extension(
         driver=driver,
         num_segments=2,
         pop_size=100,
         n_generations=50,
+        hf_cutoff=hf_cutoff,
     )
 
     # Analyze results
-    best_idx = analyze_results(result, problem, driver)
+    best_idx = analyze_results(result, problem, driver, hf_cutoff=hf_cutoff)
 
     print(f"\nOptimization complete! Review the generated design file.")
 

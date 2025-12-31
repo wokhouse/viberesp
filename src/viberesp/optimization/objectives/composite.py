@@ -87,7 +87,8 @@ class EnclosureOptimizationProblem(Problem):
         parameter_bounds: Dict[str, tuple],
         constraints: List[str] = None,
         num_segments: int = 2,
-        target_band: Tuple[float, float] = None
+        target_band: Tuple[float, float] = None,
+        hf_cutoff: float = None
     ):
         """
         Initialize optimization problem.
@@ -95,18 +96,22 @@ class EnclosureOptimizationProblem(Problem):
         Args:
             driver: ThieleSmallParameters instance
             enclosure_type: "sealed", "ported", "exponential_horn", "multisegment_horn", etc.
-            objectives: List of objective names ["f3", "flatness", "efficiency", "size",
-                       "wavefront_sphericity", "impedance_smoothness"]
+            objectives: List of objective names ["f3", "flatness", "passband_flatness",
+                       "efficiency", "size", "wavefront_sphericity", "impedance_smoothness"]
             parameter_bounds: Dict of parameter ranges
             constraints: Optional list of constraint function names
             num_segments: Number of segments for multisegment_horn (2 or 3)
             target_band: Optional (f_min, f_max) tuple for constraining flatness optimization
                         to a specific frequency band (e.g., (500, 5000) for midrange)
+            hf_cutoff: Optional HF cutoff frequency for passband_flatness objective (Hz).
+                       If using passband_flatness, this defines the upper frequency bound
+                       (e.g., 200 Hz for subwoofers, 500 Hz for bass horns).
         """
         # Import objective functions
         from viberesp.optimization.objectives.response_metrics import (
             objective_f3,
             objective_response_flatness,
+            objective_passband_flatness,
             objective_wavefront_sphericity,
             objective_impedance_smoothness,
         )
@@ -121,6 +126,7 @@ class EnclosureOptimizationProblem(Problem):
         objective_map = {
             "f3": objective_f3,
             "flatness": objective_response_flatness,
+            "passband_flatness": objective_passband_flatness,
             "composite_flatness": objective_response_flatness,  # Alias for now
             "efficiency": objective_efficiency,
             "size": objective_enclosure_volume,
@@ -181,6 +187,7 @@ class EnclosureOptimizationProblem(Problem):
         self.param_names = list(parameter_bounds.keys())
         self.num_segments = num_segments
         self.target_band = target_band
+        self.hf_cutoff = hf_cutoff
 
         # Extract parameter bounds in order
         xl = np.array([parameter_bounds[p][0] for p in self.param_names])
@@ -254,8 +261,25 @@ class EnclosureOptimizationProblem(Problem):
                         obj_config.name in ["flatness", "response_flatness"]
                     )
 
+                    # Check if this objective needs hf_cutoff parameter
+                    needs_hf_cutoff = (
+                        self.hf_cutoff is not None and
+                        obj_config.name == "passband_flatness"
+                    )
+
+                    # For passband_flatness, pass hf_cutoff and num_segments
+                    if needs_hf_cutoff:
+                        obj_value = obj_config.function(
+                            design_vector,
+                            self.driver,
+                            self.enclosure_type,
+                            hf_cutoff=self.hf_cutoff,
+                            n_points=100,
+                            voltage=2.83,
+                            num_segments=self.num_segments
+                        )
                     # For multisegment_horn objectives, pass num_segments
-                    if needs_num_segments and obj_config.name in [
+                    elif needs_num_segments and obj_config.name in [
                         "wavefront_sphericity", "impedance_smoothness",
                         "response_flatness", "response_slope", "flatness", "slope"
                     ]:
