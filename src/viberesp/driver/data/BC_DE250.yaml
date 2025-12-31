@@ -1,0 +1,66 @@
+name: "BC_DE250"
+manufacturer: "B&C Speakers"
+model: "DE250"
+description: "1 inch exit compression driver (approximate parameters)"
+
+# Datasheet specifications (for reference)
+datasheet:
+  throat_diameter: 25  # mm (1 inch)
+  impedance_nominal: 8  # Ohms
+  impedance_minimum: 7.8  # Ohms
+  power_continuous: 120  # W
+  power_nominal: 60  # W
+  frequency_range: "1 kHz - 18 kHz"
+  voice_coil_diameter: 44  # mm (1.7 inch)
+  inductance: 0.11  # mH
+  diaphragm_material: "Polyimide"
+  sensitivity: 108.5  # dB (2.83V, 1m)
+  crossover_recommended: 1.6  # kHz
+  winding_material: "Aluminium"
+  flux_density: 1.85  # T
+
+# Physical parameters (estimated for horn optimizer)
+parameters:
+  M_md: 0.002  # kg - driver mass only (~2g, typical for 1" compression drivers)
+  C_ms: 1.0e-5  # m/N - compliance (very stiff suspension)
+  R_ms: 1.5  # N·s/m - mechanical resistance
+  R_e: 7.8  # Ohms - voice coil DC resistance (minimum from datasheet)
+  L_e: 0.11e-3  # H - voice coil inductance
+  BL: 6.0  # T·m - force factor (estimated - actual value not published by B&C)
+  S_d: 0.0015  # m² - effective diaphragm area (~15 cm², typical for 1" drivers)
+  X_max: 0.0003  # m - maximum linear excursion (~0.3mm, very small for compression driver)
+
+# Compression driver specific parameters
+compression_driver:
+  throat_diameter: 0.0254  # m - 1 inch exit
+  throat_area: 5.07e-4  # m² - π × (12.7mm)²
+  front_chamber_volume: 15e-6  # m³ - Front cavity (~15 cc, typical for 1" drivers)
+  phase_plug_channels: 12  # Number of phase plug channels (typical for 1" drivers)
+
+# Notes and warnings
+notes: |
+  B&C does not publish Thiele-Small parameters for the DE250 compression driver.
+  These are ESTIMATED values suitable for horn optimization approximations.
+
+  Parameter estimation rationale:
+  - M_md (~2g): Typical for 1" exit compression drivers with 44mm voice coils
+  - C_ms (1.0e-5 m/N): Very stiff suspension, typical for compression drivers
+  - S_d (~15 cm²): Based on typical diaphragm size for 1" throat drivers
+    (diaphragm is typically 1.5-2× throat diameter)
+  - BL (~6 T·m): Estimated from 1.85T flux density and 44mm voice coil
+  - X_max (~0.3mm): Compression drivers have very limited excursion
+  - R_e (7.8Ω): Minimum impedance from datasheet
+
+  Horn optimizer usage:
+  - Driver is designed for HF horns (1kHz - 18kHz)
+  - Recommended crossover at 1.6kHz
+  - High sensitivity (108.5 dB) suggests high efficiency
+
+  CAUTION: These are approximate values. For accurate simulation results,
+  measure actual Thiele-Small parameters or obtain from B&C.
+
+# Literature references
+literature:
+  - "B&C DE250 datasheet"
+  - "https://www.bcspeakers.com/"
+  - "Compression driver parameter estimation: Based on typical 1\" exit driver characteristics"

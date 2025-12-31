@@ -12,11 +12,35 @@ Viberesp is a CLI tool for loudspeaker enclosure design and simulation, with ini
 3. Export to Hornresp for validation
 4. Iterate based on validation results
 
-## CRITICAL: Literature Citation Requirements
+## CRITICAL Rules for Physics Simulation
 
-### ALL Simulation Code MUST Cite Literature
+### Rule #1: ALWAYS Use Validated Physics Models for Output
 
-**This is the most important rule in this project:**
+**NEVER create simplified approximations or "fudge factors" for SPL/response calculations.**
+
+When generating frequency response, SPL curves, impedance plots, or ANY physics-based output:
+- ✅ **USE:** Validated functions from `src/viberesp/simulation/` (tested against Hornresp)
+- ❌ **NEVER:** Create your own simplified models, approximations, or heuristic formulas
+
+**Examples of WRONG approaches (garden paths to avoid):**
+- ❌ "Let's just use a -12 dB/octave high-pass filter" → **NOT validated**
+- ❌ "I'll add some Gaussian peaks for resonances" → **NOT physics-based**
+- ❌ "The datasheet says 108.5 dB, so I'll use that" → **NOT calculated from first principles**
+- ❌ "Pressure ∝ 1/|Z_throat|" → **WRONG** (throat impedance ≠ radiated SPL)
+
+**What to do INSTEAD:**
+1. Check `src/viberesp/simulation/` for existing validated functions
+2. If no validated function exists: **STOP** - do not create approximation
+3. Either:
+   - Research and implement proper physics (with literature citations)
+   - Use Hornresp directly for that calculation
+   - Clearly label as "UNVALIDATED APPROXIMATION - DO NOT USE FOR PRODUCTION"
+
+**Validation requirement:** All physics output must be validated against Hornresp before use in design tools.
+
+### Rule #2: Literature Citation Requirements
+
+**ALL Simulation Code MUST Cite Literature**
 
 Every function in the `src/viberesp/simulation/` module that implements acoustic theory **MUST** cite the literature it implements.
 
