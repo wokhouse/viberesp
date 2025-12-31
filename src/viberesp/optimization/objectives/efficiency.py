@@ -73,9 +73,9 @@ def objective_efficiency(
         >>> -eff  # Convert back to positive SPL
         89.5  # dB average SPL (example value)
     """
-    # For multi-segment horns, use true efficiency calculation (percentage)
+    # For multi-segment and mixed-profile horns, use true efficiency calculation (percentage)
     # instead of SPL-based approximation
-    if enclosure_type == "multisegment_horn":
+    if enclosure_type in ["multisegment_horn", "mixed_profile_horn"]:
         return objective_efficiency_percent(
             design_vector, driver, enclosure_type, reference_frequency, voltage
         )
@@ -154,6 +154,16 @@ def objective_efficiency(
 
                 # Build horn (handles both standard and hyperbolic designs)
                 horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
+            elif enclosure_type == "mixed_profile_horn":
+                from viberesp.optimization.parameters.multisegment_horn_params import build_mixed_profile_horn
+
+                # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+                horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments=2)
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
                 # Calculate SPL at this frequency
@@ -282,6 +292,16 @@ def objective_reference_sensitivity(
             # Calculate SPL at reference frequency
             spl = flh.spl_response(reference_frequency, voltage=voltage)
             result = {'SPL': spl}
+        elif enclosure_type == "mixed_profile_horn":
+            from viberesp.optimization.parameters.multisegment_horn_params import build_mixed_profile_horn
+
+            # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+            horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments=2)
+            flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+            # Calculate SPL at reference frequency
+            spl = flh.spl_response(reference_frequency, voltage=voltage)
+            result = {'SPL': spl}
         else:
             raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
@@ -335,6 +355,33 @@ def objective_efficiency_percent(
 
             # Build horn (handles both standard and hyperbolic designs)
             horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
+            flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+            # Calculate acoustic power at reference frequency
+            power_acoustic = flh.acoustic_power(reference_frequency, voltage=voltage)
+
+            # Calculate electrical power
+            result = flh.electrical_impedance(reference_frequency, voltage=voltage)
+            Ze = result['Ze_real'] + 1j * result['Ze_imag']
+
+            if abs(Ze) > 0:
+                power_electrical = (voltage ** 2) * Ze.real / (abs(Ze) ** 2)
+            else:
+                power_electrical = 0
+
+            # Calculate efficiency as percentage
+            if power_electrical > 0:
+                efficiency_percent = (power_acoustic / power_electrical) * 100
+            else:
+                efficiency_percent = 0
+
+            # Return as negative for minimization (pymoo minimizes by default)
+            return -efficiency_percent
+        elif enclosure_type == "mixed_profile_horn":
+            from viberesp.optimization.parameters.multisegment_horn_params import build_mixed_profile_horn
+
+            # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+            horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments=2)
             flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
             # Calculate acoustic power at reference frequency

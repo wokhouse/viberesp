@@ -396,7 +396,7 @@ def main():
         "--driver",
         type=str,
         default="TC2",
-        choices=["TC2", "TC3", "TC4", "BC_8NDL51", "BC_12NDL76", "BC_15DS115"],
+        choices=["TC2", "TC3", "TC4", "BC_8NDL51", "BC_12NDL76", "BC_15DS115", "BC_18RBX100"],
         help="Driver to use for optimization"
     )
     parser.add_argument(

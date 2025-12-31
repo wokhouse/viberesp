@@ -116,6 +116,81 @@ def objective_f3(
 
         return fc  # Minimize cutoff frequency for better bass extension
 
+    elif enclosure_type in ["multisegment_horn", "mixed_profile_horn"]:
+        # For multi-segment and mixed-profile horns, calculate F3 from frequency response
+        # F3 is the -3dB point relative to the passband reference level
+        from viberesp.optimization.parameters.multisegment_horn_params import (
+            build_multisegment_horn,
+            build_mixed_profile_horn,
+        )
+
+        # Build horn based on type
+        if enclosure_type == "multisegment_horn":
+            horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
+        else:  # mixed_profile_horn
+            horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments=2)
+
+        # Create front-loaded horn system
+        flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+        # Generate frequency array for F3 calculation (bass range: 20-500 Hz)
+        if frequency_points is None:
+            frequencies = np.logspace(np.log10(20), np.log10(500), 200)
+        else:
+            frequencies = frequency_points
+
+        # Calculate SPL response
+        spl_values = []
+        for freq in frequencies:
+            try:
+                spl = flh.spl_response(freq, voltage=2.83)
+                spl_values.append(spl)
+            except Exception:
+                spl_values.append(np.nan)
+
+        spl_values = np.array(spl_values)
+
+        # Remove NaN values
+        valid_mask = ~np.isnan(spl_values)
+        if np.sum(valid_mask) < 10:
+            return 500.0  # Large penalty if calculation failed
+
+        freq_valid = frequencies[valid_mask]
+        spl_valid = spl_values[valid_mask]
+
+        # Find reference level (max SPL in passband, typically 100-500 Hz for bass horns)
+        passband_mask = (freq_valid >= 50) & (freq_valid <= 500)
+        if np.sum(passband_mask) > 0:
+            reference_spl = np.max(spl_valid[passband_mask])
+        else:
+            reference_spl = np.max(spl_valid)
+
+        # Find F3: frequency where SPL drops to reference - 3dB
+        target_spl = reference_spl - 3.0
+
+        # Find the lowest frequency where we cross -3dB
+        # (looking from bass region upward)
+        below_target = spl_valid < target_spl
+
+        if np.sum(below_target) > 0:
+            # Find first frequency below target (from low to high)
+            for i in range(len(freq_valid)):
+                if spl_valid[i] < target_spl:
+                    # Interpolate to find exact F3
+                    if i > 0:
+                        f1, f2 = freq_valid[i-1], freq_valid[i]
+                        spl1, spl2 = spl_valid[i-1], spl_valid[i]
+                        # Linear interpolation in log-frequency space
+                        log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
+                                 (target_spl - spl1) / (spl2 - spl1)
+                        f3 = 10 ** log_f3
+                    else:
+                        f3 = freq_valid[i]
+                    return f3
+
+        # If no -3dB point found, return lowest frequency measured
+        return freq_valid[0]
+
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
