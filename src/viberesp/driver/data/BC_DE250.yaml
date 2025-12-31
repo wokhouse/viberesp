@@ -26,9 +26,16 @@ parameters:
   R_ms: 1.5  # N·s/m - mechanical resistance
   R_e: 7.8  # Ohms - voice coil DC resistance (minimum from datasheet)
   L_e: 0.11e-3  # H - voice coil inductance
-  BL: 6.0  # T·m - force factor (estimated for 1.85T flux, 44mm VC)
+  BL: 6.0  # T·m - force factor (estimated - actual value not published by B&C)
   S_d: 0.0015  # m² - effective diaphragm area (~15 cm², typical for 1" drivers)
   X_max: 0.0003  # m - maximum linear excursion (~0.3mm, very small for compression driver)
+
+# Compression driver specific parameters
+compression_driver:
+  throat_diameter: 0.0254  # m - 1 inch exit
+  throat_area: 5.07e-4  # m² - π × (12.7mm)²
+  front_chamber_volume: 15e-6  # m³ - Front cavity (~15 cc, typical for 1" drivers)
+  phase_plug_channels: 12  # Number of phase plug channels (typical for 1" drivers)
 
 # Notes and warnings
 notes: |
