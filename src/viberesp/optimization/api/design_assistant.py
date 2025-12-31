@@ -302,6 +302,9 @@ class DesignAssistant:
         from viberesp.optimization.parameters.multisegment_horn_params import (
             get_multisegment_horn_parameter_space
         )
+        from viberesp.optimization.parameters.conical_horn_params import (
+            get_conical_horn_parameter_space
+        )
         from viberesp.optimization.objectives.composite import EnclosureOptimizationProblem
         from viberesp.optimization.optimizers.pymoo_interface import run_nsga2
         from viberesp.optimization.results.pareto_front import rank_designs
@@ -322,7 +325,7 @@ class DesignAssistant:
             )
 
         # Validate enclosure type
-        supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn"]
+        supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn", "conical_horn"]
         if enclosure_type not in supported_types:
             return OptimizationResult(
                 success=False,
@@ -353,6 +356,10 @@ class DesignAssistant:
             param_space = get_multisegment_horn_parameter_space(
                 driver, preset=preset, num_segments=num_segments
             )
+        elif enclosure_type == "conical_horn":
+            # Get preset from constraints, default to midrange_horn
+            preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
+            param_space = get_conical_horn_parameter_space(driver, preset=preset)
         else:
             return OptimizationResult(
                 success=False,
@@ -391,6 +398,13 @@ class DesignAssistant:
                     ["mouth_size", "flare_constant_limits"]
                 ))
 
+            if enclosure_type == "conical_horn":
+                # Conical horn-specific constraints
+                constraint_list.extend(constraints.get(
+                    "constraint_list",
+                    ["mouth_size", "expansion_ratio"]
+                ))
+
             if enclosure_type == "multisegment_horn":
                 # Multisegment horn constraints
                 constraint_list.extend(constraints.get(
@@ -405,6 +419,9 @@ class DesignAssistant:
             if enclosure_type == "exponential_horn":
                 # Default horn constraints
                 constraint_list.extend(["mouth_size", "flare_constant_limits"])
+            if enclosure_type == "conical_horn":
+                # Default conical horn constraints
+                constraint_list.extend(["mouth_size", "expansion_ratio"])
             if enclosure_type == "multisegment_horn":
                 # Default multisegment horn constraints
                 constraint_list.extend(["segment_continuity", "flare_constant_limits"])

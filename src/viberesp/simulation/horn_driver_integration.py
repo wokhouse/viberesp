@@ -17,17 +17,19 @@ from __future__ import annotations
 
 import math
 import cmath
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 from viberesp.simulation.horn_theory import (
     exponential_horn_throat_impedance,
     exponential_horn_tmatrix,
+    conical_horn_throat_impedance,
     multsegment_horn_throat_impedance,
     circular_piston_radiation_impedance,
     MediumProperties,
 )
+from viberesp.simulation.types import ExponentialHorn, ConicalHorn, HyperbolicHorn
 from viberesp.simulation.constants import (
     SPEED_OF_SOUND,
     AIR_DENSITY,
@@ -636,7 +638,7 @@ class HornSPLResult:
 
 def calculate_horn_spl_flow(
     frequencies: FloatArray,
-    horn: 'ExponentialHorn',
+    horn: Union['ExponentialHorn', 'ConicalHorn', 'HyperbolicHorn'],
     driver: ThieleSmallParameters,
     voltage: float = 2.83,
     distance: float = 1.0,
@@ -644,7 +646,7 @@ def calculate_horn_spl_flow(
     medium: Optional[MediumProperties] = None
 ) -> HornSPLResult:
     """
-    Calculate SPL response of compression driver on exponential horn.
+    Calculate SPL response of compression driver on horn.
 
     This function implements the complete electro-mechano-acoustical chain:
     1. Calculate electrical impedance including motional component from acoustic load
@@ -653,6 +655,8 @@ def calculate_horn_spl_flow(
     4. Use T-matrix to propagate throat velocity to mouth
     5. Calculate radiated power from mouth velocity and radiation impedance
     6. Convert power to SPL at specified distance
+
+    Supports ExponentialHorn, ConicalHorn, and HyperbolicHorn geometries.
 
     Literature:
         Electrical circuit (Beranek 1954, Chapter 8):
@@ -679,7 +683,7 @@ def calculate_horn_spl_flow(
 
     Args:
         frequencies: Array of frequencies (Hz)
-        horn: ExponentialHorn geometry parameters
+        horn: Horn geometry parameters (ExponentialHorn, ConicalHorn, or HyperbolicHorn)
         driver: ThieleSmallParameters for compression driver
         voltage: Input voltage (V), default 2.83V (1W into 8Ω)
         distance: Measurement distance (m), default 1m
@@ -695,7 +699,8 @@ def calculate_horn_spl_flow(
         - All calculations use complex arithmetic for proper phase handling
         - SPL reference is 20 μPa (standard for airborne sound)
         - Power reference is 1 pW (10⁻¹² W)
-        - Below horn cutoff, throat impedance is reactive → minimal radiation
+        - Exponential/Hyperbolic horns: Below cutoff, throat impedance is reactive → minimal radiation
+        - Conical horns: No sharp cutoff, resistance rises gradually from zero frequency
 
     Examples:
         >>> import numpy as np
@@ -713,7 +718,7 @@ def calculate_horn_spl_flow(
         Expected tolerances:
         - f > 1.5×f_c: < 1.0 dB deviation
         - f_c < f < 1.5×f_c: < 2.5 dB deviation
-        - f < f_c: Slope match (~24 dB/octave rolloff)
+        - f < f_c: Slope match (~24 dB/octave rolloff for exponential)
     """
     if medium is None:
         medium = MediumProperties()
@@ -728,9 +733,24 @@ def calculate_horn_spl_flow(
 
     # Step 1: Calculate throat acoustic impedance
     # This includes mouth radiation impedance and T-matrix transformation
-    z_throat_acoustic = exponential_horn_throat_impedance(
-        frequencies, horn, medium, radiation_angle
-    )
+    # Route to appropriate impedance calculation based on horn type
+    if isinstance(horn, ConicalHorn):
+        z_throat_acoustic = conical_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    elif isinstance(horn, ExponentialHorn):
+        z_throat_acoustic = exponential_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    elif isinstance(horn, HyperbolicHorn):
+        # Hyperbolic horns use the exponential throat impedance (T=1 is exponential)
+        # For now, we use the exponential function as HyperbolicHorn shares
+        # similar impedance characteristics. TODO: Implement hyperbolic-specific impedance
+        z_throat_acoustic = exponential_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    else:
+        raise TypeError(f"Unsupported horn type: {type(horn)}")
 
     # Step 2: Calculate mechanical impedance seen by voice coil
     # Z_mech_total = R_ms + jωM_md + 1/(jωC_ms) + Z_throat_acoustic_transformed
@@ -783,7 +803,27 @@ def calculate_horn_spl_flow(
     # And p_m = U_m · Z_mouth, so:
     # U_t = C·p_m + D·U_m = C·Z_mouth·U_m + D·U_m = U_m·(C·Z_mouth + D)
     # Therefore: U_m = U_t / (C·Z_mouth + D)
-    a, b, c, d = exponential_horn_tmatrix(frequencies, horn, medium)
+
+    # Calculate T-matrix based on horn type
+    if isinstance(horn, ExponentialHorn):
+        # Exponential horns use the array-based function
+        a, b, c, d = exponential_horn_tmatrix(frequencies, horn, medium)
+    elif isinstance(horn, (ConicalHorn, HyperbolicHorn)):
+        # Conical and Hyperbolic horns have calculate_t_matrix method on the class
+        # which takes a single frequency, so we need to loop
+        a_list, b_list, c_list, d_list = [], [], [], []
+        for f in frequencies:
+            t_matrix = horn.calculate_t_matrix(f, medium.c, medium.rho)
+            a_list.append(t_matrix[0, 0])
+            b_list.append(t_matrix[0, 1])
+            c_list.append(t_matrix[1, 0])
+            d_list.append(t_matrix[1, 1])
+        a = np.array(a_list, dtype=complex)
+        b = np.array(b_list, dtype=complex)
+        c = np.array(c_list, dtype=complex)
+        d = np.array(d_list, dtype=complex)
+    else:
+        raise TypeError(f"Unsupported horn type: {type(horn)}")
 
     # Get mouth impedance (already calculated inside throat_impedance, but need it here)
     # Recalculate for clarity

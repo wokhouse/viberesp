@@ -28,6 +28,13 @@ from viberesp.optimization.parameters.multisegment_horn_params import (
     calculate_multisegment_horn_cutoff,
     calculate_multisegment_horn_volume,
 )
+from viberesp.optimization.parameters.conical_horn_params import (
+    get_conical_horn_parameter_space,
+    calculate_conical_horn_volume,
+    calculate_conical_expansion_ratio,
+    decode_conical_design,
+    build_conical_horn,
+)
 
 __all__ = [
     "ParameterRange",
@@ -41,4 +48,9 @@ __all__ = [
     "decode_multisegment_design",
     "calculate_multisegment_horn_cutoff",
     "calculate_multisegment_horn_volume",
+    "get_conical_horn_parameter_space",
+    "calculate_conical_horn_volume",
+    "calculate_conical_expansion_ratio",
+    "decode_conical_design",
+    "build_conical_horn",
 ]

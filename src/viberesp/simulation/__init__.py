@@ -21,12 +21,18 @@ from viberesp.simulation.constants import (
     wavelength,
     wavenumber,
 )
-from viberesp.simulation.types import ExponentialHorn, FrequencyResponse, SimulationResult
+from viberesp.simulation.types import (
+    ConicalHorn,
+    ExponentialHorn,
+    FrequencyResponse,
+    SimulationResult,
+)
 
 # Horn theory functions (T-matrix method)
 from viberesp.simulation.horn_theory import (
     MediumProperties,
     circular_piston_radiation_impedance,
+    conical_horn_throat_impedance,
     exponential_horn_throat_impedance,
     exponential_horn_tmatrix,
     throat_impedance_from_tmatrix,
@@ -54,6 +60,7 @@ __all__ = [
     # Horn theory functions
     "MediumProperties",
     "circular_piston_radiation_impedance",
+    "conical_horn_throat_impedance",
     "exponential_horn_throat_impedance",
     "exponential_horn_tmatrix",
     "throat_impedance_from_tmatrix",
@@ -63,6 +70,7 @@ __all__ = [
     "horn_system_acoustic_impedance",
     "horn_electrical_impedance",
     # Data structures
+    "ConicalHorn",
     "ExponentialHorn",
     "FrequencyResponse",
     "SimulationResult",

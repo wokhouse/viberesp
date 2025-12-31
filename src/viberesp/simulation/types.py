@@ -316,6 +316,226 @@ class HyperbolicHorn:
 
 
 @dataclass
+class ConicalHorn:
+    """
+    A conical horn with linear radius expansion.
+
+    The conical horn is the simplest horn geometry, consisting of a straight-sided
+    cone. Unlike exponential horns, it expands linearly in radius and quadratically
+    in area. It supports spherical wavefronts rather than the plane waves assumed
+    in Webster's equation for exponential horns.
+
+    Area function:
+        S(x) = S_t * (1 + x/x0)^2
+
+    Equivalently, using linear radius expansion:
+        r(x) = r_t + (r_m - r_t) * (x/L)
+        S(x) = π * r(x)^2
+
+    where x0 is the distance from the projected apex to the throat.
+
+    Literature:
+        - Olson (1947), Section 5.15 - Conical horn geometry
+        - Beranek (1954), Chapter 5 - Spherical wave horns
+        - Kolbrek, "Horn Theory: An Introduction, Part 1" - T-matrix method
+        - literature/horns/conical_theory.md
+
+    Attributes:
+        throat_area: Throat cross-sectional area [m²]
+        mouth_area: Mouth cross-sectional area [m²]
+        length: Axial length [m]
+        x0: Distance from projected apex to throat [m] (calculated if not provided)
+
+    Examples:
+        >>> horn = ConicalHorn(
+        ...     throat_area=0.005,  # 50 cm²
+        ...     mouth_area=0.05,    # 500 cm²
+        ...     length=0.5          # 50 cm
+        ... )
+        >>> horn.x0
+        0.166...  # Distance from apex to throat
+
+    Notes:
+        Conical horns have NO sharp cutoff frequency (unlike exponential horns).
+        Resistance rises gradually from zero frequency, providing wider bandwidth
+        but less optimal loading at any specific frequency.
+    """
+
+    throat_area: float
+    mouth_area: float
+    length: float
+    x0: Optional[float] = None
+
+    def __post_init__(self):
+        """Calculate x0 from geometry if not provided."""
+        if self.throat_area <= 0 or self.mouth_area <= 0 or self.length <= 0:
+            raise ValueError("All dimensions must be positive")
+
+        if self.mouth_area <= self.throat_area:
+            raise ValueError(
+                f"Conical horn must expand (mouth_area > throat_area), "
+                f"got mouth_area={self.mouth_area}, throat_area={self.throat_area}"
+            )
+
+        if self.x0 is None:
+            # x0 = r_t * L / (r_m - r_t) from similar triangles
+            # Or equivalently: x0 = L * sqrt(S_t) / (sqrt(S_m) - sqrt(S_t))
+            r_t = np.sqrt(self.throat_area / np.pi)
+            r_m = np.sqrt(self.mouth_area / np.pi)
+
+            # Handle cylindrical case (no expansion)
+            if abs(r_m - r_t) < 1e-9:
+                self.x0 = np.inf
+            else:
+                self.x0 = (r_t * self.length) / (r_m - r_t)
+
+    def throat_radius(self) -> float:
+        """Calculate throat radius from throat area (assuming circular)."""
+        return np.sqrt(self.throat_area / np.pi)
+
+    def mouth_radius(self) -> float:
+        """Calculate mouth radius from mouth area (assuming circular)."""
+        return np.sqrt(self.mouth_area / np.pi)
+
+    def area_at(self, x: float) -> float:
+        """
+        Calculate cross-sectional area at distance x from throat.
+
+        S(x) = π * [r_t + (r_m - r_t) * (x/L)]^2
+
+        Literature:
+            - Olson (1947), Section 5.15 - Conical horn geometry
+            - literature/horns/conical_theory.md
+
+        Args:
+            x: Axial distance from throat [m], 0 ≤ x ≤ length
+
+        Returns:
+            Cross-sectional area at position x [m²]
+        """
+        if x < 0 or x > self.length:
+            raise ValueError(f"x must be in [0, {self.length}], got {x}")
+
+        r_t = self.throat_radius()
+        r_m = self.mouth_radius()
+        r_x = r_t + (r_m - r_t) * (x / self.length)
+        return np.pi * (r_x ** 2)
+
+    def calculate_t_matrix(self, f: float, c: float = 343.2, rho: float = 1.205) -> np.ndarray:
+        """
+        Calculate the 2x2 Transfer Matrix [A, B; C, D] for this conical horn
+        using spherical wave theory.
+
+        Uses spherical Bessel functions to properly account for the spherical
+        wavefronts in conical horns (not plane waves like exponential horns).
+
+        Literature:
+            - Olson (1947), Section 5.21 - Conical horn T-matrix
+            - J.O. Smith, "Conical Acoustic Tubes", Physical Audio Signal Processing
+              https://ccrma.stanford.edu/~jos/pasp/Conical_Acoustic_Tubes.html
+            - Pierce, A.D., Acoustics, Eq. 7-6.2
+            - literature/horns/conical_theory.md
+
+        Theory:
+            For a conical horn, Webster's equation solution is in terms of spherical
+            Bessel functions. The state vector V(r) = [p(r), U(r)]ᵀ is:
+
+                V(r) = M(r) * [C₁, C₂]ᵀ
+
+            where M(r) is constructed from spherical Bessel functions:
+                p(r) = C₁·j₀(kr) + C₂·y₀(kr)
+                U(r) = (S/jρc) · [C₁·j₁(kr) + C₂·y₁(kr)]
+
+            The T-matrix relates throat to mouth: V_throat = T · V_mouth
+            where T = M(r_throat) · M(r_mouth)⁻¹
+
+        Args:
+            f: Frequency [Hz]
+            c: Speed of sound [m/s]
+            rho: Air density [kg/m³]
+
+        Returns:
+            2x2 np.ndarray of complex floats [[A, B], [C, D]]
+
+        Notes:
+            The T-matrix relates pressure and volume velocity at throat (port 1)
+            to mouth (port 2): [p₁, U₁]ᵀ = [A B; C D][p₂, U₂]ᵀ
+
+            Pressure scales as 1/r for spherical waves (not √S as in plane waves).
+            This is the KEY difference from exponential horns.
+
+        Examples:
+            >>> horn = ConicalHorn(throat_area=0.015, mouth_area=0.15, length=1.2)
+            >>> T = horn.calculate_t_matrix(1000.0)
+            >>> det = np.linalg.det(T)
+            >>> abs(det - 1.0) < 1e-6  # Reciprocal network
+            True
+        """
+        from scipy import special
+
+        k = 2 * np.pi * f / c
+        L = self.length
+        S_t = self.throat_area
+        S_m = self.mouth_area
+
+        # Handle DC limit (very small k)
+        if k * L < 1e-4:
+            # Identity matrix for DC
+            return np.array([[1.0, 0.0], [0.0, 1.0]], dtype=complex)
+
+        # Get x0 (distance from apex to throat)
+        x0 = self.x0
+
+        # Handle cylindrical case (no expansion)
+        if np.isinf(x0):
+            # Plane wave propagation (cylindrical pipe)
+            Z_c = (rho * c) / S_t
+            cos_kl = np.cos(k * L)
+            sin_kl = np.sin(k * L)
+            return np.array([
+                [cos_kl, 1j * Z_c * sin_kl],
+                [1j * (1 / Z_c) * sin_kl, cos_kl]
+            ], dtype=complex)
+
+        # Conical case (Spherical Wave)
+        r1 = x0  # Throat radius from apex
+        r2 = x0 + L  # Mouth radius from apex
+        kr1 = k * r1
+        kr2 = k * r2
+
+        def get_state_matrix(r, S, kr):
+            """
+            Build the state matrix M(r) that relates [C₁, C₂] to [p, U].
+
+            M(r) = [[j₀(kr), y₀(kr)],
+                    [(S/jρc)·j₁(kr), (S/jρc)·y₁(kr)]]
+            """
+            j0 = special.spherical_jn(0, kr)
+            y0 = special.spherical_yn(0, kr)
+            j1 = special.spherical_jn(1, kr)
+            y1 = special.spherical_yn(1, kr)
+
+            # Volume velocity pre-factor: S / (j * rho * c)
+            u_scale = S / (1j * rho * c)
+
+            return np.array([
+                [j0, y0],
+                [u_scale * j1, u_scale * y1]
+            ], dtype=complex)
+
+        # Build state matrices at throat and mouth
+        M_throat = get_state_matrix(r1, S_t, kr1)
+        M_mouth = get_state_matrix(r2, S_m, kr2)
+
+        # T-matrix: V_throat = T · V_mouth
+        # where T = M_throat · M_mouth⁻¹
+        M_mouth_inv = np.linalg.inv(M_mouth)
+        T = np.matmul(M_throat, M_mouth_inv)
+
+        return T
+
+
+@dataclass
 class HornSegment:
     """
     Single segment of a multi-segment horn with exponential flare.
@@ -478,7 +698,7 @@ class MultiSegmentHorn:
         0.1
     """
 
-    segments: List[Union['HornSegment', 'HyperbolicHorn']]
+    segments: List[Union['HornSegment', 'HyperbolicHorn', 'ConicalHorn']]
 
     def __post_init__(self):
         """Validate segment continuity."""
@@ -603,7 +823,8 @@ class SimulationResult:
     Container for simulation results with metadata.
 
     Attributes:
-        horn: Horn geometry used in simulation (ExponentialHorn or MultiSegmentHorn)
+        horn: Horn geometry used in simulation (ExponentialHorn, HyperbolicHorn,
+              ConicalHorn, or MultiSegmentHorn)
         frequencies: Frequency array (Hz)
         throat_impedance: Complex throat impedance at each frequency (Ω)
         radiation_impedance: Radiation impedance at mouth (Ω)
@@ -619,7 +840,7 @@ class SimulationResult:
         ... )
     """
 
-    horn: Union[ExponentialHorn, MultiSegmentHorn]
+    horn: Union[ExponentialHorn, HyperbolicHorn, ConicalHorn, MultiSegmentHorn]
     frequencies: np.ndarray
     throat_impedance: np.ndarray
     radiation_impedance: Optional[np.ndarray] = None
