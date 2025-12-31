@@ -165,30 +165,35 @@ def objective_f3(
         else:
             reference_spl = np.max(spl_valid)
 
-        # Find F3: frequency where SPL drops to reference - 3dB
+        # Find F3: frequency where SPL crosses reference - 3dB
+        # For bass horns, we want the lower -3dB frequency (bass extension)
+        # Look for crossover from BELOW target to ABOVE target
         target_spl = reference_spl - 3.0
 
-        # Find the lowest frequency where we cross -3dB
-        # (looking from bass region upward)
-        below_target = spl_valid < target_spl
+        # Iterate through frequencies to find where response crosses -3dB
+        # (from bass region upward, looking for transition from below to above)
+        for i in range(len(freq_valid) - 1):
+            below_current = spl_valid[i] < target_spl
+            below_next = spl_valid[i + 1] < target_spl
 
-        if np.sum(below_target) > 0:
-            # Find first frequency below target (from low to high)
-            for i in range(len(freq_valid)):
-                if spl_valid[i] < target_spl:
-                    # Interpolate to find exact F3
-                    if i > 0:
-                        f1, f2 = freq_valid[i-1], freq_valid[i]
-                        spl1, spl2 = spl_valid[i-1], spl_valid[i]
-                        # Linear interpolation in log-frequency space
-                        log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
-                                 (target_spl - spl1) / (spl2 - spl1)
-                        f3 = 10 ** log_f3
-                    else:
-                        f3 = freq_valid[i]
-                    return f3
+            # Found crossover: current is below, next is above (or at target)
+            if below_current and not below_next:
+                # Interpolate to find exact F3
+                f1, f2 = freq_valid[i], freq_valid[i + 1]
+                spl1, spl2 = spl_valid[i], spl_valid[i + 1]
+                # Linear interpolation in log-frequency space
+                log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
+                         (target_spl - spl1) / (spl2 - spl1)
+                f3 = 10 ** log_f3
+                return f3
 
-        # If no -3dB point found, return lowest frequency measured
+        # If all frequencies are below target (response never reaches -3dB),
+        # return the highest frequency measured (poor bass extension)
+        if np.all(spl_valid < target_spl):
+            return freq_valid[-1]
+
+        # If all frequencies are above target (response is flat to bass limit),
+        # return the lowest frequency measured (excellent bass extension)
         return freq_valid[0]
 
     else:
