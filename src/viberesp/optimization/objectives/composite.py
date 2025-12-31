@@ -221,8 +221,8 @@ class EnclosureOptimizationProblem(Problem):
         F = np.zeros((n_individuals, self.n_obj))
 
         # Determine if we need to pass num_segments parameter
-        # (for multisegment_horn objectives)
-        needs_num_segments = self.enclosure_type == "multisegment_horn"
+        # (for multisegment_horn and mixed_profile_horn objectives)
+        needs_num_segments = self.enclosure_type in ["multisegment_horn", "mixed_profile_horn"]
 
         # Evaluate each individual
         for i in range(n_individuals):

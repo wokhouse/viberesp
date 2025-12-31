@@ -763,3 +763,267 @@ def calculate_multisegment_horn_volume(
         v2 = (middle_area + mouth_area) / 2 * length2
 
     return v1 + v2
+
+
+def get_mixed_profile_parameter_space(
+    driver: ThieleSmallParameters,
+    preset: str = "midrange_horn",
+    num_segments: int = 2
+) -> EnclosureParameterSpace:
+    """
+    Get parameter space for mixed-profile multi-segment horn optimization.
+
+    This extends the standard multi-segment horn parameter space by allowing
+    each segment to independently choose its profile type:
+    - 0 = Exponential (HornSegment)
+    - 1 = Conical (ConicalHorn)
+    - 2 = Hyperbolic with T parameter (HyperbolicHorn)
+
+    For a 2-segment mixed profile horn, optimizes 9-11 parameters:
+    - throat_area, middle_area, mouth_area: Horn geometry
+    - length1, length2: Segment lengths
+    - profile_type1, profile_type2: Profile type for each segment (0=exp, 1=con, 2=hyp)
+    - T1, T2: Shape parameters (only used if profile_type=2, else ignored)
+    - V_tc, V_rc: Chamber volumes
+
+    Literature:
+        - Olson (1947), Chapter 8 - Compound horns with mixed profiles
+        - Kolbrek Part 1 - T-matrix chaining for arbitrary segment types
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Args:
+        driver: ThieleSmallParameters for the driver
+        preset: Design preset ("bass_horn", "midrange_horn", "fullrange_horn")
+        num_segments: Number of horn segments (2 or 3)
+
+    Returns:
+        EnclosureParameterSpace: Parameter space definition with profile type selection
+
+    Raises:
+        ValueError: If preset or num_segments is not recognized
+
+    Examples:
+        >>> from viberesp.driver import load_driver
+        >>> param_space = get_mixed_profile_parameter_space(
+        ...     driver, preset="midrange_horn", num_segments=2
+        ... )
+        >>> param_space.get_parameter_names()
+        ['throat_area', 'middle_area', 'mouth_area', 'length1', 'length2',
+         'profile_type1', 'profile_type2', 'T1', 'T2', 'V_tc', 'V_rc']
+    """
+    # Get base parameter space (without profile types or T params)
+    base_space = get_multisegment_horn_parameter_space(
+        driver, preset=preset, num_segments=num_segments
+    )
+
+    # Add profile type selection for each segment
+    # 0 = exponential (HornSegment)
+    # 1 = conical (ConicalHorn)
+    # 2 = hyperbolic (HyperbolicHorn with T parameter)
+    profile_type_parameters = [
+        ParameterRange(
+            name=f"profile_type{i+1}",
+            min_value=0,
+            max_value=2,
+            units="",
+            description=f"Profile type for segment {i+1} (0=exponential, 1=conical, 2=hyperbolic)"
+        )
+        for i in range(num_segments)
+    ]
+
+    # Add T parameters for potential hyperbolic segments
+    t_parameters = [
+        ParameterRange(
+            name=f"T{i+1}",
+            min_value=0.5,
+            max_value=1.0,
+            units="",
+            description=f"Shape parameter T for segment {i+1} (used only if profile_type={i+1}=2)"
+        )
+        for i in range(num_segments)
+    ]
+
+    # Find V_tc index and insert profile_type and T parameters before it
+    base_params = base_space.parameters.copy()
+    vtc_idx = next(i for i, p in enumerate(base_params) if p.name == "V_tc")
+
+    # Insert parameters before V_tc: profile_type1, profile_type2, ..., T1, T2, ...
+    new_parameters = base_params[:vtc_idx] + profile_type_parameters + t_parameters + base_params[vtc_idx:]
+
+    # Update typical ranges to include new parameters
+    typical_ranges = base_space.typical_ranges.copy()
+    for preset_name in typical_ranges:
+        for i in range(num_segments):
+            typical_ranges[preset_name][f"profile_type{i+1}"] = (0, 0)  # Default to exponential
+            typical_ranges[preset_name][f"T{i+1}"] = (0.9, 1.0)  # Default T range
+
+    return EnclosureParameterSpace(
+        enclosure_type="multisegment_horn_mixed_profile",
+        parameters=new_parameters,
+        typical_ranges=typical_ranges,
+        constraints=base_space.constraints,
+    )
+
+
+def decode_mixed_profile_design(
+    design: np.ndarray,
+    driver: ThieleSmallParameters,
+    num_segments: int = 2
+) -> dict:
+    """
+    Decode optimization array into mixed-profile multi-segment horn parameters.
+
+    Converts the flat optimization array into a structured dictionary
+    with horn geometry parameters including profile type selection for
+    building a MultiSegmentHorn with mixed segment types.
+
+    Args:
+        design: Optimization array
+            For 2-segment: [throat_area, middle_area, mouth_area,
+                           length1, length2, profile_type1, profile_type2,
+                           T1, T2, V_tc, V_rc]
+            For 3-segment: adds [area2, length3, profile_type3, T3] before V_tc
+        driver: ThieleSmallParameters for the driver
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        Dictionary with horn parameters:
+        - throat_area, mouth_area: Overall horn dimensions
+        - segments: List of segment specification tuples
+        - V_tc, V_rc: Chamber volumes
+        - profile_types: List of profile type codes for each segment
+        - T_params: List of T values (only used for hyperbolic segments)
+        - segment_classes: List of class names for each segment
+
+    Examples:
+        >>> # Mixed horn: segment 1 exponential, segment 2 conical
+        >>> design = np.array([0.001, 0.01, 0.1, 0.3, 0.6, 0, 1, 0.7, 1.0, 0.0, 0.0])
+        >>> params = decode_mixed_profile_design(design, driver, num_segments=2)
+        >>> params['profile_types']
+        [0, 1]  # [exponential, conical]
+        >>> params['segment_classes']
+        ['HornSegment', 'ConicalHorn']
+    """
+    if num_segments == 2:
+        (throat_area, middle_area, mouth_area, length1, length2,
+         profile_type1, profile_type2, T1, T2, V_tc, V_rc) = design
+
+        # Build segment specification list
+        segments = [
+            (throat_area, middle_area, length1, profile_type1, T1),
+            (middle_area, mouth_area, length2, profile_type2, T2),
+        ]
+        profile_types = [int(profile_type1), int(profile_type2)]
+        T_params = [T1, T2]
+
+    elif num_segments == 3:
+        (throat_area, middle_area, area2, mouth_area,
+         length1, length2, length3, profile_type1, profile_type2, profile_type3,
+         T1, T2, T3, V_tc, V_rc) = design
+
+        # Build segment specification list
+        segments = [
+            (throat_area, middle_area, length1, profile_type1, T1),
+            (middle_area, area2, length2, profile_type2, T2),
+            (area2, mouth_area, length3, profile_type3, T3),
+        ]
+        profile_types = [int(profile_type1), int(profile_type2), int(profile_type3)]
+        T_params = [T1, T2, T3]
+
+    else:
+        raise ValueError(f"num_segments must be 2 or 3, got {num_segments}")
+
+    # Map profile type codes to class names
+    # 0 = HornSegment (exponential)
+    # 1 = ConicalHorn
+    # 2 = HyperbolicHorn
+    type_to_class = {
+        0: "HornSegment",
+        1: "ConicalHorn",
+        2: "HyperbolicHorn",
+    }
+
+    segment_classes = [type_to_class.get(pt, "HornSegment") for pt in profile_types]
+
+    return {
+        'throat_area': throat_area,
+        'mouth_area': mouth_area,
+        'segments': segments,
+        'V_tc': V_tc,
+        'V_rc': V_rc,
+        'profile_types': profile_types,
+        'T_params': T_params,
+        'segment_classes': segment_classes,
+        'total_length': sum(seg[2] for seg in segments),
+    }
+
+
+def build_mixed_profile_horn(
+    design: np.ndarray,
+    driver: ThieleSmallParameters,
+    num_segments: int = 2
+):
+    """
+    Build MultiSegmentHorn from mixed-profile design vector.
+
+    This function creates a multi-segment horn where each segment can be
+    independently chosen as exponential, conical, or hyperbolic.
+
+    Literature:
+        - Olson (1947), Chapter 8 - Compound horns
+        - Kolbrek, "Horn Theory: An Introduction, Part 1"
+        - literature/horns/kolbrek_horn_theory_tutorial.md
+
+    Args:
+        design: Optimization array
+            - 2-segment: [throat, middle, mouth, L1, L2, ptype1, ptype2, T1, T2, V_tc, V_rc]
+            - 3-segment: adds [area2, L3, ptype3, T3]
+        driver: ThieleSmallParameters (for context)
+        num_segments: Number of segments (2 or 3)
+
+    Returns:
+        Tuple of (MultiSegmentHorn instance, V_tc, V_rc)
+
+    Raises:
+        ValueError: If design vector has invalid length or profile type
+
+    Examples:
+        >>> # Conical throat, exponential mouth
+        >>> design = np.array([0.001, 0.01, 0.1, 0.3, 0.6, 1, 0, 1.0, 0.7, 0.0, 0.0])
+        >>> horn, V_tc, V_rc = build_mixed_profile_horn(design, driver, num_segments=2)
+        >>> type(horn.segments[0]).__name__
+        'ConicalHorn'
+        >>> type(horn.segments[1]).__name__
+        'HornSegment'
+    """
+    from viberesp.simulation.types import HornSegment, ConicalHorn, HyperbolicHorn, MultiSegmentHorn
+
+    # Decode design
+    params = decode_mixed_profile_design(design, driver, num_segments)
+
+    # Build segments with appropriate types
+    segments = []
+    for seg_spec in params['segments']:
+        throat, mouth, length, profile_type, T = seg_spec
+        profile_type = int(profile_type)
+
+        if profile_type == 0:
+            # Exponential
+            segments.append(HornSegment(throat, mouth, length))
+        elif profile_type == 1:
+            # Conical
+            segments.append(ConicalHorn(throat, mouth, length))
+        elif profile_type == 2:
+            # Hyperbolic
+            segments.append(HyperbolicHorn(throat, mouth, length, T=T))
+        else:
+            raise ValueError(
+                f"Unknown profile type {profile_type} for segment "
+                f"(throat={throat}, mouth={mouth}). "
+                f"Valid types: 0=exponential, 1=conical, 2=hyperbolic"
+            )
+
+    # Create MultiSegmentHorn
+    horn = MultiSegmentHorn(segments)
+
+    return horn, params['V_tc'], params['V_rc']

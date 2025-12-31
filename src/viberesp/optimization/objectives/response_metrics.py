@@ -29,6 +29,7 @@ from viberesp.simulation.types import HornSegment, MultiSegmentHorn
 from viberesp.optimization.parameters.multisegment_horn_params import (
     decode_multisegment_design,
     build_multisegment_horn,
+    build_mixed_profile_horn,
     detect_design_type,
 )
 from viberesp.simulation.constants import SPEED_OF_SOUND
@@ -201,6 +202,15 @@ def objective_response_flatness(
             n_points
         )
 
+    # For mixed_profile_horn, use target_band if provided
+    elif enclosure_type == "mixed_profile_horn" and target_band is not None:
+        f_min, f_max = target_band
+        frequencies = np.logspace(
+            np.log10(f_min),
+            np.log10(f_max),
+            n_points
+        )
+
     # For exponential horn, adjust frequency range to exclude cutoff region
     elif enclosure_type == "exponential_horn" and len(design_vector) >= 3:
         throat_area = design_vector[0]
@@ -294,6 +304,16 @@ def objective_response_flatness(
             elif enclosure_type == "multisegment_horn":
                 # Build multi-segment horn (handles both standard and hyperbolic)
                 horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+
+                # Create front-loaded horn
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
+            elif enclosure_type == "mixed_profile_horn":
+                # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+                horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
@@ -441,6 +461,34 @@ def objective_response_slope(
             f_max = 20000
 
         f_min = max(frequency_range[0], fc * 1.5)
+    elif enclosure_type == "mixed_profile_horn" and len(design_vector) >= 9:
+        # For mixed-profile horn, calculate cutoff frequency
+        num_segments = 2
+        horn, _, _ = build_mixed_profile_horn(design_vector, driver, num_segments)
+
+        # Extract flare constants from segments (only for exponential/hyperbolic)
+        c = 343.0
+        fc_values = []
+        for seg in horn.segments:
+            if hasattr(seg, 'flare_constant'):  # HornSegment (exponential)
+                if seg.flare_constant > 0:
+                    fc_values.append((c * seg.flare_constant / 2.0) / (2 * np.pi))
+            elif hasattr(seg, 'm'):  # HyperbolicHorn
+                if seg.m > 0:
+                    fc_values.append((c * seg.m * 2) / (2 * np.pi))
+            # Note: ConicalHorn segments don't have a sharp cutoff, skip them
+
+        fc = max(fc_values) if fc_values else 500.0
+
+        # Determine appropriate frequency range
+        if fc < 100:
+            f_max = max(frequency_range[1], fc * 5)
+        elif fc < 500:
+            f_max = max(frequency_range[1], fc * 20, 5000)
+        else:
+            f_max = 20000
+
+        f_min = max(frequency_range[0], fc * 1.5)
 
         # Ensure f_min < f_max for valid range
         if f_min < f_max:
@@ -471,6 +519,16 @@ def objective_response_slope(
             elif enclosure_type == "multisegment_horn":
                 # Build multi-segment horn (handles both standard and hyperbolic)
                 horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+
+                # Create front-loaded horn
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                spl_values.append(spl)
+            elif enclosure_type == "mixed_profile_horn":
+                # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+                horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
