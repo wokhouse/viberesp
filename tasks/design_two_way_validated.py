@@ -464,10 +464,6 @@ def plot_optimized_system(result: Dict, output_path: str):
     plt.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"Plot saved to: {output_path}")
-
-    pdf_path = output_path.replace('.png', '.pdf')
-    fig.savefig(pdf_path, bbox_inches='tight')
-    print(f"PDF saved to: {pdf_path}")
     print()
 
     return fig
