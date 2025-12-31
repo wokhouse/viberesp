@@ -178,3 +178,7 @@ data/
 tests/reports/*.html
 tests/reports/*.json
 tests/reports/*.png
+
+# Transient optimization outputs
+tasks/*.png
+tasks/plot_*.py
