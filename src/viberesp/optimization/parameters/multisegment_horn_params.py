@@ -92,8 +92,15 @@ def get_multisegment_horn_parameter_space(
     if preset == "bass_horn":
         # Bass horn: Large mouth, long length, low cutoff frequency
         # Target cutoff: 40-80 Hz
-        throat_min = 0.1 * S_d
-        throat_max = 0.3 * S_d
+        #
+        # CRITICAL: Throat sizing for direct radiator bass horns
+        # Literature: Beranek (1954), Olson (1947) - Practical horn design
+        # For bass horns with woofers (not compression drivers):
+        #   - Throat should be 50-100% of driver area
+        #   - Compression ratio < 2:1 to avoid turbulence/choking
+        #   - Higher compression requires phase plug (impractical for woofers)
+        throat_min = 0.5 * S_d  # 50% of driver area (compression ratio 2:1)
+        throat_max = 1.0 * S_d  # 100% of driver area (no compression, best for woofers)
         middle_min = 0.05  # m²
         middle_max = 0.5  # m²
         mouth_min = 0.3  # m²
@@ -225,7 +232,7 @@ def get_multisegment_horn_parameter_space(
     # These are useful for initial population seeding in optimization
     typical_ranges = {
         "bass_horn": {
-            "throat_area": (0.15 * S_d, 0.25 * S_d),
+            "throat_area": (0.7 * S_d, 1.0 * S_d),  # 70-100% of driver area (practical range)
             "middle_area": (0.2, 0.4),
             "mouth_area": (0.5, 1.0),
             "length1": (1.0, 1.5),

@@ -103,18 +103,76 @@ def objective_f3(
         return driver.F_s
 
     elif enclosure_type == "exponential_horn":
-        # For exponential horn, F3 is the cutoff frequency
-        # Literature: Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
-        # Horns act as high-pass filters below cutoff frequency
+        # For exponential horn, calculate F3 from actual frequency response
+        # NOT just the theoretical cutoff frequency!
+        # Literature: Olson (1947), Eq. 5.18 - f_c = c·m/(2π) (for reference only)
+        # Actual F3 depends on driver parameters and chamber volumes
         throat_area = design_vector[0]
         mouth_area = design_vector[1]
         length = design_vector[2]
-        # V_rc not used for cutoff calculation (design_vector[3])
+        V_tc = design_vector[3] if len(design_vector) > 3 else 0.0
+        V_rc = design_vector[4] if len(design_vector) > 4 else 0.0
 
-        # Calculate cutoff frequency using Kolbrek convention (matches Hornresp's F12)
-        fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
+        # Create horn
+        horn = ExponentialHorn(throat_area=throat_area, mouth_area=mouth_area, length=length)
+        flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
-        return fc  # Minimize cutoff frequency for better bass extension
+        # Generate frequency array for F3 calculation (bass range: 20-500 Hz)
+        if frequency_points is None:
+            frequencies = np.logspace(np.log10(20), np.log10(500), 200)
+        else:
+            frequencies = frequency_points
+
+        # Calculate SPL response
+        spl_values = []
+        for freq in frequencies:
+            try:
+                spl = flh.spl_response(freq, voltage=2.83)
+                spl_values.append(spl)
+            except Exception:
+                spl_values.append(np.nan)
+
+        spl_values = np.array(spl_values)
+
+        # Remove NaN values
+        valid_mask = ~np.isnan(spl_values)
+        if np.sum(valid_mask) < 10:
+            return 500.0  # Large penalty if calculation failed
+
+        freq_valid = frequencies[valid_mask]
+        spl_valid = spl_values[valid_mask]
+
+        # Find reference level (max SPL in passband, typically 100-500 Hz for bass horns)
+        passband_mask = (freq_valid >= 50) & (freq_valid <= 500)
+        if np.sum(passband_mask) > 0:
+            reference_spl = np.max(spl_valid[passband_mask])
+        else:
+            reference_spl = np.max(spl_valid)
+
+        # Find F3: frequency where SPL crosses reference - 3dB
+        # For bass horns, we want the lower -3dB frequency (bass extension)
+        # Look for crossover from BELOW target to ABOVE target
+        target_spl = reference_spl - 3.0
+
+        # Iterate through frequencies to find where response crosses -3dB
+        # (from bass region upward, looking for transition from below to above)
+        for i in range(len(freq_valid) - 1):
+            below_current = spl_valid[i] < target_spl
+            below_next = spl_valid[i + 1] < target_spl
+
+            # Found crossover: current is below, next is above (or at target)
+            if below_current and not below_next:
+                # Interpolate to find exact F3
+                f1, f2 = freq_valid[i], freq_valid[i + 1]
+                spl1, spl2 = spl_valid[i], spl_valid[i + 1]
+                # Linear interpolation in log-frequency space
+                log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
+                         (target_spl - spl1) / (spl2 - spl1)
+                f3 = 10 ** log_f3
+                return f3
+
+        # If F3 not found in range, return minimum frequency measured
+        return freq_valid[0]
 
     elif enclosure_type in ["multisegment_horn", "mixed_profile_horn"]:
         # For multi-segment and mixed-profile horns, calculate F3 from frequency response

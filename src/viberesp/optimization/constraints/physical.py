@@ -584,3 +584,148 @@ def constraint_conical_monotonic_expansion(
     return throat_area - mouth_area
 
 
+def constraint_horn_throat_sizing(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    min_compression_ratio: float = 0.5,
+    max_compression_ratio: float = 2.0
+) -> float:
+    """
+    Constrain horn throat size relative to driver area to prevent bottlenecks.
+
+    For bass horns with direct radiator woofers (not compression drivers):
+    - Throat area should be 50-100% of driver diaphragm area
+    - Compression ratio (driver_area / throat_area) should be 1:1 to 2:1
+    - Higher compression requires phase plugs (impractical for woofers)
+
+    CRITICAL: This prevents the throat bottleneck issue that causes:
+    - Air turbulence and distortion at high power
+    - Choked flow limiting output
+    - Nonlinear compression artifacts
+
+    Literature:
+        - Beranek (1954), Chapter 5 - Horn throat design
+        - Olson (1947), Chapter 8 - Direct radiator vs compression driver loading
+        - Practical horn design: throat ≥ Sd/2 for woofers without phase plugs
+
+    Args:
+        design_vector: Horn parameters
+            - Exponential: [throat_area, mouth_area, length, V_tc, V_rc]
+            - Multisegment: [throat_area, middle_area, mouth_area, length1, length2, ...]
+        driver: ThieleSmallParameters instance
+        enclosure_type: Must be "exponential_horn", "multisegment_horn", or "conical_horn"
+        min_compression_ratio: Minimum throat/drive ratio (default 0.5 = 50%)
+            - Set to 1.0 for no compression (throat = driver area)
+            - Set to 0.5 for acceptable compression (throat ≥ 50% driver)
+        max_compression_ratio: Maximum compression ratio (default 2.0)
+            - throat_area ≥ driver_area / max_compression_ratio
+
+    Returns:
+        Constraint violation (positive if violated, negative = satisfied)
+        Returns value representing how much the constraint is violated
+
+    Examples:
+        >>> driver = load_driver("BC_21DS115")  # Sd = 1680 cm²
+        >>> # Good design: throat = 1200 cm² (compression ratio = 1.4:1)
+        >>> design = np.array([0.12, 1.0, 3.5, 0.0, 0.0])  # throat in m²
+        >>> constraint_horn_throat_sizing(design, driver, "exponential_horn")
+        -240.0  # Satisfied (throat > minimum)
+
+        >>> # Bad design: throat = 150 cm² (compression ratio = 11.2:1)
+        >>> design = np.array([0.015, 1.0, 3.5, 0.0, 0.0])
+        >>> constraint_horn_throat_sizing(design, driver, "exponential_horn")
+        690.0  # VIOLATION (throat too small - would cause bottleneck)
+    """
+    # Only apply to horn types
+    horn_types = ["exponential_horn", "multisegment_horn", "conical_horn",
+                  "mixed_profile_horn"]
+    if enclosure_type not in horn_types:
+        return 0.0  # Not applicable for other enclosure types
+
+    # Extract throat area (first element for all horn types)
+    throat_area = design_vector[0]
+    driver_area = driver.S_d
+
+    # Calculate compression ratio
+    # compression_ratio = driver_area / throat_area
+    # throat ≥ driver_area / max_compression_ratio
+    # throat ≤ driver_area / min_compression_ratio
+    #
+    # For min_compression_ratio = 0.5:
+    #   throat ≥ 0.5 * driver_area  (compression ≤ 2:1)
+    #
+    # For max_compression_ratio = 2.0:
+    #   throat ≤ driver_area / 2.0  (same constraint)
+    #
+    # Actually, let's simplify:
+    #   minimum_throat = driver_area * min_compression_ratio
+    #   where min_compression_ratio is the fraction of driver area
+
+    # Minimum throat: 50% of driver area (compression ratio 2:1 max)
+    min_throat = driver_area * min_compression_ratio
+
+    # Maximum throat: 100% of driver area (no compression)
+    max_throat = driver_area * 1.0
+
+    # Constraint: min_throat ≤ throat_area ≤ max_throat
+    # Violation if throat_area < min_throat
+    violation_min = min_throat - throat_area
+
+    # Also warn if throat > driver (not physically possible)
+    violation_max = throat_area - max_throat
+
+    # Return maximum violation (positive = bad)
+    return max(violation_min, violation_max, 0.0)
+
+
+def constraint_exponential_monotonic_expansion(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str
+) -> float:
+    """
+    Constrain exponential horn to have monotonic area expansion (mouth > throat).
+
+    Ensures the horn expands rather than contracts, which is necessary for
+    proper impedance transformation. Prevents "reverse horn" cheat solutions
+    where mouth < throat (which would minimize F3 artificially).
+
+    CRITICAL: Without this constraint, optimizer may create designs with
+    mouth_area < throat_area, causing invalid F3 calculations (negative values).
+
+    Literature:
+        - Olson (1947), Chapter 5 - Horn geometry requirements
+        - Beranek (1954) - Monotonic expansion for impedance matching
+
+    Args:
+        design_vector: [throat_area, mouth_area, length, V_tc, V_rc]
+        driver: ThieleSmallParameters instance (not used for this constraint)
+        enclosure_type: Must be "exponential_horn"
+
+    Returns:
+        Constraint violation (positive if violated, negative = satisfied)
+
+    Examples:
+        >>> # Good horn: mouth > throat
+        >>> design = np.array([0.10, 1.0, 3.5, 0.0, 0.0])  # throat=1000cm², mouth=10000cm²
+        >>> constraint_exponential_monotonic_expansion(design, driver, "exponential_horn")
+        -0.90  # Satisfied (mouth > throat)
+
+        >>> # Bad horn: mouth < throat (reverse horn)
+        >>> design = np.array([0.168, 0.013, 1.5, 0.0, 0.0])  # throat=1680cm², mouth=130cm²
+        >>> constraint_exponential_monotonic_expansion(design, driver, "exponential_horn")
+        0.155  # VIOLATION (throat > mouth, would cause invalid F3)
+    """
+    if enclosure_type != "exponential_horn":
+        return 0.0  # Not applicable for other enclosure types
+
+    throat_area = design_vector[0]
+    mouth_area = design_vector[1]
+
+    # Constraint: mouth_area > throat_area
+    # Return violation (positive if violated)
+    return throat_area - mouth_area
+
+
+

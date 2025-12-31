@@ -73,8 +73,18 @@ def get_exponential_horn_parameter_space(
         # Bass horn: Large mouth, long length, low cutoff frequency
         # Target cutoff: 40-80 Hz
         # Mouth radius: ~0.5-1.0 m for effective radiation
-        throat_min = 0.1 * S_d
-        throat_max = 0.3 * S_d
+        #
+        # CRITICAL: Throat sizing for direct radiator bass horns
+        # Literature: Beranek (1954), Olson (1947) - Practical horn design
+        # For bass horns with woofers (not compression drivers):
+        #   - Throat should be 50-100% of driver area
+        #   - Compression ratio < 2:1 to avoid turbulence/choking
+        #   - Higher compression requires phase plug (impractical for woofers)
+        #
+        # throat_min = 0.5 * S_d gives compression ratio of 2:1 (acceptable)
+        # throat_max = 1.0 * S_d gives compression ratio of 1:1 (no compression)
+        throat_min = 0.5 * S_d  # 50% of driver area (compression ratio 2:1)
+        throat_max = 1.0 * S_d  # 100% of driver area (no compression, best for woofers)
         mouth_min = 0.1  # m² (radius ~18 cm)
         mouth_max = 1.0  # m² (radius ~56 cm)
         length_min = 1.5  # m (bass horns are long)
@@ -133,8 +143,10 @@ def get_exponential_horn_parameter_space(
         )
 
     # Define parameter ranges
-    # Literature: Olson (1947) - Throat area should be 10-50% of diaphragm area
-    # for compression drivers (less for direct radiators)
+    # Literature: Olson (1947), Beranek (1954) - Throat area depends on driver type:
+    #   - Compression drivers (with phase plugs): 10-50% of diaphragm area
+    #   - Direct radiator woofers (bass horns): 50-100% of diaphragm area
+    #     (higher compression requires phase plug, impractical for woofers)
     parameters = [
         ParameterRange(
             name="throat_area",

@@ -405,7 +405,7 @@ class DesignAssistant:
                 # Horn-specific constraints
                 constraint_list.extend(constraints.get(
                     "constraint_list",
-                    ["mouth_size", "flare_constant_limits"]
+                    ["mouth_size", "flare_constant_limits", "monotonic_expansion"]
                 ))
 
             if enclosure_type == "conical_horn":
@@ -435,7 +435,7 @@ class DesignAssistant:
                 constraint_list.append("port_velocity")
             if enclosure_type == "exponential_horn":
                 # Default horn constraints
-                constraint_list.extend(["mouth_size", "flare_constant_limits"])
+                constraint_list.extend(["mouth_size", "flare_constant_limits", "monotonic_expansion"])
             if enclosure_type == "conical_horn":
                 # Default conical horn constraints
                 constraint_list.extend(["mouth_size", "expansion_ratio"])
