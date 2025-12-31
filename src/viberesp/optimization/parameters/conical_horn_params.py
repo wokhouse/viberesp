@@ -57,7 +57,7 @@ def get_conical_horn_parameter_space(
         >>> from viberesp.driver import load_driver
         >>> param_space = get_conical_horn_parameter_space(driver, preset="midrange_horn")
         >>> param_space.get_parameter_names()
-        ['throat_area', 'mouth_area', 'length', 'V_rc']
+        ['throat_area', 'mouth_area', 'length', 'V_tc', 'V_rc']
         >>> xl, xu = param_space.get_bounds_array()
         >>> xl[0]  # Minimum throat area [m²]
         0.00016...

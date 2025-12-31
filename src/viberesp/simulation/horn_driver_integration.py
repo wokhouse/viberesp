@@ -29,7 +29,7 @@ from viberesp.simulation.horn_theory import (
     circular_piston_radiation_impedance,
     MediumProperties,
 )
-from viberesp.simulation.types import ExponentialHorn, ConicalHorn, HyperbolicHorn
+from viberesp.simulation.types import ExponentialHorn, ConicalHorn, HyperbolicHorn, MultiSegmentHorn
 from viberesp.simulation.constants import (
     SPEED_OF_SOUND,
     AIR_DENSITY,

@@ -149,11 +149,13 @@ class EnclosureOptimizationProblem(Problem):
                 constraint_multisegment_continuity,
                 constraint_multisegment_flare_limits,
                 constraint_multisegment_flare_curvature,
+                constraint_conical_expansion_ratio,
             )
             from viberesp.optimization.constraints.performance import (
                 constraint_f3_limit,
                 constraint_qtc_range,
                 constraint_volume_limit,
+                constraint_mouth_size,
             )
 
             constraint_map = {
@@ -165,6 +167,8 @@ class EnclosureOptimizationProblem(Problem):
                 "segment_continuity": constraint_multisegment_continuity,
                 "flare_constant_limits": constraint_multisegment_flare_limits,
                 "flare_curvature": constraint_multisegment_flare_curvature,
+                "mouth_size": constraint_mouth_size,
+                "expansion_ratio": constraint_conical_expansion_ratio,
             }
 
             for constr_name in constraints:
