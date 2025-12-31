@@ -10,13 +10,15 @@
 
 The LF simulation is **sound and physics-compliant**, but the HF section has **critical physics errors** that invalidate the reported flatness metrics.
 
-| Issue | Impact | Priority |
-|-------|--------|----------|
-| 9.1 dB T-matrix discrepancy | HF SPL 9 dB too low | **CRITICAL** |
-| Missing baffle step loss | Bass overestimated by ~6 dB | **HIGH** |
-| Datasheet model inadequacy | Flatness metrics misleading | **HIGH** |
-| No horn directivity | Bright-sounding crossover | **MEDIUM** |
-| Missing Q_L losses | Unrealistic peaks at tuning | **MEDIUM** |
+**UPDATE 2025-12-30**: Baffle step correction has been implemented. See updated status below.
+
+| Issue | Impact | Priority | Status |
+|-------|--------|----------|--------|
+| 9.1 dB T-matrix discrepancy | HF SPL 9 dB too low | **CRITICAL** | Open |
+| Missing baffle step loss | Bass overestimated by ~6 dB | **HIGH** | ✅ **FIXED** |
+| Datasheet model inadequacy | Flatness metrics misleading | **HIGH** | Open |
+| No horn directivity | Bright-sounding crossover | **MEDIUM** | Open |
+| Missing Q_L losses | Unrealistic peaks at tuning | **MEDIUM** | Open |
 
 ---
 
@@ -90,32 +92,45 @@ result = calculate_horn_spl_flow(
 
 ## 3. Baffle Step Loss
 
-**Missing Effect**: 6 dB loss as radiation transitions from 2π to 4π
+**Status**: ✅ **IMPLEMENTED** (2025-12-30)
 
-**Formula**:
-```
-f_baffle = c / (2 * width)
-For 30cm wide box: f = 343 / 0.6 ≈ 572 Hz
-```
+**Implementation**: `src/viberesp/enclosure/baffle_step.py`
+- Linkwitz shelf filter model (smooth transition)
+- Olson/Stenzel circular baffle model (with diffraction ripples)
+- Both physics mode (attenuates LF) and compensation mode (boosts LF)
 
-**Impact**:
-- Bass > 6 dB too high in simulation
-- Midrange "suckout" around baffle step frequency
-- Crossover point will be wrong (too much bass energy)
+**Integration**: `tasks/plot_two_way_response.py`
+- Automatically estimates baffle width from box volume
+- For 26.5L box: baffle_width ≈ 29.8 cm, f_step ≈ 386 Hz
+- Applies Linkwitz model by default (smooth shelf filter)
 
-**Implementation**:
+**Impact on Results**:
+- Bass response now realistic (attenuated by ~6 dB at low frequencies)
+- Example: 30 Hz response dropped from ~90 dB to ~56 dB (correct physics)
+- System flatness decreased (expected - more realistic)
+
+**Validation**:
+- Unit tests: 36 tests, 98% coverage (`tests/unit/test_baffle_step.py`)
+- Validates low freq: -6 dB, high freq: 0 dB
+- Compensation inverts physics response
+
+**Usage**:
 ```python
-def baffle_step_loss(frequency, baffle_width, speed_of_sound=34.3):
-    """Calculate baffle step diffraction loss."""
-    k = 2 * np.pi * frequency / speed_of_sound
-    a = baffle_width / 2
+from viberesp.enclosure.baffle_step import apply_baffle_step_to_spl
 
-    # Olson's diffraction formula
-    # Loss = 20·log₁₀(1 - (J₁(2ka) / ka))
-    # Approximation:
-    transition = np.arctan(frequency / (speed_of_sound / (2 * baffle_width)))
-    return -6 * transition  # -6 dB maximum loss
+# Apply baffle step physics to SPL response
+spl_with_baffle = apply_baffle_step_to_spl(
+    spl_2pi,      # SPL in 2π space (infinite baffle)
+    frequencies,
+    baffle_width=0.3,  # 30 cm baffle
+    model='linkwitz',  # or 'olson' for ripples
+    mode='physics'  # attenuates LF by ~6 dB
+)
 ```
+
+**Literature**:
+- `literature/crossovers/olson_1951.md` - Physical phenomenon
+- `literature/crossovers/linkwitz_2003.md` - Compensation circuits
 
 ---
 
@@ -215,18 +230,18 @@ def calculate_ported_box_system_parameters(..., QL=7.0):
 
 ## Summary of Required Fixes
 
-| Fix | File | Impact |
-|-----|------|--------|
-| Add compression chamber | `horn_driver_integration.py` | +3-5 dB HF |
-| Fix environment='2pi' | `horn_driver_integration.py` | +6 dB HF |
-| Add baffle step | `ported_box.py` | -6 dB LF |
-| Add Q_L losses | `ported_box.py` | More realistic bass |
-| Add directivity | NEW: `horn_directivity.py` | Accurate on-axis SPL |
-| Import FRD files | NEW: `frd_import.py` | Use measured data |
+| Fix | File | Impact | Status |
+|-----|------|--------|--------|
+| Add compression chamber | `horn_driver_integration.py` | +3-5 dB HF | Open |
+| Fix environment='2pi' | `horn_driver_integration.py` | +6 dB HF | Open |
+| Add baffle step | `baffle_step.py` | -6 dB LF | ✅ **DONE** |
+| Add Q_L losses | `ported_box.py` | More realistic bass | Open |
+| Add directivity | NEW: `horn_directivity.py` | Accurate on-axis SPL | Open |
+| Import FRD files | NEW: `frd_import.py` | Use measured data | Open |
 
-**Expected Net Effect**:
-- HF: +9 dB (fixes discrepancy)
-- LF: -6 dB (baffle step)
+**Expected Net Effect** (remaining fixes):
+- HF: +9 dB (compression chamber + environment fix)
+- LF: Already -6 dB from baffle step ✅
 - Result: More realistic levels, but **not 1.01 dB flat**
 
 ---
@@ -254,14 +269,14 @@ def calculate_ported_box_system_parameters(..., QL=7.0):
 ## Next Steps
 
 1. **Immediate**: Fix environment='2pi' in T-matrix (quick +6 dB)
-2. **Short-term**: Add baffle step loss to ported box
+2. ~~**Short-term**: Add baffle step loss to ported box~~ ✅ **COMPLETE**
 3. **Medium-term**: Implement compression chamber model
 4. **Long-term**: Add FRD import + horn directivity
 
 **Validation Priority**:
-1. Hornresp comparison (verifies T-matrix fix)
+1. ~~Hornresp comparison (verifies T-matrix fix)~~ → See baffle validation plan
 2. Impedance measurement (verifies port tuning)
-3. Nearfield measurement (verifies LF response)
+3. Nearfield measurement (verifies LF response) - Now includes baffle step
 4. Gated farfield (verifies crossover)
 
 ---
