@@ -421,10 +421,19 @@ def horn_system_acoustic_impedance(
     else:
         raise TypeError(f"Unsupported horn type: {type(horn)}")
 
-    # Add throat chamber compliance (series element)
+    # Add throat chamber compliance (parallel element)
+    # For compression driver topology, the throat chamber is in parallel with
+    # the horn impedance, not in series. The driver sees both the compliance
+    # of the throat chamber AND the horn impedance at the same pressure point.
+    #
+    # Literature: Beranek (1954), Chapter 5 - Acoustic circuits
+    # Parallel combination: 1/Z_total = 1/Z_tc + 1/Z_horn
     if V_tc > 0:
         Z_tc = throat_chamber_impedance(frequencies, V_tc, A_tc, medium)
-        Z_front = Z_tc + Z_horn_throat
+        # Parallel combination: Z_front = Z_tc || Z_horn_throat
+        # For very large Z_tc (small compliance), Z_front ≈ Z_horn_throat
+        # This prevents the throat chamber from blocking acoustic power flow
+        Z_front = 1.0 / (1.0 / Z_tc + 1.0 / Z_horn_throat)
     else:
         Z_front = Z_horn_throat
 
