@@ -17,28 +17,36 @@ Viberesp is a CLI tool for simulating horn-loaded loudspeaker enclosures using a
 
 ## Project Status
 
-**Phase 7.4 Complete** - Viberesp has fully functional optimization and parameter sweep tools. Horn simulation is in development.
+**Phase 7 Complete** - Viberesp has fully functional optimization tools, horn simulation, and comprehensive validation. Exponential horn simulation is production-ready with T-matrix method.
 
 ### ✅ Implemented (Phase 7)
 - Multi-objective optimization (NSGA-II)
-- Sealed box design and optimization
-- Ported box design and optimization
+- Sealed box design and optimization (with Hornresp validation)
+- Ported box design and optimization (with Hornresp validation)
 - Enclosure type recommendations
 - Agent-friendly Python API
 - Constraint handling (physical and performance)
 - Pareto front analysis
-- **Parameter sweep with sensitivity analysis** (NEW!)
-- **Automatic design recommendations** (optimal ranges, trends, diminishing returns)
+- Parameter sweep with sensitivity analysis
+- Automatic design recommendations (optimal ranges, trends, diminishing returns)
+- YAML-based driver definitions
+- Hornresp query tools and batch validation
+
+### ✅ Implemented (Horn Simulation)
+- **Exponential horn simulation** using T-matrix method (Kolbrek)
+- Horn driver integration with chamber models
+- Throat impedance calculations with radiation corrections
+- Multi-segment horn optimization with target band constraints
+- Half-space radiation (standard 2π steradians)
 
 ### 🔄 In Development
-- Horn simulation engine (exponential, hyperbolic, conical)
-- Hornresp validation integration
+- Hyperbolic and conical horn profiles
+- Hornresp validation integration for horns
 - CLI interface for human users
 
 ### ⏳ Planned
 - Folded horn support
-- Multi-segment horn optimization
-- Advanced visualizations
+- Advanced visualizations and plotting
 
 See [ROADMAP.md](ROADMAP.md) for detailed development phases.
 
@@ -724,12 +732,12 @@ validation:
 See [ROADMAP.md](ROADMAP.md) for detailed development phases:
 
 - **Phase 1**: ✅ Literature review and algorithm selection
-- **Phase 2**: 🔄 Driver parameter input system
-- **Phase 3**: ⏳ Horn simulation engine
-- **Phase 4**: ⏳ Hornresp export functionality
-- **Phase 5**: ⏳ Validation framework
-- **Phase 6**: ⏳ CLI user interface and workflow
-- **Phase 7**: ⏳ Optimization and exploration tools
+- **Phase 2**: ✅ Driver parameter system (YAML-based driver definitions)
+- **Phase 3**: 🔄 Horn simulation engine (Exponential ✅, hyperbolic/conical in progress)
+- **Phase 4**: ✅ Hornresp export functionality (with query tools)
+- **Phase 5**: ✅ Validation framework (sealed/ported box validation passing)
+- **Phase 6**: 🔄 CLI user interface (Python API complete, CLI in progress)
+- **Phase 7**: ✅ Optimization and exploration tools (NSGA-II, Pareto analysis, parameter sweep)
 
 ## FAQ
 
