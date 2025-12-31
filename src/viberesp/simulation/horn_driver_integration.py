@@ -323,7 +323,7 @@ def rear_chamber_impedance(
 
 def horn_system_acoustic_impedance(
     frequencies: FloatArray,
-    horn: 'ExponentialHorn | MultiSegmentHorn',
+    horn: Union['ExponentialHorn', 'ConicalHorn', 'HyperbolicHorn', 'MultiSegmentHorn'],
     V_tc: float = 0.0,
     A_tc: Optional[float] = None,
     V_rc: float = 0.0,
@@ -336,7 +336,7 @@ def horn_system_acoustic_impedance(
     Combines throat chamber, horn throat impedance, and rear chamber impedance
     to calculate the total acoustic load on the driver.
 
-    Supports both single-segment ExponentialHorn and multi-segment MultiSegmentHorn.
+    Supports ExponentialHorn, ConicalHorn, HyperbolicHorn, and MultiSegmentHorn.
 
     Literature:
         - Olson (1947), Chapter 8 - Complete horn driver systems
@@ -357,7 +357,7 @@ def horn_system_acoustic_impedance(
 
     Args:
         frequencies: Array of frequencies [Hz]
-        horn: ExponentialHorn or MultiSegmentHorn geometry parameters
+        horn: Horn geometry parameters (ExponentialHorn, ConicalHorn, HyperbolicHorn, or MultiSegmentHorn)
         V_tc: Throat chamber volume [m³], default 0 (no throat chamber)
         A_tc: Throat chamber area [m²], defaults to horn.throat_area
         V_rc: Rear chamber volume [m³], default 0 (no rear chamber)
@@ -397,17 +397,29 @@ def horn_system_acoustic_impedance(
 
     # Calculate horn throat impedance (T-matrix method)
     # Check horn type and use appropriate impedance calculation
-    horn_type = type(horn).__name__
-    if horn_type == "MultiSegmentHorn":
+    if isinstance(horn, ConicalHorn):
+        # Conical horn: spherical wave T-matrix
+        Z_horn_throat = conical_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    elif isinstance(horn, ExponentialHorn):
+        # Exponential horn: plane wave T-matrix
+        Z_horn_throat = exponential_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    elif isinstance(horn, HyperbolicHorn):
+        # Hyperbolic horn: use exponential for now (T=1 is exponential)
+        # TODO: Implement hyperbolic-specific throat impedance
+        Z_horn_throat = exponential_horn_throat_impedance(
+            frequencies, horn, medium, radiation_angle
+        )
+    elif isinstance(horn, MultiSegmentHorn):
         # Multi-segment horn: chain T-matrices for each segment
         Z_horn_throat = multsegment_horn_throat_impedance(
             frequencies, horn, medium
         )
     else:
-        # Single-segment exponential horn
-        Z_horn_throat = exponential_horn_throat_impedance(
-            frequencies, horn, medium, radiation_angle
-        )
+        raise TypeError(f"Unsupported horn type: {type(horn)}")
 
     # Add throat chamber compliance (series element)
     if V_tc > 0:
