@@ -421,7 +421,8 @@ class ConicalHorn:
         r_x = r_t + (r_m - r_t) * (x / self.length)
         return np.pi * (r_x ** 2)
 
-    def calculate_t_matrix(self, f: float, c: float = 343.2, rho: float = 1.205) -> np.ndarray:
+    def calculate_t_matrix(self, f: float, c: float = 343.2, rho: float = 1.205,
+                           use_explicit_form: bool = True) -> np.ndarray:
         """
         Calculate the 2x2 Transfer Matrix [A, B; C, D] for this conical horn
         using spherical wave theory.
@@ -449,10 +450,18 @@ class ConicalHorn:
             The T-matrix relates throat to mouth: V_throat = T · V_mouth
             where T = M(r_throat) · M(r_mouth)⁻¹
 
+            This implementation uses explicit ABCD formulas derived from the
+            Wronskian identity: j₀(z)y₁(z) - j₁(z)y₀(z) = -z⁻²
+
+            This provides better numerical stability than matrix inversion
+            at low frequencies where spherical Bessel functions become singular.
+
         Args:
             f: Frequency [Hz]
             c: Speed of sound [m/s]
             rho: Air density [kg/m³]
+            use_explicit_form: If True (default), use explicit ABCD formulas
+                derived from Wronskian. If False, use numerical matrix inversion.
 
         Returns:
             2x2 np.ndarray of complex floats [[A, B], [C, D]]
@@ -503,36 +512,79 @@ class ConicalHorn:
         kr1 = k * r1
         kr2 = k * r2
 
-        def get_state_matrix(r, S, kr):
-            """
-            Build the state matrix M(r) that relates [C₁, C₂] to [p, U].
+        # Calculate spherical Bessel functions at throat and mouth
+        j0_1 = special.spherical_jn(0, kr1)
+        j1_1 = special.spherical_jn(1, kr1)
+        y0_1 = special.spherical_yn(0, kr1)
+        y1_1 = special.spherical_yn(1, kr1)
 
-            M(r) = [[j₀(kr), y₀(kr)],
-                    [(S/jρc)·j₁(kr), (S/jρc)·y₁(kr)]]
-            """
-            j0 = special.spherical_jn(0, kr)
-            y0 = special.spherical_yn(0, kr)
-            j1 = special.spherical_jn(1, kr)
-            y1 = special.spherical_yn(1, kr)
+        j0_2 = special.spherical_jn(0, kr2)
+        j1_2 = special.spherical_jn(1, kr2)
+        y0_2 = special.spherical_yn(0, kr2)
+        y1_2 = special.spherical_yn(1, kr2)
 
-            # Volume velocity pre-factor: S / (j * rho * c)
-            u_scale = S / (1j * rho * c)
+        # Characteristic impedance of medium
+        Z0 = rho * c
 
-            return np.array([
-                [j0, y0],
-                [u_scale * j1, u_scale * y1]
+        if use_explicit_form:
+            # Use explicit ABCD formulas derived from Wronskian
+            # This is numerically stable at low frequencies
+            #
+            # The Wronskian for spherical Bessel functions:
+            # W{j₀, y₀}(z) = j₀(z)y₁(z) - j₁(z)y₀(z) = -z⁻²
+            #
+            # Using this identity, we can derive explicit formulas for the
+            # T-matrix elements without numerical matrix inversion:
+            #
+            # Let A_ij = j_i(kr₁)y_j(kr₂) - y_i(kr₁)j_j(kr₂)
+            #
+            # Then the T-matrix elements are:
+            # A = -(kr₂)² · A₀₀
+            # B = (jZ₀/S_m)(kr₂)² · [j₀(kr₁)y₀(kr₂) - j₀(kr₂)y₀(kr₁)]
+            # C = -(S_t/jZ₀)(kr₂)² · A₁₁
+            # D = (S_t/S_m)(r₁/r₂) · [j₀(kr₂)y₁(kr₁) - j₁(kr₁)y₀(kr₂)]
+
+            # Cross products needed for T-matrix elements
+            A_00 = j0_1 * y1_2 - y0_1 * j1_2  # j₀(kr₁)y₁(kr₂) - y₀(kr₁)j₁(kr₂)
+            A_01 = j0_1 * y0_2 - y0_1 * j0_2  # j₀(kr₁)y₀(kr₂) - y₀(kr₁)j₀(kr₂)
+            A_11 = j1_1 * y1_2 - y1_1 * j1_2  # j₁(kr₁)y₁(kr₂) - y₁(kr₁)j₁(kr₂)
+            A_10 = j0_2 * y1_1 - j1_1 * y0_2  # j₀(kr₂)y₁(kr₁) - j₁(kr₁)y₀(kr₂)
+
+            # Prefactors
+            kr2_sq = (kr2) ** 2
+            impedance_scale_t = S_t / (1j * Z0)
+            impedance_scale_m = S_m / (1j * Z0)
+
+            # T-matrix elements (explicit formulas using Wronskian)
+            # All elements scale with (kr2)² for consistency
+            A = -kr2_sq * A_00
+            B = (1j * Z0 / S_m) * kr2_sq * A_01
+            C = -(impedance_scale_t) * kr2_sq * A_11
+            D = -kr2_sq * (S_t / S_m) * A_10
+
+        else:
+            # Legacy method: numerical matrix inversion
+            # This is retained for testing/validation purposes
+            u_scale_t = S_t / (1j * rho * c)
+            u_scale_m = S_m / (1j * rho * c)
+
+            M_throat = np.array([
+                [j0_1, y0_1],
+                [u_scale_t * j1_1, u_scale_t * y1_1]
             ], dtype=complex)
 
-        # Build state matrices at throat and mouth
-        M_throat = get_state_matrix(r1, S_t, kr1)
-        M_mouth = get_state_matrix(r2, S_m, kr2)
+            M_mouth = np.array([
+                [j0_2, y0_2],
+                [u_scale_m * j1_2, u_scale_m * y1_2]
+            ], dtype=complex)
 
-        # T-matrix: V_throat = T · V_mouth
-        # where T = M_throat · M_mouth⁻¹
-        M_mouth_inv = np.linalg.inv(M_mouth)
-        T = np.matmul(M_throat, M_mouth_inv)
+            M_mouth_inv = np.linalg.inv(M_mouth)
+            T = np.matmul(M_throat, M_mouth_inv)
 
-        return T
+            A, B = T[0, 0], T[0, 1]
+            C, D = T[1, 0], T[1, 1]
+
+        return np.array([[A, B], [C, D]], dtype=complex)
 
 
 @dataclass

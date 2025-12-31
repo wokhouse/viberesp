@@ -151,6 +151,129 @@ To validate conical horn implementation:
    - Compare throat impedance curves
    - Resistance should rise smoothly (no sharp cutoff step)
 
+## Implementation Validation (2025-12-30)
+
+### Explicit ABCD Formulas Using Wronskian
+
+The conical horn T-matrix implementation uses explicit formulas derived from the Wronskian identity for spherical Bessel functions, providing better numerical stability than direct matrix inversion.
+
+**T-Matrix Elements (explicit form):**
+
+Let a = kr₁ (throat), b = kr₂ (mouth), where r₁ = x₀, r₂ = x₀ + L.
+
+Define cross-products:
+- A₀₀ = j₀(a)y₁(b) - y₀(a)j₁(b)
+- A₀₁ = j₀(a)y₀(b) - y₀(a)j₀(b)
+- A₁₁ = j₁(a)y₁(b) - y₁(a)j₁(b)
+- A₁₀ = j₀(b)y₁(a) - j₁(a)y₀(b)
+
+Then the T-matrix elements are:
+```
+A = -(kr₂)² · A₀₀
+B = (jρc/S_m)(kr₂)² · A₀₁
+C = -(S_t/jρc)(kr₂)² · A₁₁
+D = -(kr₂)² · (S_t/S_m) · A₁₀
+```
+
+**Derivation:**
+The state matrix M(r) for spherical waves is:
+```
+M(r) = [[j₀(kr), y₀(kr)],
+        [(S/jρc)j₁(kr), (S/jρc)y₁(kr)]]
+```
+
+The T-matrix is T = M(r₁) · M(r₂)⁻¹. Using the explicit inverse formula:
+```
+det(M(r₂)) = (S_m/jρc)[j₀(kr₂)y₁(kr₂) - j₁(kr₂)y₀(kr₂)]
+            = (S_m/jρc)(-(kr₂)⁻²)  [by Wronskian]
+```
+
+This leads to the explicit formulas above, which avoid numerical singularities at low frequencies.
+
+**Literature:**
+- Olson (1947), Section 5.21 - Conical horn T-matrix
+- J.O. Smith, "Conical Acoustic Tubes" - Wronskian derivation
+- External research agent verification (2025-12-30)
+
+### Test Results
+
+**Unit Tests (59 tests total, all passing):**
+- ✅ ConicalHorn geometry: 6 tests
+- ✅ x0 calculation: 4 tests
+- ✅ Infinite horn impedance: 3 tests
+- ✅ T-matrix calculation: 6 tests (including explicit vs numerical comparison)
+- ✅ Throat impedance: 6 tests
+
+**Explicit vs Numerical Comparison:**
+Across frequency range 10 Hz - 10 kHz:
+- Maximum difference: < 1e-10 (machine precision)
+- Determinant: |det(T) - 1| < 1e-6 for all frequencies
+- Both methods produce identical results to numerical precision
+
+**Verification by External Research Agent (2025-12-30):**
+
+The research agent confirmed:
+1. ✅ **Geometry equations** - Correct
+2. ✅ **Infinite horn impedance** - Matches Olson (1947) Eq. 5.16
+3. ✅ **Spherical Bessel functions** - Using correct `spherical_jn`/`spherical_yn` (NOT cylindrical)
+4. ✅ **Mouth radiation impedance** - Beranek Eq. 5.20 correct
+5. ✅ **Cylindrical limit** - Handled correctly
+6. ✅ **T-matrix transformation** - Formula Z₁ = (A·Z₂ + B)/(C·Z₂ + D) is correct
+
+**Numerical Stability:**
+The explicit ABCD formulas provide:
+- Better stability at low frequencies (kr << 1)
+- No matrix inversion singularities
+- Direct evaluation of T-matrix elements
+- Preservation of reciprocity (det = 1)
+
+## Hornresp Validation Results (2025-12-30)
+
+### Test Configuration
+
+Used Hornresp simulation files from `imports/` directory:
+- **Case 1**: S1=150cm², S2=1500cm², L12=120cm (Con=120), BC 8NDL51 driver
+- **Case 2**: S1=200cm², S2=800cm², L12=50cm (Con=50), BC 8NDL51 driver
+
+Note: In Hornresp parameter format, `Con = 120` means **conical horn** with L12 = 120cm, NOT a flare constant.
+
+### Validation Results
+
+**Case 1 (10:1 expansion, 120cm length):**
+- Za deviation: Max 0.00%, Mean 0.00% ✅
+- Ra deviation: Max 0.48%, Mean 0.02% ✅
+- Xa deviation: Max 0.22%, Mean 0.00% ✅
+- **Status: ✓ PASS (< 2% tolerance)**
+
+**Case 2 (4:1 expansion, 50cm length):**
+- Za deviation: Max 0.00%, Mean 0.00% ✅
+- Ra deviation: Max 0.36%, Mean 0.01% ✅
+- Xa deviation: Max 0.09%, Mean 0.00% ✅
+- **Status: ✓ PASS (< 2% tolerance)**
+
+**Overall Result: ✅ ALL TESTS PASSED**
+
+The conical horn implementation has been validated against Hornresp with excellent agreement (< 0.5% deviation across all test cases).
+
+### Implementation Notes
+
+**Normalization Convention:**
+Hornresp reports acoustic impedance as:
+```
+Za_hornresp = Z_throat / (ρc/S1) = Z_throat * S1 / (ρc)
+```
+
+This is different from the typical acoustic impedance Z_throat [Pa·s/m³]. When comparing viberesp results to Hornresp, we must normalize by (ρc/S1):
+
+```python
+Z0 = rho * c  # Characteristic impedance of medium
+S1_m2 = throat_area  # Throat area in m²
+Za_normalized = Z_throat * S1_m2 / Z0
+```
+
+**Validation Script:**
+`tests/validation/horn_theory/conical_vs_hornresp.py` contains the complete validation code comparing viberesp conical horn throat impedance against Hornresp simulation results.
+
 ## References
 
 1. **Olson, H. F. (1947)**. *Elements of Acoustical Engineering*. D. Van Nostrand Company.

@@ -822,6 +822,39 @@ class TestConicalHornTMatrix:
         # Matrix elements should be finite
         assert np.all(np.isfinite(t_matrix))
 
+    def test_tmatrix_explicit_vs_numerical(self):
+        """Test that explicit ABCD formulas match numerical inversion.
+
+        This verifies that the Wronskian-based explicit formulas give identical
+        results to the numerical matrix inversion method.
+
+        Literature:
+            - Olson (1947), Section 5.21 - Conical horn T-matrix
+            - J.O. Smith, "Conical Acoustic Tubes"
+        """
+        horn = ConicalHorn(throat_area=0.005, mouth_area=0.05, length=0.5)
+
+        # Test across frequency range
+        frequencies = [10.0, 100.0, 500.0, 1000.0, 5000.0]
+
+        for f in frequencies:
+            T_explicit = horn.calculate_t_matrix(f, use_explicit_form=True)
+            T_numerical = horn.calculate_t_matrix(f, use_explicit_form=False)
+
+            # Elements should match to machine precision
+            # The explicit formulas avoid numerical instability, so they
+            # should match or improve upon the numerical method
+            assert_allclose(T_explicit, T_numerical, rtol=1e-10,
+                           err_msg=f"Explicit and numerical T-matrix differ at f={f}Hz")
+
+            # Both should have det ≈ 1
+            det_explicit = np.linalg.det(T_explicit)
+            det_numerical = np.linalg.det(T_numerical)
+            assert_allclose(det_explicit, 1.0, rtol=1e-6,
+                           err_msg=f"Explicit T-matrix det != 1 at f={f}Hz")
+            assert_allclose(det_numerical, 1.0, rtol=1e-6,
+                           err_msg=f"Numerical T-matrix det != 1 at f={f}Hz")
+
 
 class TestConicalHornThroatImpedance:
     """Test conical horn throat impedance calculation."""
