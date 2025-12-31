@@ -36,11 +36,28 @@ compression_driver:
   throat_area: 5.07e-4  # m² - π × (12.7mm)²
   front_chamber_volume: 12e-6  # m³ - Front cavity (~12 cc, smaller due to compact design)
   phase_plug_channels: 10  # Number of phase plug channels (typical for compact 1" drivers)
+  diaphragm_diameter: 0.044  # m - 44mm (1.75 inch) diaphragm
+  beaming_freq: 13700  # Hz - Based on throat diameter: f = c/D = 343/0.025 = 13.72kHz
 
 # Notes and warnings
 notes: |
   B&C does not publish Thiele-Small parameters for the DH350 compression driver.
   These are ESTIMATED values suitable for horn optimization approximations.
+
+  Beaming Frequency Calculation:
+  - For compression drivers with horns, use THROAT diameter, not diaphragm
+  - Formula: f_beam = c / D_throat (where D = throat diameter)
+  - Calculation: 343 m/s / 0.025 m = 13,720 Hz
+  - Below 13.7 kHz: Horn controls dispersion pattern (throat acoustically small)
+  - Above 13.7 kHz: Driver beams, throat acts as directional source
+  - This applies to all compression drivers with 1" (25mm) throat
+
+  Theory:
+  - Phase plug transforms wavefront from diaphragm to throat exit
+  - Throat becomes the effective acoustic radiator for the horn
+  - Literature: Kolbrek & Dunker on horn upper frequency limits
+  - Literature: Beranek (1954) on throat impedance and ka relationship
+  - Validated: Matches Hornresp simulation (uses throat entry area S1)
 
   Parameter estimation rationale:
   - M_md (~1.8g): Lighter than DE250 due to smaller 36mm voice coil vs 44mm

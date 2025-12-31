@@ -1,0 +1,75 @@
+name: "GENERIC_RING_RADIATOR"
+manufacturer: "Theoretical"
+model: "Ring Radiator"
+description: "Generic 1 inch exit ring radiator compression driver (theoretical model for simulation)"
+
+# Datasheet specifications (theoretical)
+datasheet:
+  throat_diameter: 25  # mm (1 inch)
+  impedance_nominal: 8  # Ohms
+  impedance_minimum: 7.0  # Ohms
+  power_continuous: 40  # W
+  power_nominal: 20  # W
+  frequency_range: "1.5 kHz - 20 kHz"
+  voice_coil_diameter: 36  # mm (1.4 inch)
+  inductance: 0.04  # mH
+  diaphragm_material: "Titanium/Ring"
+  sensitivity: 110  # dB (2.83V, 1m)
+  crossover_recommended: 1.5  # kHz
+  winding_material: "Copper"
+  flux_density: 2.0  # T
+
+# Physical parameters (theoretical, based on ring radiator characteristics)
+parameters:
+  M_md: 0.0015  # kg - driver mass only (~1.5g, lighter due to ring design)
+  C_ms: 1.5e-5  # m/N - compliance (stiffer suspension)
+  R_ms: 2.0  # N·s/m - mechanical resistance
+  R_e: 7.0  # Ohms - voice coil DC resistance
+  L_e: 0.04e-3  # H - voice coil inductance
+  BL: 5.5  # T·m - force factor (estimated - 36mm coil with 2.0T flux)
+  S_d: 0.0010  # m² - effective diaphragm area (~10 cm², ring has less area than dome)
+  X_max: 0.0002  # m - maximum linear excursion (~0.2mm, ring radiators have limited excursion)
+
+# Compression driver specific parameters
+compression_driver:
+  throat_diameter: 0.0254  # m - 1 inch exit
+  throat_area: 5.07e-4  # m² - π × (12.7mm)²
+  front_chamber_volume: 10e-6  # m³ - Front cavity (~10 cc, compact design)
+  phase_plug_channels: 12  # Number of phase plug channels
+  diaphragm_diameter: 0.044  # m - 44mm physical diameter (similar to standard drivers)
+  beaming_freq: 16000  # Hz - Ring radiator pushes beaming to very high frequency
+
+# Notes and warnings
+notes: |
+  This is a THEORETICAL driver model for simulation purposes, representing
+  an ideal ring radiator compression driver.
+
+  Ring radiator characteristics:
+  - V-shaped ring instead of dome reduces effective radiating width
+  - Moving mass driven at center of ring
+  - Pushes beaming frequency to >16 kHz (vs 5 kHz for standard dome)
+  - Higher sensitivity due to reduced mass
+  - Better high-frequency extension with constant directivity
+
+  Parameter estimation rationale:
+  - M_md (~1.5g): Lighter than dome due to ring design
+  - C_ms (1.5e-5 m/N): Stiff suspension typical for compression drivers
+  - S_d (~10 cm²): Ring has less area than dome (14 cm² for DH350)
+  - BL (~5.5 T·m): Estimated from 2.0T flux density and 36mm voice coil
+  - X_max (~0.2mm): Limited excursion for ring design
+  - beaming_freq (16000 Hz): Ring geometry delays beaming significantly
+
+  Horn optimizer usage:
+  - Driver is designed for extended HF response (1.5kHz - 20kHz)
+  - Recommended crossover at 1.5kHz
+  - Very high sensitivity (110 dB) due to ring efficiency
+  - Excellent high-frequency dispersion up to 16kHz
+
+  CAUTION: This is a theoretical model. Real ring radiators may have
+  different parameters based on specific implementation.
+
+# Literature references
+literature:
+  - "Beranek, L. L. (1954). Acoustics. (Piston directivity and ka factors)"
+  - "Geddes, E. (2002). Audio Transducers. (Phase plug geometry and wavefront curvature)"
+  - "Smith, D. (1997). Phase Plug Modeling and Analysis, AES Convention"

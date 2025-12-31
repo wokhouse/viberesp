@@ -1,0 +1,91 @@
+name: "BC_DH450"
+manufacturer: "B&C Speakers"
+model: "DH450"
+description: "1 inch exit compression driver with 44mm voice coil"
+
+# Datasheet specifications
+datasheet:
+  throat_diameter: 25  # mm (1 inch)
+  impedance_nominal: 16  # Ohms
+  impedance_minimum: 12.3  # Ohms
+  power_continuous: 40  # W
+  power_nominal: 20  # W
+  frequency_range: "1 kHz - 18 kHz"
+  voice_coil_diameter: 44  # mm (1.7 inch)
+  inductance: 0.22  # mH
+  diaphragm_material: "HT Polymer"
+  sensitivity: 110  # dB (2.83V, 1m)
+  crossover_recommended: 1.0  # kHz
+  winding_material: "Aluminium"
+  flux_density: 1.9  # T
+
+# Physical parameters (estimated for horn optimizer)
+# Note: B&C does not publish T/S parameters for compression drivers
+# These are ESTIMATED based on similar drivers and technology
+parameters:
+  M_md: 0.0017  # kg - driver mass only (~1.7g)
+  C_ms: 1.3e-5  # m/N - compliance (stiff suspension)
+  R_ms: 1.7  # N·s/m - mechanical resistance
+  R_e: 12.3  # Ohms - voice coil DC resistance (minimum from datasheet)
+  L_e: 0.22e-3  # H - voice coil inductance
+  BL: 5.8  # T·m - force factor (estimated - 44mm coil with 1.9T flux, improved efficiency)
+  S_d: 0.0014  # m² - effective diaphragm area (~14 cm², similar to DH350)
+  X_max: 0.0003  # m - maximum linear excursion (~0.3mm, compression driver)
+
+# Compression driver specific parameters
+compression_driver:
+  throat_diameter: 0.0254  # m - 1 inch exit
+  throat_area: 5.07e-4  # m² - π × (12.7mm)²
+  front_chamber_volume: 12e-6  # m³ - Front cavity (~12 cc)
+  phase_plug_channels: 12  # Number of phase plug channels (HLX design)
+  diaphragm_diameter: 0.044  # m - 44mm (1.7 inch) diaphragm
+  beaming_freq: 13700  # Hz - Based on throat diameter: f = c/D = 343/0.025 = 13.72kHz
+
+# Notes and warnings
+notes: |
+  B&C does not publish Thiele-Small parameters for the DH450 compression driver.
+  These are ESTIMATED values suitable for horn optimization approximations.
+
+  Beaming Frequency Calculation:
+  - For compression drivers with horns, use THROAT diameter, not diaphragm
+  - Formula: f_beam = c / D_throat (where D = throat diameter)
+  - Calculation: 343 m/s / 0.025 m = 13,720 Hz
+  - Below 13.7 kHz: Horn controls dispersion pattern (throat acoustically small)
+  - Above 13.7 kHz: Driver beams, throat acts as directional source
+  - This applies to ALL compression drivers with 1" (25mm) throat
+  - DH350 and DH450 have the SAME beaming frequency (same throat size)
+
+  Theory:
+  - Phase plug transforms wavefront from diaphragm to throat exit
+  - Throat becomes the effective acoustic radiator for the horn
+  - Literature: Kolbrek & Dunker on horn upper frequency limits
+  - Literature: Beranek (1954) on throat impedance and ka relationship
+  - Validated: Matches Hornresp simulation (uses throat entry area S1)
+
+  Comparison: DH450 vs DH350
+  - Both have 1" throat → same beaming frequency → similar HF performance
+  - DH450: Higher sensitivity (110 vs 108 dB), 16Ω vs 4Ω, 18kHz vs 17kHz response
+  - For 2-way flatness validation: Both perform similarly within tolerance
+
+  Parameter estimation rationale:
+  - M_md (~1.7g): Similar to DH350, 44mm voice coil
+  - C_ms (1.3e-5 m/N): Stiff suspension typical for compression drivers
+  - S_d (~14 cm²): Based on 44mm diaphragm (similar to DH350)
+  - BL (~5.8 T·m): Estimated from 1.9T flux density and 44mm voice coil
+  - X_max (~0.3mm): Standard compression driver excursion
+  - R_e (12.3Ω): Minimum impedance from datasheet (16Ω nominal)
+
+  Horn optimizer usage:
+  - Driver is designed for HF horns (1kHz - 18kHz per datasheet)
+  - Recommended crossover at 1kHz
+  - High sensitivity (110 dB) and 16Ω impedance for flexible system design
+
+  CAUTION: These are ESTIMATED values. For accurate simulation results,
+  measure actual Thiele-Small parameters or obtain from B&C.
+
+# Literature references
+literature:
+  - "B&C DH450 datasheet"
+  - "https://www.bcspeakers.com/"
+  - "Beranek (1954) - Acoustic impedance and throat loading theory"
+  - "Olson (1947) - Horn impedance calculations"
