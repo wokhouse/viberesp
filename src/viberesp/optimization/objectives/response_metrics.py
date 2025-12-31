@@ -847,7 +847,7 @@ def objective_impedance_smoothness(
     n_points: int = 100
 ) -> float:
     """
-    Calculate throat impedance smoothness for multi-segment horn.
+    Calculate throat impedance smoothness for multi-segment and mixed-profile horns.
 
     Measures how smooth the throat impedance is vs frequency. Peaks and dips
     in throat impedance indicate resonances that color the sound. A smooth
@@ -871,8 +871,9 @@ def objective_impedance_smoothness(
     Args:
         design_vector: Horn parameters
             - For multisegment_horn: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+            - For mixed_profile_horn: [throat, area1, area2, mouth, L1, L2, ptype1, ptype2, T1, T2, V_tc, V_rc]
         driver: ThieleSmallParameters instance
-        enclosure_type: Must be "multisegment_horn"
+        enclosure_type: "multisegment_horn" or "mixed_profile_horn"
         num_segments: Number of horn segments (2 or 3)
         frequency_range: (f_min, f_max) in Hz for evaluation
         n_points: Number of frequency points to evaluate
@@ -881,7 +882,7 @@ def objective_impedance_smoothness(
         Peak-to-peak variation of throat resistance in ohms (lower is better)
 
     Raises:
-        ValueError: If enclosure_type is not "multisegment_horn"
+        ValueError: If enclosure_type is not supported
 
     Examples:
         >>> driver = load_driver("TC2")
@@ -893,14 +894,16 @@ def objective_impedance_smoothness(
         >>> smoothness
         15.3  # ohms peak-to-peak (example value)
     """
-    if enclosure_type != "multisegment_horn":
+    # Build horn based on enclosure type
+    if enclosure_type == "multisegment_horn":
+        horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
+    elif enclosure_type == "mixed_profile_horn":
+        horn, _, _ = build_mixed_profile_horn(design_vector, driver, num_segments)
+    else:
         raise ValueError(
-            f"objective_impedance_smoothness only supports 'multisegment_horn', "
-            f"got '{enclosure_type}'"
+            f"objective_impedance_smoothness only supports horn enclosures "
+            f"('multisegment_horn', 'mixed_profile_horn'), got '{enclosure_type}'"
         )
-
-    # Build multi-segment horn (handles both standard and hyperbolic)
-    horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
 
     # Generate frequency array (log-spaced)
     frequencies = np.logspace(

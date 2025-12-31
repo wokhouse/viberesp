@@ -191,6 +191,17 @@ class EnclosureOptimizationProblem(Problem):
         n_obj = len(self.objective_configs)
         n_constr = len(self.constraint_funcs)
 
+        # Determine variable types (continuous vs integer)
+        # For mixed_profile_horn, profile_type parameters are integers
+        if enclosure_type == "mixed_profile_horn":
+            # Find profile_type parameter indices
+            vtype = np.ones(n_var, dtype=bool)  # Start with all continuous (True)
+            for i, param_name in enumerate(self.param_names):
+                if param_name.startswith("profile_type"):
+                    vtype[i] = False  # Mark as integer
+        else:
+            vtype = np.ones(n_var, dtype=bool)  # All continuous
+
         # Initialize parent Problem class
         super().__init__(
             n_var=n_var,
@@ -198,7 +209,7 @@ class EnclosureOptimizationProblem(Problem):
             n_constr=n_constr,
             xl=xl,
             xu=xu,
-            vtype_double=True  # All parameters are continuous
+            vtype=vtype  # Mix of continuous (True) and integer (False)
         )
 
     def _evaluate(self, X, out, *args, **kwargs):
@@ -226,7 +237,13 @@ class EnclosureOptimizationProblem(Problem):
 
         # Evaluate each individual
         for i in range(n_individuals):
-            design_vector = X[i]
+            design_vector = X[i].copy()
+
+            # For mixed_profile_horn, ensure profile_type parameters are integers
+            if self.enclosure_type == "mixed_profile_horn":
+                for param_idx, param_name in enumerate(self.param_names):
+                    if param_name.startswith("profile_type"):
+                        design_vector[param_idx] = int(np.round(design_vector[param_idx]))
 
             # Evaluate each objective
             for j, obj_config in enumerate(self.objective_configs):
