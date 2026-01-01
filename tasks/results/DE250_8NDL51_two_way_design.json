@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-01-01T13:00:59.144882",
+  "lf_driver": "BC_8NDL51",
+  "hf_driver": "BC_DE250",
+  "lf_enclosure": {
+    "type": "ported",
+    "Vb_liters": 10.098912041063999,
+    "Fb_hz": 75.00019775967137,
+    "expected_F3_hz": 90.58423308723911
+  },
+  "hf_horn": {
+    "type": "multisegment_optimized",
+    "throat_area_cm2": 5.61023746073082,
+    "middle_area_cm2": 105.20334756992698,
+    "mouth_area_cm2": 564.640816682545,
+    "length1_cm": 20.427320541909488,
+    "length2_cm": 21.368140393759422,
+    "total_length_m": 0.4179546093566891,
+    "cutoff_hz": 783.3636640762812,
+    "flare_constant_m1": 14.349909808461968,
+    "V_tc_cm3": 10.707278905529563,
+    "V_rc_cm3": 11.939373997749097,
+    "optimization_objectives": [
+      "wavefront_sphericity",
+      "impedance_smoothness"
+    ]
+  },
+  "crossover": {
+    "frequency_hz": 1583.6734693877552,
+    "type": "Linkwitz-Riley",
+    "order": 4,
+    "lf_padding_db": 0,
+    "hf_padding_db": -19.190813378711283,
+    "estimated_ripple_db": 19.69819800046084
+  },
+  "performance_targets": {
+    "bass_extension_F3_hz": 90.58423308723911,
+    "max_ripple_db": 19.69819800046084,
+    "system_sensitivity_db": 88.80918662128872
+  }
+}
