@@ -1,5 +1,5 @@
 """
-Predefined optimization presets for common horn design scenarios.
+Predefined optimization presets for common design scenarios.
 
 This module provides pre-configured optimization templates that encapsulate
 best practices for different design goals. Each preset specifies objectives,
@@ -12,6 +12,19 @@ Presets:
     max_efficiency: Maximize horn efficiency at target frequency
     flat_response: Prioritize smooth frequency response over extension
     balanced: Balanced trade-off between size, extension, and response quality
+
+    Sealed Box Presets:
+        sealed_butterworth: Maximally flat sealed box (Qtc=0.707)
+        sealed_compact: Small sealed box for space-constrained designs
+        sealed_deep_bass: Large sealed box for deep bass extension
+        sealed_car: Car audio optimized (small box with cabin gain)
+
+    Ported Box Presets:
+        ported_b4: Butterworth B4 alignment (maximally flat)
+        ported_qb3: Quasi-Butterworth 3rd order (tighter bass)
+        ported_bb4: Extended bass shelf (more bass output)
+        ported_compact: Compact ported design
+        ported_car_audio: Car audio optimized (small box, higher tuning)
 """
 
 from typing import Dict, Any, List
@@ -56,7 +69,7 @@ OPTIMIZATION_PRESETS: Dict[str, Dict[str, Any]] = {
             "f3_max": 45.0,
             "max_volume": 200.0,  # liters
         },
-        "parameter_space_preset": "compact",
+        "parameter_space_preset": "bass_horn",
         "typical_use_cases": [
             "Desktop or bookshelf systems",
             "Portable sound systems",
@@ -125,9 +138,8 @@ OPTIMIZATION_PRESETS: Dict[str, Dict[str, Any]] = {
 
     "midrange_horn": {
         "description": "Optimize midrange horn for smooth response and pattern control",
-        "objectives": ["passband_flatness", "wavefront_sphericity"],
+        "objectives": ["flatness"],
         "default_constraints": {
-            "passband_range": [500, 5000],  # Hz
             "max_volume": 50.0,  # liters
         },
         "parameter_space_preset": "midrange_horn",
@@ -147,11 +159,157 @@ OPTIMIZATION_PRESETS: Dict[str, Dict[str, Any]] = {
             "max_height": 0.5,  # meters
             "f3_max": 45.0,
         },
-        "parameter_space_preset": "compact",
+        "parameter_space_preset": "bass_horn",
         "typical_use_cases": [
             "Folded horns for home use",
             "Compact bass bins",
             "Space-constrained folded designs",
+        ],
+    },
+
+    # Sealed Box Presets
+    "sealed_butterworth": {
+        "description": "Sealed box with maximally flat Butterworth response (Qtc=0.707)",
+        "objectives": ["f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 200.0,  # liters (will be overridden by driver Vas)
+            "f3_max": 60.0,
+        },
+        "parameter_space_preset": "sealed",
+        "typical_use_cases": [
+            "High-fidelity home audio",
+            "Critical listening systems",
+            "Studio monitoring subwoofers",
+            "Applications prioritizing transient response",
+        ],
+    },
+
+    "sealed_compact": {
+        "description": "Small sealed box for space-constrained installations",
+        "objectives": ["volume", "f3"],
+        "default_constraints": {
+            "max_volume": 50.0,  # liters (very small)
+            "f3_max": 80.0,  # Accept higher cutoff for small size
+        },
+        "parameter_space_preset": "sealed",
+        "typical_use_cases": [
+            "Desktop or bookshelf systems",
+            "Compact home theater",
+            "Multi-room audio systems",
+            "Applications where space is at a premium",
+        ],
+    },
+
+    "sealed_deep_bass": {
+        "description": "Large sealed box for deep bass extension",
+        "objectives": ["f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 500.0,  # liters (large box)
+            "f3_max": 30.0,  # Target deep bass
+        },
+        "parameter_space_preset": "sealed",
+        "typical_use_cases": [
+            "Dedicated home theater subwoofers",
+            "High-end audio systems",
+            "Applications where size is not constrained",
+            "Critical music listening with deep bass requirements",
+        ],
+    },
+
+    "sealed_car": {
+        "description": "Sealed box optimized for car audio (small box, cabin gain)",
+        "objectives": ["volume", "flatness"],
+        "default_constraints": {
+            "max_volume": 30.0,  # liters (very small for trunk/under-seat)
+            "f3_max": 70.0,  # Cabin gain will extend response
+        },
+        "parameter_space_preset": "sealed",
+        "typical_use_cases": [
+            "Car audio subwoofers",
+            "Trunk or under-seat installations",
+            "Systems with cabin gain (12dB/octave below 50Hz)",
+            "Mobile audio applications",
+        ],
+    },
+
+    # Ported Box Presets
+    "ported_b4": {
+        "description": "Butterworth B4 alignment - maximally flat vented box response",
+        "objectives": ["f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 300.0,  # liters
+            "f3_max": 40.0,
+        },
+        "parameter_space_preset": "ported",
+        "typical_use_cases": [
+            "High-fidelity home audio subwoofers",
+            "Critical music listening",
+            "Studio monitoring subwoofers",
+            "Applications requiring accurate bass reproduction",
+        ],
+    },
+
+    "ported_qb3": {
+        "description": "Quasi-Butterworth 3rd order - tighter bass with good transient response",
+        "objectives": ["f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 250.0,  # liters
+            "f3_max": 35.0,
+        },
+        "parameter_space_preset": "ported",
+        "typical_use_cases": [
+            "Music-oriented subwoofers",
+            "Home theater with music priority",
+            "Applications valuing transient response",
+            "Tighter bass than B4 alignment",
+        ],
+    },
+
+    "ported_bb4": {
+        "description": "Extended bass shelf - maximum bass output with gentle rolloff",
+        "objectives": ["f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 200.0,  # liters (smaller than B4)
+            "f3_max": 45.0,
+        },
+        "parameter_space_preset": "ported",
+        "typical_use_cases": [
+            "Home theater subwoofers",
+            "High-output applications",
+            "Party/dance music systems",
+            "Applications prioritizing bass output over extension",
+        ],
+    },
+
+    "ported_compact": {
+        "description": "Compact ported design for space-constrained installations",
+        "objectives": ["volume", "f3", "flatness"],
+        "default_constraints": {
+            "max_volume": 80.0,  # liters (compact)
+            "f3_max": 50.0,  # Accept higher cutoff for small size
+        },
+        "parameter_space_preset": "ported",
+        "typical_use_cases": [
+            "Compact home theater",
+            "Bookshelf subwoofers",
+            "Desktop audio systems",
+            "Space-constrained bass reinforcement",
+        ],
+    },
+
+    "ported_car_audio": {
+        "description": "Ported box optimized for car audio (small box, higher tuning)",
+        "objectives": ["volume", "flatness"],
+        "default_constraints": {
+            "max_volume": 40.0,  # liters (small for car)
+            "f3_max": 50.0,  # Cabin gain will extend response
+        },
+        "parameter_space_preset": "ported",
+        "typical_use_cases": [
+            "Car audio subwoofers",
+            "Trunk or hatchback installations",
+            "Systems with cabin gain",
+            "Mobile audio with SPL requirements",
         ],
     },
 }

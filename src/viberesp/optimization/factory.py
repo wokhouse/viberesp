@@ -117,10 +117,10 @@ class OptimizationScriptFactory:
             )
 
         elif self.config.enclosure_type == "sealed":
-            from viberesp.optimization.parameters.sealed_params import (
-                get_sealed_parameter_space,
+            from viberesp.optimization.parameters.sealed_box_params import (
+                get_sealed_box_parameter_space,
             )
-            return get_sealed_parameter_space(self.driver)
+            return get_sealed_box_parameter_space(self.driver)
 
         elif self.config.enclosure_type == "ported":
             from viberesp.optimization.parameters.ported_box_params import (
@@ -236,10 +236,18 @@ class OptimizationScriptFactory:
 
         # Performance constraints from config
         if "f3_max" in self.config.constraints:
-            constraints.append(("f3_max", constraint_f3_limit))
+            f3_limit = self.config.constraints["f3_max"]
+            # Create wrapper function with parameter
+            def f3_max_constraint(X, driver, enclosure_type):
+                return constraint_f3_limit(X, driver, enclosure_type, f3_max_hz=f3_limit)
+            constraints.append(("f3_max", f3_max_constraint))
 
         if "max_volume" in self.config.constraints:
-            constraints.append(("volume_limit", constraint_volume_limit))
+            volume_limit = self.config.constraints["max_volume"]
+            # Create wrapper function with parameter
+            def volume_limit_constraint(X, driver, enclosure_type):
+                return constraint_volume_limit(X, driver, enclosure_type, max_volume_liters=volume_limit)
+            constraints.append(("volume_limit", volume_limit_constraint))
 
         return constraints
 
@@ -400,6 +408,10 @@ class OptimizationScriptFactory:
             print("=" * 80)
             print(f"Optimization: {self.config.driver_name} - {self.config.enclosure_type}")
             print(f"Objectives: {', '.join(self.config.objectives)}")
+            if self.config.constraints:
+                print(f"Constraints:")
+                for key, value in self.config.constraints.items():
+                    print(f"  - {key}: {value}")
             print("=" * 80)
 
         # Create problem
@@ -422,11 +434,11 @@ class OptimizationScriptFactory:
             self._algorithm,
             termination=('n_gen', self.config.algorithm.n_generations),
             verbose=False,
-            callback=lambda alg: print("=", end="", flush=True) if alg.n_gen % 10 == 0 and self.config.verbose else None
+            callback=lambda alg: print("=", end="", flush=True) if alg.n_gen % max(1, self.config.algorithm.n_generations // 20) == 0 and self.config.verbose else None
         )
 
         if self.config.verbose:
-            print("] Done!")
+            print(f"] {self.config.algorithm.n_generations}/{self.config.algorithm.n_generations} generations")
 
         # Process results
         if self.config.verbose:
@@ -455,10 +467,25 @@ class OptimizationScriptFactory:
         Returns:
             Processed OptimizationResult
         """
+        import numpy as np
+
         # Extract Pareto front
         pareto_front = []
 
-        for i, design in enumerate(pymoo_result.X):
+        # Handle both 1D and 2D result arrays
+        X = pymoo_result.X
+        F = pymoo_result.F
+
+        if X is None or F is None:
+            raise ValueError("Optimization failed to produce any results")
+
+        # Ensure 2D arrays
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+        if F.ndim == 1:
+            F = F.reshape(1, -1)
+
+        for i, design in enumerate(X):
             # Create design dictionary
             design_dict = {
                 "parameters": {},
@@ -473,12 +500,15 @@ class OptimizationScriptFactory:
 
             # Objectives
             for j, obj_name in enumerate(self.config.objectives):
-                design_dict["objectives"][obj_name] = float(pymoo_result.F[i, j])
+                design_dict["objectives"][obj_name] = float(F[i, j])
 
             # Constraints (if available)
             if pymoo_result.G is not None:
+                G = pymoo_result.G
+                if G.ndim == 1:
+                    G = G.reshape(1, -1)
                 for j, (constr_name, _) in enumerate(self._build_constraint_functions()):
-                    design_dict["constraints"][constr_name] = float(pymoo_result.G[i, j])
+                    design_dict["constraints"][constr_name] = float(G[i, j])
 
             pareto_front.append(design_dict)
 

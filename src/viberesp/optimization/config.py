@@ -144,9 +144,6 @@ class OptimizationConfig:
             "volume",
             "flatness",
             "efficiency",
-            "passband_flatness",
-            "wavefront_sphericity",
-            "impedance_smoothness",
         ]
         for obj in self.objectives:
             if obj not in valid_objectives:
@@ -174,8 +171,9 @@ class OptimizationConfig:
             "bass_horn",
             "midrange_horn",
             "fullrange_horn",
-            "compact",
-            "large",
+            # Sealed/ported box presets (generic, box params are driver-specific)
+            "sealed",
+            "ported",
         ]
         if self.parameter_space_preset not in valid_presets:
             raise ValueError(

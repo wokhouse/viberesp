@@ -182,3 +182,10 @@ tests/reports/*.png
 # Transient optimization outputs
 tasks/*.png
 tasks/plot_*.py
+# Optimization result JSON files (timestamped outputs)
+tasks/*_2025*.json
+# Plot output directories
+tasks/*_plots/
+plots/
+outputs/
+figures/

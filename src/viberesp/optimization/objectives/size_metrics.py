@@ -100,6 +100,48 @@ def objective_enclosure_volume(
         # Total volume = horn + rear chamber
         return v_horn + V_rc
 
+    elif enclosure_type in ["multisegment_horn", "mixed_profile_horn", "conical_horn"]:
+        # For multisegment/mixed/conical horns, estimate volume from parameters
+        # design_vector format: [throat_area, middle_area, mouth_area, length1, length2, V_tc, V_rc]
+        # or for conical: [throat_area, mouth_area, length, V_tc, V_rc]
+
+        if enclosure_type in ["multisegment_horn", "mixed_profile_horn"]:
+            # Estimate as conical sections
+            S_t = design_vector[0]  # throat area
+            S_m = design_vector[1]  # middle area
+            S_mouth = design_vector[2]  # mouth area
+            L1 = design_vector[3]  # first segment length
+            L2 = design_vector[4]  # second segment length
+            V_tc = design_vector[5] if len(design_vector) >= 6 else 0.0
+            V_rc = design_vector[6] if len(design_vector) >= 7 else 0.0
+
+            # Volume of conical frustum: V = (L/3) * (A1 + A2 + sqrt(A1*A2))
+            # First segment
+            r1_t = np.sqrt(S_t / np.pi)
+            r1_m = np.sqrt(S_m / np.pi)
+            V1 = (L1 / 3) * (S_t + S_m + np.sqrt(S_t * S_m))
+
+            # Second segment
+            r2_m = np.sqrt(S_m / np.pi)
+            r2_mouth = np.sqrt(S_mouth / np.pi)
+            V2 = (L2 / 3) * (S_m + S_mouth + np.sqrt(S_m * S_mouth))
+
+            # Total volume
+            return V1 + V2 + V_tc + V_rc
+
+        else:  # conical_horn
+            S_t = design_vector[0]  # throat area
+            S_m = design_vector[1]  # mouth area
+            L = design_vector[2]  # length
+            V_tc = design_vector[3] if len(design_vector) >= 4 else 0.0
+            V_rc = design_vector[4] if len(design_vector) >= 5 else 0.0
+
+            # Volume of conical horn
+            V_horn = (L / 3) * (S_t + S_m + np.sqrt(S_t * S_m))
+
+            # Total volume
+            return V_horn + V_tc + V_rc
+
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
 
