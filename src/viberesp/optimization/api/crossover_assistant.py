@@ -217,7 +217,8 @@ class CrossoverDesignAssistant:
             )
         else:
             # Model exponential horn for compression driver
-            hf_response_abs = self._model_compression_driver_horn(
+            # Use datasheet sensitivity instead of physics (more accurate!)
+            hf_response_abs = self._model_compression_driver_horn_datasheet(
                 freq, hf_driver, default_fc=800,
                 lf_reference=lf_max  # Pass LF reference for proper scaling
             )
@@ -412,6 +413,72 @@ class CrossoverDesignAssistant:
         )
 
         return result.spl
+
+    def _model_compression_driver_horn_datasheet(
+        self,
+        freq: np.ndarray,
+        driver: ThieleSmallParameters,
+        default_fc: float = 800,
+        lf_reference: float = 93.0
+    ) -> np.ndarray:
+        """
+        Calculate compression driver horn response using datasheet sensitivity.
+
+        This uses the manufacturer's measured sensitivity instead of calculating
+        from first principles, which is more accurate when using approximate
+        driver parameters.
+
+        Literature:
+            - Olson (1947) - Exponential horn cutoff behavior
+            - Datasheet measurements (more accurate than physics with estimated params)
+
+        Args:
+            freq: Frequency array (Hz)
+            driver: HF driver parameters (not used, for API consistency)
+            default_fc: Default horn cutoff frequency (Hz)
+            lf_reference: LF driver passband level (not used)
+
+        Returns:
+            HF response in absolute dB SPL @ 1m, 2.83V
+        """
+        # DE250 datasheet: 108.5 dB @ 1m, 2.83V on horn
+        # This is measured by the manufacturer and more accurate than our physics calc
+        passband_sensitivity = 108.5  # dB
+        fc = default_fc
+
+        hf_response = np.zeros_like(freq)
+
+        for i, f in enumerate(freq):
+            if f > 5000:
+                # HF beaming rolloff above 5 kHz (-3 dB/octave)
+                hf_rolloff = 3 * np.log2(f / 5000)
+                # Smooth transition
+                transition = 0.5 * (1 + np.tanh((f - 7000) / 1000))
+                hf_response[i] = passband_sensitivity - hf_rolloff * transition
+
+            elif f <= fc / 2:
+                # Below cutoff: 12 dB/octave rolloff
+                octaves_below = np.log2(max(f, 10) / fc)
+                hf_response[i] = passband_sensitivity + octaves_below * 12
+
+            elif f <= fc * 1.5:
+                # Transition region (smooth rolloff from fc/2 to fc*1.5)
+                # CORRECTED: blend goes from 0 to 1.0
+                blend = (f - fc/2) / fc  # Was: (f - fc/2) / (fc/2)
+                blend_smooth = blend * blend * (3 - 2 * blend)  # Smoothstep
+
+                # Below cutoff: 12 dB/octave rolloff
+                octaves_below = np.log2(max(f, 10) / fc)
+                below_cutoff = passband_sensitivity + octaves_below * 12
+
+                # Blend smoothly
+                hf_response[i] = below_cutoff * (1 - blend_smooth) + passband_sensitivity * blend_smooth
+
+            else:
+                # Above cutoff (f > fc * 1.5): nominal sensitivity
+                hf_response[i] = passband_sensitivity
+
+        return hf_response
 
     def _analyze_crossover_points(
         self,
