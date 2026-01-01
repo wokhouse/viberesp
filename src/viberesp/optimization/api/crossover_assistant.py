@@ -456,13 +456,15 @@ class CrossoverDesignAssistant:
                 transition = 0.5 * (1 + np.tanh((f - 7000) / 1000))
                 hf_response[i] = passband_sensitivity - hf_rolloff * transition
 
-            elif f > fc * 1.5:
-                # Above cutoff: nominal sensitivity
-                hf_response[i] = passband_sensitivity
+            elif f <= fc / 2:
+                # Below cutoff: 12 dB/octave rolloff
+                octaves_below = np.log2(max(f, 10) / fc)
+                hf_response[i] = passband_sensitivity + octaves_below * 12
 
-            elif f > fc / 2:
-                # Transition region (smooth rolloff)
-                blend = (f - fc/2) / (fc/2)
+            elif f <= fc * 1.5:
+                # Transition region (smooth rolloff from fc/2 to fc*1.5)
+                # CORRECTED: blend goes from 0 to 1.0
+                blend = (f - fc/2) / fc  # Was: (f - fc/2) / (fc/2)
                 blend_smooth = blend * blend * (3 - 2 * blend)  # Smoothstep
 
                 # Below cutoff: 12 dB/octave rolloff
@@ -473,9 +475,8 @@ class CrossoverDesignAssistant:
                 hf_response[i] = below_cutoff * (1 - blend_smooth) + passband_sensitivity * blend_smooth
 
             else:
-                # Below cutoff: 12 dB/octave rolloff
-                octaves_below = np.log2(max(f, 10) / fc)
-                hf_response[i] = passband_sensitivity + octaves_below * 12
+                # Above cutoff (f > fc * 1.5): nominal sensitivity
+                hf_response[i] = passband_sensitivity
 
         return hf_response
 
