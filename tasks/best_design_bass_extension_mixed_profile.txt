@@ -1,0 +1,18 @@
+Best Mixed-Profile Bass Horn Design - Extension Optimized
+======================================================================
+
+Objectives:
+  F3: 102.5 Hz
+  Efficiency: 2006.280%
+  Passband Flatness: 0.356 dB (std dev from F3 to 150.0 Hz)
+
+Parameters:
+  throat_area: 0.0069
+  mouth_area: 0.0544
+  segments: [(np.float64(0.006947011457418747), np.float64(0.03967816586535275), np.float64(0.5105340272075782), np.float64(0.28918036457029983), np.float64(0.7397802260175272)), (np.float64(0.03967816586535275), np.float64(0.054415309749938835), np.float64(0.43606530889169703), np.float64(0.4960529413256335), np.float64(0.9148599586315617))]
+  V_tc: 0.0000
+  V_rc: 0.0026
+  profile_types: [0, 0]
+  T_params: [np.float64(0.7397802260175272), np.float64(0.9148599586315617)]
+  segment_classes: ['HornSegment', 'HornSegment']
+  total_length: 0.9466

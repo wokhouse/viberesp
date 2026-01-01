@@ -35,6 +35,11 @@ from viberesp.optimization.parameters.conical_horn_params import (
     decode_conical_design,
     build_conical_horn,
 )
+from viberesp.optimization.parameters.multisegment_horn_params import (
+    get_mixed_profile_parameter_space,
+    decode_mixed_profile_design,
+    build_mixed_profile_horn,
+)
 
 __all__ = [
     "ParameterRange",
@@ -53,4 +58,7 @@ __all__ = [
     "calculate_conical_expansion_ratio",
     "decode_conical_design",
     "build_conical_horn",
+    "get_mixed_profile_parameter_space",
+    "decode_mixed_profile_design",
+    "build_mixed_profile_horn",
 ]

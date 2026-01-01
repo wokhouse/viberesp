@@ -489,20 +489,39 @@ def multsegment_horn_throat_impedance(
 
     # Process segments in reverse order (mouth to throat)
     for segment in reversed(horn.segments):
-        # Create ExponentialHorn for this segment to reuse existing T-matrix code
-        from viberesp.simulation.types import ExponentialHorn
-        segment_horn = ExponentialHorn(
-            throat_area=segment.throat_area,
-            mouth_area=segment.mouth_area,
-            length=segment.length
-            # flare_constant calculated automatically
-        )
+        # Check segment type and use appropriate T-matrix calculation
+        from viberesp.simulation.types import HornSegment, ConicalHorn, HyperbolicHorn
 
-        # Calculate T-matrix for this segment
-        a, b, c, d = exponential_horn_tmatrix(frequencies, segment_horn, medium)
+        if isinstance(segment, (ConicalHorn, HyperbolicHorn)):
+            # Use the segment's own T-matrix method for spherical/hyperbolic waves
+            # These methods handle single frequencies, so we need to loop
+            z_new = np.zeros_like(z_current, dtype=complex)
 
-        # Transform impedance through this segment
-        z_current = throat_impedance_from_tmatrix(z_current, a, b, c, d)
+            for i, freq in enumerate(frequencies):
+                # Get T-matrix from the segment's method
+                T = segment.calculate_t_matrix(freq, medium.c, medium.rho)
+                a, b, c, d = T[0, 0], T[0, 1], T[1, 0], T[1, 1]
+
+                # Transform impedance through this segment
+                z_new[i] = throat_impedance_from_tmatrix(z_current[i], a, b, c, d)
+
+            z_current = z_new
+
+        else:
+            # HornSegment (exponential) or ExponentialHorn: use plane wave T-matrix
+            from viberesp.simulation.types import ExponentialHorn
+            segment_horn = ExponentialHorn(
+                throat_area=segment.throat_area,
+                mouth_area=segment.mouth_area,
+                length=segment.length
+                # flare_constant calculated automatically
+            )
+
+            # Calculate T-matrix for this segment (vectorized over frequencies)
+            a, b, c, d = exponential_horn_tmatrix(frequencies, segment_horn, medium)
+
+            # Transform impedance through this segment
+            z_current = throat_impedance_from_tmatrix(z_current, a, b, c, d)
 
     return z_current
 

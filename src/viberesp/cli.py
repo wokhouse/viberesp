@@ -23,6 +23,9 @@ from viberesp.validation.commands import (
     validate_migrate
 )
 
+# Import CLI subcommands
+from viberesp.cli_commands import optimize, plot
+
 
 @click.group()
 @click.version_option(version="0.1.0")
@@ -679,6 +682,11 @@ validate.add_command(validate_parse_output)
 validate.add_command(validate_run)
 validate.add_command(validate_status)
 validate.add_command(validate_migrate)
+
+
+# Register new CLI command groups
+cli.add_command(optimize.optimize)
+cli.add_command(plot.plot)
 
 
 @cli.command()

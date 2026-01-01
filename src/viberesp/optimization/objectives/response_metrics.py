@@ -29,6 +29,7 @@ from viberesp.simulation.types import HornSegment, MultiSegmentHorn
 from viberesp.optimization.parameters.multisegment_horn_params import (
     decode_multisegment_design,
     build_multisegment_horn,
+    build_mixed_profile_horn,
     detect_design_type,
 )
 from viberesp.simulation.constants import SPEED_OF_SOUND
@@ -102,18 +103,156 @@ def objective_f3(
         return driver.F_s
 
     elif enclosure_type == "exponential_horn":
-        # For exponential horn, F3 is the cutoff frequency
-        # Literature: Olson (1947), Eq. 5.18 - f_c = c·m/(2π)
-        # Horns act as high-pass filters below cutoff frequency
+        # For exponential horn, calculate F3 from actual frequency response
+        # NOT just the theoretical cutoff frequency!
+        # Literature: Olson (1947), Eq. 5.18 - f_c = c·m/(2π) (for reference only)
+        # Actual F3 depends on driver parameters and chamber volumes
         throat_area = design_vector[0]
         mouth_area = design_vector[1]
         length = design_vector[2]
-        # V_rc not used for cutoff calculation (design_vector[3])
+        V_tc = design_vector[3] if len(design_vector) > 3 else 0.0
+        V_rc = design_vector[4] if len(design_vector) > 4 else 0.0
 
-        # Calculate cutoff frequency using Kolbrek convention (matches Hornresp's F12)
-        fc = calculate_horn_cutoff_frequency(throat_area, mouth_area, length)
+        # Create horn
+        horn = ExponentialHorn(throat_area=throat_area, mouth_area=mouth_area, length=length)
+        flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
 
-        return fc  # Minimize cutoff frequency for better bass extension
+        # Generate frequency array for F3 calculation (bass range: 20-500 Hz)
+        if frequency_points is None:
+            frequencies = np.logspace(np.log10(20), np.log10(500), 200)
+        else:
+            frequencies = frequency_points
+
+        # Calculate SPL response
+        spl_values = []
+        for freq in frequencies:
+            try:
+                spl = flh.spl_response(freq, voltage=2.83)
+                spl_values.append(spl)
+            except Exception:
+                spl_values.append(np.nan)
+
+        spl_values = np.array(spl_values)
+
+        # Remove NaN values
+        valid_mask = ~np.isnan(spl_values)
+        if np.sum(valid_mask) < 10:
+            return 500.0  # Large penalty if calculation failed
+
+        freq_valid = frequencies[valid_mask]
+        spl_valid = spl_values[valid_mask]
+
+        # Find reference level (max SPL in passband, typically 100-500 Hz for bass horns)
+        passband_mask = (freq_valid >= 50) & (freq_valid <= 500)
+        if np.sum(passband_mask) > 0:
+            reference_spl = np.max(spl_valid[passband_mask])
+        else:
+            reference_spl = np.max(spl_valid)
+
+        # Find F3: frequency where SPL crosses reference - 3dB
+        # For bass horns, we want the lower -3dB frequency (bass extension)
+        # Look for crossover from BELOW target to ABOVE target
+        target_spl = reference_spl - 3.0
+
+        # Iterate through frequencies to find where response crosses -3dB
+        # (from bass region upward, looking for transition from below to above)
+        for i in range(len(freq_valid) - 1):
+            below_current = spl_valid[i] < target_spl
+            below_next = spl_valid[i + 1] < target_spl
+
+            # Found crossover: current is below, next is above (or at target)
+            if below_current and not below_next:
+                # Interpolate to find exact F3
+                f1, f2 = freq_valid[i], freq_valid[i + 1]
+                spl1, spl2 = spl_valid[i], spl_valid[i + 1]
+                # Linear interpolation in log-frequency space
+                log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
+                         (target_spl - spl1) / (spl2 - spl1)
+                f3 = 10 ** log_f3
+                return f3
+
+        # If F3 not found in range, return minimum frequency measured
+        return freq_valid[0]
+
+    elif enclosure_type in ["multisegment_horn", "mixed_profile_horn"]:
+        # For multi-segment and mixed-profile horns, calculate F3 from frequency response
+        # F3 is the -3dB point relative to the passband reference level
+        from viberesp.optimization.parameters.multisegment_horn_params import (
+            build_multisegment_horn,
+            build_mixed_profile_horn,
+        )
+
+        # Build horn based on type
+        if enclosure_type == "multisegment_horn":
+            horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments=2)
+        else:  # mixed_profile_horn
+            horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments=2)
+
+        # Create front-loaded horn system
+        flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+        # Generate frequency array for F3 calculation (bass range: 20-500 Hz)
+        if frequency_points is None:
+            frequencies = np.logspace(np.log10(20), np.log10(500), 200)
+        else:
+            frequencies = frequency_points
+
+        # Calculate SPL response
+        spl_values = []
+        for freq in frequencies:
+            try:
+                spl = flh.spl_response(freq, voltage=2.83)
+                spl_values.append(spl)
+            except Exception:
+                spl_values.append(np.nan)
+
+        spl_values = np.array(spl_values)
+
+        # Remove NaN values
+        valid_mask = ~np.isnan(spl_values)
+        if np.sum(valid_mask) < 10:
+            return 500.0  # Large penalty if calculation failed
+
+        freq_valid = frequencies[valid_mask]
+        spl_valid = spl_values[valid_mask]
+
+        # Find reference level (max SPL in passband, typically 100-500 Hz for bass horns)
+        passband_mask = (freq_valid >= 50) & (freq_valid <= 500)
+        if np.sum(passband_mask) > 0:
+            reference_spl = np.max(spl_valid[passband_mask])
+        else:
+            reference_spl = np.max(spl_valid)
+
+        # Find F3: frequency where SPL crosses reference - 3dB
+        # For bass horns, we want the lower -3dB frequency (bass extension)
+        # Look for crossover from BELOW target to ABOVE target
+        target_spl = reference_spl - 3.0
+
+        # Iterate through frequencies to find where response crosses -3dB
+        # (from bass region upward, looking for transition from below to above)
+        for i in range(len(freq_valid) - 1):
+            below_current = spl_valid[i] < target_spl
+            below_next = spl_valid[i + 1] < target_spl
+
+            # Found crossover: current is below, next is above (or at target)
+            if below_current and not below_next:
+                # Interpolate to find exact F3
+                f1, f2 = freq_valid[i], freq_valid[i + 1]
+                spl1, spl2 = spl_valid[i], spl_valid[i + 1]
+                # Linear interpolation in log-frequency space
+                log_f3 = np.log10(f1) + (np.log10(f2) - np.log10(f1)) * \
+                         (target_spl - spl1) / (spl2 - spl1)
+                f3 = 10 ** log_f3
+                return f3
+
+        # If all frequencies are below target (response never reaches -3dB),
+        # return the highest frequency measured (poor bass extension)
+        if np.all(spl_valid < target_spl):
+            return freq_valid[-1]
+
+        # If all frequencies are above target (response is flat to bass limit),
+        # return the lowest frequency measured (excellent bass extension)
+        return freq_valid[0]
 
     else:
         raise ValueError(f"Unsupported enclosure type: {enclosure_type}")
@@ -194,6 +333,15 @@ def objective_response_flatness(
 
     # For multisegment_horn, use target_band if provided
     elif enclosure_type == "multisegment_horn" and target_band is not None:
+        f_min, f_max = target_band
+        frequencies = np.logspace(
+            np.log10(f_min),
+            np.log10(f_max),
+            n_points
+        )
+
+    # For mixed_profile_horn, use target_band if provided
+    elif enclosure_type == "mixed_profile_horn" and target_band is not None:
         f_min, f_max = target_band
         frequencies = np.logspace(
             np.log10(f_min),
@@ -294,6 +442,16 @@ def objective_response_flatness(
             elif enclosure_type == "multisegment_horn":
                 # Build multi-segment horn (handles both standard and hyperbolic)
                 horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+
+                # Create front-loaded horn
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                result = {'SPL': spl}
+            elif enclosure_type == "mixed_profile_horn":
+                # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+                horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
@@ -441,6 +599,34 @@ def objective_response_slope(
             f_max = 20000
 
         f_min = max(frequency_range[0], fc * 1.5)
+    elif enclosure_type == "mixed_profile_horn" and len(design_vector) >= 9:
+        # For mixed-profile horn, calculate cutoff frequency
+        num_segments = 2
+        horn, _, _ = build_mixed_profile_horn(design_vector, driver, num_segments)
+
+        # Extract flare constants from segments (only for exponential/hyperbolic)
+        c = 343.0
+        fc_values = []
+        for seg in horn.segments:
+            if hasattr(seg, 'flare_constant'):  # HornSegment (exponential)
+                if seg.flare_constant > 0:
+                    fc_values.append((c * seg.flare_constant / 2.0) / (2 * np.pi))
+            elif hasattr(seg, 'm'):  # HyperbolicHorn
+                if seg.m > 0:
+                    fc_values.append((c * seg.m * 2) / (2 * np.pi))
+            # Note: ConicalHorn segments don't have a sharp cutoff, skip them
+
+        fc = max(fc_values) if fc_values else 500.0
+
+        # Determine appropriate frequency range
+        if fc < 100:
+            f_max = max(frequency_range[1], fc * 5)
+        elif fc < 500:
+            f_max = max(frequency_range[1], fc * 20, 5000)
+        else:
+            f_max = 20000
+
+        f_min = max(frequency_range[0], fc * 1.5)
 
         # Ensure f_min < f_max for valid range
         if f_min < f_max:
@@ -471,6 +657,16 @@ def objective_response_slope(
             elif enclosure_type == "multisegment_horn":
                 # Build multi-segment horn (handles both standard and hyperbolic)
                 horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+
+                # Create front-loaded horn
+                flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+                # Calculate SPL at this frequency
+                spl = flh.spl_response(freq, voltage=voltage)
+                spl_values.append(spl)
+            elif enclosure_type == "mixed_profile_horn":
+                # Build mixed-profile horn (exponential/conical/hyperbolic segments)
+                horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments)
 
                 # Create front-loaded horn
                 flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
@@ -789,7 +985,7 @@ def objective_impedance_smoothness(
     n_points: int = 100
 ) -> float:
     """
-    Calculate throat impedance smoothness for multi-segment horn.
+    Calculate throat impedance smoothness for multi-segment and mixed-profile horns.
 
     Measures how smooth the throat impedance is vs frequency. Peaks and dips
     in throat impedance indicate resonances that color the sound. A smooth
@@ -813,8 +1009,9 @@ def objective_impedance_smoothness(
     Args:
         design_vector: Horn parameters
             - For multisegment_horn: [throat_area, middle_area, mouth_area, length1, length2, V_rc]
+            - For mixed_profile_horn: [throat, area1, area2, mouth, L1, L2, ptype1, ptype2, T1, T2, V_tc, V_rc]
         driver: ThieleSmallParameters instance
-        enclosure_type: Must be "multisegment_horn"
+        enclosure_type: "multisegment_horn" or "mixed_profile_horn"
         num_segments: Number of horn segments (2 or 3)
         frequency_range: (f_min, f_max) in Hz for evaluation
         n_points: Number of frequency points to evaluate
@@ -823,7 +1020,7 @@ def objective_impedance_smoothness(
         Peak-to-peak variation of throat resistance in ohms (lower is better)
 
     Raises:
-        ValueError: If enclosure_type is not "multisegment_horn"
+        ValueError: If enclosure_type is not supported
 
     Examples:
         >>> driver = load_driver("TC2")
@@ -835,14 +1032,16 @@ def objective_impedance_smoothness(
         >>> smoothness
         15.3  # ohms peak-to-peak (example value)
     """
-    if enclosure_type != "multisegment_horn":
+    # Build horn based on enclosure type
+    if enclosure_type == "multisegment_horn":
+        horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
+    elif enclosure_type == "mixed_profile_horn":
+        horn, _, _ = build_mixed_profile_horn(design_vector, driver, num_segments)
+    else:
         raise ValueError(
-            f"objective_impedance_smoothness only supports 'multisegment_horn', "
-            f"got '{enclosure_type}'"
+            f"objective_impedance_smoothness only supports horn enclosures "
+            f"('multisegment_horn', 'mixed_profile_horn'), got '{enclosure_type}'"
         )
-
-    # Build multi-segment horn (handles both standard and hyperbolic)
-    horn, _, _ = build_multisegment_horn(design_vector, driver, num_segments)
 
     # Generate frequency array (log-spaced)
     frequencies = np.logspace(
@@ -1018,6 +1217,131 @@ def objective_composite_flatness(
     composite = w1 * std_dev + w2 * abs(slope_avg) + w3 * ripple
 
     return float(composite)
+
+
+def objective_passband_flatness(
+    design_vector: np.ndarray,
+    driver: ThieleSmallParameters,
+    enclosure_type: str,
+    hf_cutoff: float = 200.0,
+    n_points: int = 100,
+    voltage: float = 2.83,
+    num_segments: int = 2,
+) -> float:
+    """
+    Calculate frequency response flatness from F3 to HF cutoff for minimization.
+
+    This objective evaluates flatness over the usable passband of a horn system,
+    defined as the range from the design's F3 (-3dB point) up to a specified
+    HF cutoff. This is particularly useful for subwoofer optimization where you
+    want flat response across the bass/midbass range.
+
+    Literature:
+        - Small (1972) - F3 definition for sealed/ported boxes
+        - Beranek (1954), Chapter 8 - Bandwidth and flatness definitions
+        - literature/thiele_small/small_1972_closed_box.md
+        - literature/thiele_small/thiele_1971_vented_boxes.md
+
+    Theory:
+        For subwoofer and bass horn applications, the key performance metric
+        is flat response across the usable passband (F3 to HF_cutoff). This
+        objective:
+        1. Calculates the design's F3 frequency
+        2. Evaluates SPL flatness from F3 to hf_cutoff
+        3. Returns standard deviation (lower = flatter passband)
+
+        This ensures the optimizer minimizes response variations across the
+        actual operating range of the subwoofer, rather than a fixed frequency
+        band that may include irrelevant regions.
+
+    Args:
+        design_vector: Enclosure parameters
+            - For multisegment_horn: [throat_area, middle_area, mouth_area,
+              length1, length2, V_rc]
+            - For mixed_profile_horn: [throat, area1, area2, mouth, L1, L2,
+              ptype1, ptype2, T1, T2, V_tc, V_rc]
+        driver: ThieleSmallParameters instance
+        enclosure_type: "multisegment_horn" or "mixed_profile_horn"
+        hf_cutoff: High-frequency cutoff in Hz (default 200 Hz for subwoofers)
+        n_points: Number of frequency points to evaluate
+        voltage: Input voltage for SPL calculation (default 2.83V)
+        num_segments: Number of segments (default 2)
+
+    Returns:
+        Standard deviation of SPL (dB) over F3 to hf_cutoff range (lower is better)
+
+    Raises:
+        ValueError: If enclosure_type is not supported
+
+    Examples:
+        >>> driver = load_driver("BC_18RBX100")
+        >>> # Evaluate flatness from F3 to 200 Hz for subwoofer
+        >>> flatness = objective_passband_flatness(
+        ...     design_vector, driver, "mixed_profile_horn",
+        ...     hf_cutoff=200.0
+        ... )
+        >>> flatness
+        1.23  # dB standard deviation (example value)
+
+    Notes:
+        - Uses log-spaced frequencies to match human hearing perception
+        - Automatically excludes frequencies below F3 (by definition)
+        - For bass horns, typical hf_cutoff values: 150-300 Hz
+        - For full-range horns, use higher hf_cutoff: 500-2000 Hz
+    """
+    # Step 1: Calculate F3 for this design
+    f3 = objective_f3(design_vector, driver, enclosure_type)
+
+    # Step 2: Build the horn system
+    if enclosure_type == "multisegment_horn":
+        horn, V_tc, V_rc = build_multisegment_horn(design_vector, driver, num_segments)
+    elif enclosure_type == "mixed_profile_horn":
+        horn, V_tc, V_rc = build_mixed_profile_horn(design_vector, driver, num_segments)
+    else:
+        raise ValueError(
+            f"objective_passband_flatness only supports horn enclosures "
+            f"('multisegment_horn', 'mixed_profile_horn'), got '{enclosure_type}'"
+        )
+
+    # Step 3: Create front-loaded horn system
+    flh = FrontLoadedHorn(driver, horn, V_tc=V_tc, V_rc=V_rc)
+
+    # Step 4: Generate frequency array from F3 to HF cutoff
+    # Add 10% margin above F3 to ensure we're evaluating the passband
+    f_min = f3 * 1.1
+    f_max = max(hf_cutoff, f_min * 1.5)  # Ensure we have a valid range
+
+    frequencies = np.logspace(
+        np.log10(f_min),
+        np.log10(f_max),
+        n_points
+    )
+
+    # Step 5: Calculate SPL at each frequency
+    spl_values = []
+    for freq in frequencies:
+        try:
+            spl = flh.spl_response(freq, voltage=voltage)
+            spl_values.append(spl)
+        except Exception as e:
+            import warnings
+            warnings.warn(f"SPL calculation failed at {freq:.1f} Hz: {e}")
+            spl_values.append(np.nan)
+
+    spl_values = np.array(spl_values)
+
+    # Step 6: Remove NaN values
+    valid_mask = ~np.isnan(spl_values)
+    if np.sum(valid_mask) < 10:
+        return 100.0  # Large penalty if too many failures
+
+    spl_valid = spl_values[valid_mask]
+
+    # Step 7: Calculate flatness as standard deviation
+    # Beranek (1954), Chapter 8 - Flatness criterion
+    flatness_metric = np.std(spl_valid)
+
+    return float(flatness_metric)
 
 
 def multisegment_horn_objectives(

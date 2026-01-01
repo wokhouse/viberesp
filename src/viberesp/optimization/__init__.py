@@ -13,6 +13,7 @@ Key components:
 - api: Agent-friendly Python API for programmatic access
 - results: Pareto front analysis and design ranking
 - validation: Validation against Hornresp
+- factory: Optimization factory for script generation
 
 Literature:
     - Small (1972) - Closed-box and vented box system parameters
@@ -22,9 +23,29 @@ Literature:
 """
 
 from viberesp.optimization.api import DesignAssistant, DesignRecommendation, OptimizationResult
+from viberesp.optimization.factory import OptimizationScriptFactory
+from viberesp.optimization.config import OptimizationConfig, AlgorithmConfig
+from viberesp.optimization.presets import (
+    OPTIMIZATION_PRESETS,
+    get_available_presets,
+    get_preset_info,
+    print_preset_table,
+    suggest_preset,
+)
 
 __all__ = [
+    # API
     "DesignAssistant",
     "DesignRecommendation",
     "OptimizationResult",
+    # Factory
+    "OptimizationScriptFactory",
+    "OptimizationConfig",
+    "AlgorithmConfig",
+    # Presets
+    "OPTIMIZATION_PRESETS",
+    "get_available_presets",
+    "get_preset_info",
+    "print_preset_table",
+    "suggest_preset",
 ]

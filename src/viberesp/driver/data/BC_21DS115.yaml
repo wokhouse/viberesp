@@ -1,0 +1,57 @@
+name: "BC_21DS115"
+manufacturer: "B&C Speakers"
+model: "21DS115-4"
+description: "21 inch Subwoofer driver"
+
+# Datasheet specifications (for reference)
+datasheet:
+  fs: 36  # Hz
+  re: 5.1  # Ohms
+  qts: 0.30
+  qes: 0.31
+  qms: 8.4
+  vas: 198  # dm³ (198 L)
+  sd: 1680  # cm²
+  eta0: 3.0  # %
+  xmax: 16.5  # mm
+  mms: 0.390  # kg (total moving mass)
+  bl: 38.0  # T·m
+  le: 4.55  # mH
+  ebp: 116  # Hz
+
+# Physical parameters (used for ThieleSmallParameters)
+parameters:
+  M_md: 0.309473  # kg - driver mass only (optimized to match datasheet Fs=36Hz)
+  C_ms: 5.053e-5  # m/N - compliance (from Vas=198L, Sd=1680cm²)
+  R_ms: 10.50  # N·s/m - mechanical resistance (from Qms=8.4)
+  R_e: 5.1  # Ohms - voice coil DC resistance
+  L_e: 4.55e-3  # H - voice coil inductance
+  BL: 38.0  # T·m - force factor
+  S_d: 0.168  # m² - effective area
+  X_max: 0.0165  # m - maximum linear excursion
+
+# Notes and warnings
+notes: |
+  M_md is driver mass only (excludes radiation mass).
+  The datasheet Mms=390g, Fs=36Hz, and Vas=198L are consistent when
+  using the standard Thiele-Small relationships.
+
+  Calculated from datasheet Mms=390g and Fs=36Hz:
+  - C_ms = 5.053e-5 m/N (from Vas=198L, Sd=1680cm²)
+  - R_ms = 10.50 N·s/m (from Qms=8.4)
+  - M_md = 0.309 kg (optimized to match Fs=36Hz with Hornresp radiation mass)
+
+  Resulting values (match datasheet):
+  - Fs ≈ 36.0 Hz ✓
+  - Qes ≈ 0.31 ✓
+  - Qms ≈ 8.3 ✓
+  - Qts ≈ 0.30 ✓
+  - Vas ≈ 198 L ✓
+
+  Radiation mass is calculated internally using Beranek (1954) theory
+  to match Hornresp methodology (2× radiation mass for infinite baffle).
+
+# Literature references
+literature:
+  - "B&C 21DS115 datasheet"
+  - "https://www.bcspeakers.com/"

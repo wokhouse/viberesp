@@ -316,12 +316,69 @@ class FrontLoadedHorn:
         horn_type = type(self.horn).__name__
 
         if horn_type == "MultiSegmentHorn":
-            # For multi-segment horn: calculate power at throat
-            # Power is conserved in lossless horn: W_throat = W_mouth
-            # W = Re(p_throat × conj(U_throat))
+            # For multi-segment horn: transform throat quantities to mouth
+            # CRITICAL: Chain T-matrices in FORWARD order (throat -> mouth)
+            # Then invert to transform from throat to mouth
+            #
+            # Literature: Kolbrek "Horn Theory" - T_total = T_1 × T_2 × ... × T_n
+            # where matrices are applied from throat to mouth (FORWARD order)
+
+            from viberesp.simulation.types import HornSegment, ConicalHorn, HyperbolicHorn
+            from viberesp.simulation.horn_theory import exponential_horn_tmatrix
+
+            # Start with identity matrix
+            a, b, c_mat, d = 1.0, 0.0, 0.0, 1.0
+
+            # Chain T-matrices in FORWARD order (throat to mouth)
+            # This is CRITICAL - T-matrices relate throat to mouth
+            for segment in self.horn.segments:
+                if isinstance(segment, (ConicalHorn, HyperbolicHorn)):
+                    # Use the segment's T-matrix method
+                    T = segment.calculate_t_matrix(frequency, medium.c, medium.rho)
+                    # Chain: T_total = T_total @ T_segment
+                    # (apply new segment on the right)
+                    a_new = a * T[0, 0] + b * T[1, 0]
+                    b_new = a * T[0, 1] + b * T[1, 1]
+                    c_new = c_mat * T[0, 0] + d * T[1, 0]
+                    d_new = c_mat * T[0, 1] + d * T[1, 1]
+                    a, b, c_mat, d = a_new, b_new, c_new, d_new
+                else:
+                    # HornSegment (exponential): use exponential T-matrix
+                    from viberesp.simulation.types import ExponentialHorn
+
+                    segment_horn = ExponentialHorn(
+                        throat_area=segment.throat_area,
+                        mouth_area=segment.mouth_area,
+                        length=segment.length
+                    )
+                    a_seg, b_seg, c_seg, d_seg = exponential_horn_tmatrix(
+                        np.array([frequency]), segment_horn, medium
+                    )
+
+                    # Chain: T_total = T_total @ T_segment
+                    # (apply new segment on the right)
+                    a_new = a * a_seg[0] + b * c_seg[0]
+                    b_new = a * b_seg[0] + b * d_seg[0]
+                    c_new = c_mat * a_seg[0] + d * c_seg[0]
+                    d_new = c_mat * b_seg[0] + d * d_seg[0]
+                    a, b, c_mat, d = a_new, b_new, c_new, d_new
+
+            # Determinant of T-matrix (should be 1 for lossless horn)
+            det = a * d - b * c_mat
+
+            if abs(det) < 1e-15:
+                return 0.0
+
+            # Inverse transform: [p_mouth, U_mouth] = (1/det) × [d, -b; -c, a] @ [p_throat, U_throat]
+            p_mouth_complex = (d * p_throat_complex - b * U_throat_complex) / det
+            U_mouth_complex = (-c_mat * p_throat_complex + a * U_throat_complex) / det
+
+            # Acoustic power at mouth
+            # W = Re(p_m × U_m*)
             # Kolbrek, "Horn Loudspeaker Simulation Part 3"
             # Beranek (1954), Chapter 4
-            power = np.real(p_throat_complex * np.conj(U_throat_complex))
+            # Factor of 0.5 for RMS (peak values used in calculation)
+            power = 0.5 * np.real(p_mouth_complex * np.conj(U_mouth_complex))
         else:
             # For single-segment exponential horn: transform to mouth
             # [p_throat, U_throat] = T_horn @ [p_mouth, U_mouth]

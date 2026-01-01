@@ -305,6 +305,10 @@ class DesignAssistant:
         from viberesp.optimization.parameters.conical_horn_params import (
             get_conical_horn_parameter_space
         )
+        from viberesp.optimization.parameters.multisegment_horn_params import (
+            get_mixed_profile_parameter_space,
+            build_mixed_profile_horn,
+        )
         from viberesp.optimization.objectives.composite import EnclosureOptimizationProblem
         from viberesp.optimization.optimizers.pymoo_interface import run_nsga2
         from viberesp.optimization.results.pareto_front import rank_designs
@@ -325,7 +329,7 @@ class DesignAssistant:
             )
 
         # Validate enclosure type
-        supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn", "conical_horn"]
+        supported_types = ["sealed", "ported", "exponential_horn", "multisegment_horn", "conical_horn", "mixed_profile_horn"]
         if enclosure_type not in supported_types:
             return OptimizationResult(
                 success=False,
@@ -360,6 +364,12 @@ class DesignAssistant:
             # Get preset from constraints, default to midrange_horn
             preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
             param_space = get_conical_horn_parameter_space(driver, preset=preset)
+        elif enclosure_type == "mixed_profile_horn":
+            # Get preset from constraints, default to midrange_horn
+            preset = constraints.get("preset", "midrange_horn") if constraints else "midrange_horn"
+            param_space = get_mixed_profile_parameter_space(
+                driver, preset=preset, num_segments=num_segments
+            )
         else:
             return OptimizationResult(
                 success=False,
@@ -395,7 +405,7 @@ class DesignAssistant:
                 # Horn-specific constraints
                 constraint_list.extend(constraints.get(
                     "constraint_list",
-                    ["mouth_size", "flare_constant_limits"]
+                    ["mouth_size", "flare_constant_limits", "monotonic_expansion"]
                 ))
 
             if enclosure_type == "conical_horn":
@@ -411,6 +421,13 @@ class DesignAssistant:
                     "constraint_list",
                     ["segment_continuity", "flare_constant_limits"]
                 ))
+
+            if enclosure_type == "mixed_profile_horn":
+                # Mixed profile horn constraints (similar to multisegment)
+                constraint_list.extend(constraints.get(
+                    "constraint_list",
+                    ["segment_continuity", "flare_constant_limits"]
+                ))
         else:
             # Default constraints
             constraint_list = ["max_displacement"]
@@ -418,12 +435,15 @@ class DesignAssistant:
                 constraint_list.append("port_velocity")
             if enclosure_type == "exponential_horn":
                 # Default horn constraints
-                constraint_list.extend(["mouth_size", "flare_constant_limits"])
+                constraint_list.extend(["mouth_size", "flare_constant_limits", "monotonic_expansion"])
             if enclosure_type == "conical_horn":
                 # Default conical horn constraints
                 constraint_list.extend(["mouth_size", "expansion_ratio"])
             if enclosure_type == "multisegment_horn":
                 # Default multisegment horn constraints
+                constraint_list.extend(["segment_continuity", "flare_constant_limits"])
+            if enclosure_type == "mixed_profile_horn":
+                # Default mixed profile horn constraints
                 constraint_list.extend(["segment_continuity", "flare_constant_limits"])
 
         # Setup problem

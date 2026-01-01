@@ -1343,3 +1343,334 @@ ME Amplifier Polarity Value = 1
     print(f"Exported {driver_name} {num_segments}-segment horn to {output_path}")
     print(f"  Throat: {s1:.1f} cm² → Mouth: {max(s2, s3, s4, s5):.1f} cm²")
     print(f"  Total length: {horn.total_length()*100:.1f} cm")
+
+
+def export_mixed_profile_horn_to_hornresp(
+    driver: ThieleSmallParameters,
+    horn: 'MultiSegmentHorn',
+    driver_name: str,
+    output_path: str,
+    comment: Optional[str] = None,
+    V_tc_liters: float = 0.0,
+    A_tc_cm2: Optional[float] = None,
+    V_rc_liters: float = 0.0,
+    L_rc_cm: Optional[float] = None,
+    radiation_angle: float = 6.283185307179586,  # 2π
+) -> None:
+    """Export a mixed-profile horn (Con/Exp/Hyp segments) to Hornresp format.
+
+    Generates a .txt file in Hornresp native format for a mixed-profile
+    horn where each segment can be conical, exponential, or hyperbolic.
+
+    Literature:
+        - Hornresp User Manual - Multi-segment horn with segment types
+        - Hornresp supports: Con (conical), Exp (exponential), Hyp (hyperbolic)
+        - Segment type specified by suffix on length parameter (e.g., L12Con)
+        - Olson (1947), Chapter 8 - Compound horns
+        - https://www.hornresp.net/
+
+    Args:
+        driver: ThieleSmallParameters instance in SI units
+        horn: MultiSegmentHorn with mixed segment types (HornSegment, ConicalHorn, HyperbolicHorn)
+        driver_name: Name/identifier for the system
+        output_path: Path to output .txt file
+        comment: Optional comment/description
+        V_tc_liters: Throat chamber volume in liters (default: 0)
+        A_tc_cm2: Throat chamber area in cm² (defaults to horn throat area)
+        V_rc_liters: Rear chamber volume in liters (default: 0)
+        L_rc_cm: Rear chamber depth in cm (optional, auto-calculated if None)
+        radiation_angle: Solid angle of radiation (steradians)
+
+    Raises:
+        ValueError: If horn has more than 4 segments (Hornresp limit)
+
+    Examples:
+        >>> from viberesp.simulation.types import HornSegment, ConicalHorn, MultiSegmentHorn
+        >>> seg1 = ConicalHorn(throat_area=0.001, mouth_area=0.01, length=0.3)
+        >>> seg2 = HornSegment(throat_area=0.01, mouth_area=0.1, length=0.6)
+        >>> horn = MultiSegmentHorn(segments=[seg1, seg2])
+        >>> export_mixed_profile_horn_to_hornresp(driver, horn, "Mixed", "mixed.txt")
+    """
+    from viberesp.simulation.types import HornSegment, ConicalHorn, HyperbolicHorn
+
+    # Convert driver to Hornresp format
+    record = driver_to_hornresp_record(driver, driver_name)
+
+    # Validate number of segments
+    if horn.num_segments > 4:
+        raise ValueError(
+            f"Hornresp supports maximum 4 segments, got {horn.num_segments}. "
+            "Reduce number of segments or export segments separately."
+        )
+
+    # Set radiation angle
+    pi = 3.141592653589793
+    if radiation_angle == 2 * pi:
+        ang_value = "2.0"  # Half-space
+    elif radiation_angle == 4 * pi:
+        ang_value = "4.0"  # Full-space
+    elif radiation_angle == pi:
+        ang_value = "1.0"  # Quarter-space
+    else:
+        ang_value = "2.0"  # Default to half-space
+
+    segments = horn.segments
+    num_segments = len(segments)
+    c = 343.0  # Speed of sound (m/s)
+
+    # Helper functions for unit conversion
+    def area_to_cm2(area_m2: float) -> float:
+        return area_m2 * 10000.0
+
+    def length_to_cm(length_m: float) -> float:
+        return length_m * 100.0
+
+    # Build horn parameters segment by segment
+    # Hornresp format: S1, S2, L12<type>, F12 | S2, S3, L23<type>, F23 | ...
+    # Types: Con (conical), Exp (exponential), Hyp (hyperbolic)
+    # For conical: F parameter is 0
+    # For hyperbolic: T parameter is included in calculation
+
+    horn_lines = []
+    s_prev = area_to_cm2(segments[0].throat_area)
+
+    for i, seg in enumerate(segments):
+        s_curr = area_to_cm2(seg.mouth_area)
+        length_cm = length_to_cm(seg.length)
+
+        # Determine segment type and flare parameter
+        if isinstance(seg, ConicalHorn):
+            # Conical segment
+            seg_type = "Con"
+            flare_param = "0.00"  # No flare constant for conical
+        elif isinstance(seg, HyperbolicHorn):
+            # Hyperbolic segment
+            seg_type = "Hyp"
+            # Hyperbolic horns have T parameter
+            # F parameter in Hornresp for hyperbolic uses T in calculation
+            # For HyperbolicHorn with T, the flare is: m * T
+            # Hornresp expects this as F parameter
+            m = seg.flare_constant if hasattr(seg, 'flare_constant') else 0
+            T = seg.T if hasattr(seg, 'T') else 1.0
+            # Hornresp format for hyperbolic: F = c * m * T / (4π)
+            flare_param = f"{(c * m * T) / (4.0 * math.pi):.2f}"
+        else:
+            # Exponential segment (HornSegment)
+            seg_type = "Exp"
+            m = seg.flare_constant if hasattr(seg, 'flare_constant') else 0
+            flare_param = f"{(c * m) / (4.0 * math.pi):.2f}"
+
+        # Format: S<i>, S<i+1>, L<i><i+1><type>, F<i><i+1>
+        if i == 0:
+            horn_lines.append(f"S1 = {s_prev:.2f}")
+        horn_lines.append(f"S{i+1} = {s_curr:.2f}")
+        horn_lines.append(f"L{i+1}{i+2}{seg_type} = {length_cm:.2f}")
+        horn_lines.append(f"F{i+1}{i+2} = {flare_param}")
+
+        # Add S<i+1> again for next segment (Hornresp format quirk)
+        if i < num_segments - 1:
+            horn_lines.append(f"S{i+1} = {s_curr:.2f}")
+
+    # Fill remaining segments (Hornresp expects up to 4 segments)
+    while len(horn_lines) < 20:  # 4 segments * 5 lines each
+        next_seg = len(horn_lines) // 5 + 1
+        if next_seg > num_segments:
+            horn_lines.append(f"S{next_seg} = 0.00")
+            horn_lines.append(f"S{next_seg+1} = 0.00")
+            horn_lines.append(f"L{next_seg}{next_seg+1}Con = 0.00")
+            horn_lines.append(f"F{next_seg}{next_seg+1} = 0.00")
+            if next_seg < 4:
+                horn_lines.append(f"S{next_seg+1} = 0.00")
+
+    horn_section = "|HORN PARAMETER VALUES:\n\n" + "\n".join(horn_lines[:20])
+
+    # Calculate chamber parameters (same as multisegment function)
+    s1_cm2 = area_to_cm2(segments[0].throat_area)
+
+    if A_tc_cm2 is None:
+        atc_cm2 = s1_cm2
+    else:
+        atc_cm2 = A_tc_cm2
+
+    # Calculate rear chamber depth
+    VRC_TOLERANCE = 0.005
+    has_rear_chamber = V_rc_liters > VRC_TOLERANCE
+
+    if has_rear_chamber and L_rc_cm is None:
+        vrc_cm3 = V_rc_liters * 1000.0
+        piston_radius_cm = math.sqrt(driver.S_d / math.pi) * 100.0
+        piston_area_cm2 = driver.S_d * 10000.0
+
+        lrc_min = 2.0 * piston_radius_cm
+        lrc_max = vrc_cm3 / piston_area_cm2
+
+        if lrc_min > lrc_max + 0.1:
+            min_vrc_liters = (lrc_min * piston_area_cm2) / 1000.0
+            raise ValueError(
+                f"Rear chamber volume {V_rc_liters:.1f}L is too small for driver. "
+                f"Minimum volume to fit driver: {min_vrc_liters:.1f}L"
+            )
+
+        lrc_cube = vrc_cm3 ** (1.0/3.0)
+        lrc_value = max(lrc_min, min(lrc_cube, lrc_max))
+    else:
+        lrc_value = L_rc_cm if L_rc_cm else 0.0
+        if not has_rear_chamber:
+            V_rc_liters = 0.0
+
+    if has_rear_chamber and lrc_value <= 0:
+        raise ValueError(f"Lrc must be > 0 for rear chamber, got {lrc_value}")
+
+    chamber_section = f"""|CHAMBER PARAMETER VALUES:
+
+Vrc = {V_rc_liters:.2f}
+Lrc = {lrc_value:.2f}
+Fr = 0.00
+Tal = 0.00
+Vtc = {V_tc_liters * 1000:.2f}
+Atc = {atc_cm2:.2f}"""
+
+    # Generate file content
+    comment_text = comment or f"{driver_name} mixed-profile horn from viberesp"
+    id_hash = abs(hash(driver_name)) % 100000
+    id_value = f"{id_hash / 100:.2f}"
+
+    # Use same template structure as multisegment export
+    content = f"""ID = {id_value}
+
+Comment = {comment_text}
+
+|RADIATION, SOURCE AND MOUTH PARAMETER VALUES:
+
+Ang = {ang_value} x Pi
+Eg = 2.83
+Rg = 0.00
+Cir = 0.42
+
+{horn_section}
+
+{record.to_hornresp_format()}
+
+|CHAMBER PARAMETER VALUES:
+
+Vrc = {V_rc_liters:.2f}
+Lrc = {lrc_value:.2f}
+Fr = 0.00
+Tal = 0.00
+Vtc = {V_tc_liters * 1000:.2f}
+Atc = {atc_cm2:.2f}
+
+Acoustic Path Length = 0.0
+
+|MAXIMUM SPL PARAMETER VALUES:
+
+Pamp = 100
+Vamp = 25
+Iamp = 4
+Pmax = 200
+Xmax = 7.0
+
+Maximum SPL Setting = 3
+
+|ABSORBENT FILLING MATERIAL PARAMETER VALUES:
+
+Fr1 = 0.00
+Fr2 = 0.00
+Fr3 = 0.00
+
+|LENS AND OTHER PARAMETERS:
+
+St = 0.00
+Lt = 0.00
+
+|VIS PARAMETERS:
+
+Vta = 0.00
+Lta = 0.00
+
+|INTERNAL IMAGES:
+
+Rear = Closed
+Image 1 Amp = 0.00
+Image 1 Time = 0.00
+Image 2 Amp = 0.00
+Image 2 Time = 0.00
+
+|DIAGNOSTIC:
+
+Diagnostic = 0
+
+|FILTER:
+
+Filter Type = 0
+
+|INPUT PARAMETERS:
+
+Band 1 Frequency = 0
+Band 1 Q Factor = 0.01
+Band 1 Gain = 0.0
+Band 1 Type = -1
+Band 2 Frequency = 0
+Band 2 Q Factor = 0.01
+Band 2 Gain = 0.0
+Band 2 Type = -1
+Band 3 Frequency = 0
+Band 3 Q Factor = 0.01
+Band 3 Gain = 0.0
+Band 3 Type = -1
+Band 4 Frequency = 0
+Band 4 Q Factor = 0.01
+Band 4 Gain = 0.0
+Band 4 Type = -1
+Band 5 Frequency = 0
+Band 5 Q Factor = 0.01
+Band 5 Gain = 0.0
+Band 5 Type = -1
+Band 6 Frequency = 0
+Band 6 Q Factor = 0.01
+Band 6 Gain = 0.0
+Band 6 Type = -1
+
+|STATUS FLAGS:
+
+Auto Path Flag = 0
+Lossy Inductance Model Flag = 0
+Semi-Inductance Model Flag = 0
+Damping Model Flag = 0
+Closed Mouth Flag = 0
+Continuous Flag = 1
+End Correction Flag = 1
+
+|OTHER SETTINGS:
+
+Filter Type Index = 0
+Filter Input Index = 0
+Filter Output Index = 0
+
+Filter Type = 1
+
+MEH Configuration = 0
+ME Amplifier Polarity Value = 1
+"""
+
+    # Write to file with CRLF line endings
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, 'w', encoding='utf-8', newline='\r\n') as f:
+        f.write(content)
+
+    # Build segment type summary
+    segment_types = []
+    for seg in segments:
+        if isinstance(seg, ConicalHorn):
+            segment_types.append("Con")
+        elif isinstance(seg, HyperbolicHorn):
+            segment_types.append(f"Hyp(T={seg.T:.2f})")
+        else:
+            segment_types.append("Exp")
+
+    print(f"Exported {driver_name} mixed-profile horn ({num_segments} segments) to {output_path}")
+    print(f"  Profile: {' → '.join(segment_types)}")
+    print(f"  Throat: {area_to_cm2(segments[0].throat_area):.1f} cm² → Mouth: {area_to_cm2(segments[-1].mouth_area):.1f} cm²")
+    print(f"  Total length: {horn.total_length()*100:.1f} cm")
