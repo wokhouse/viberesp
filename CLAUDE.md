@@ -519,6 +519,60 @@ AIR_DENSITY = 1.18  # kg/m³
 
 ## Optimization and Exploration
 
+### Enclosure Optimization Code: Generic vs Driver-Specific
+
+**CRITICAL:** Enclosure optimization code committed to the repository **MUST be generic** and work with any driver, not hardcoded for specific drivers.
+
+**What this means:**
+- ✅ **DO:** Create generic optimization functions that accept any `ThieleSmallParameters` object
+- ✅ **DO:** Parameterize optimization constraints by driver properties (e.g., `Vb_min = driver.V_as * 0.5`)
+- ❌ **DON'T:** Hardcode driver-specific values in optimization logic
+- ❌ **DON'T:** Create optimization workflows that only work with one driver
+
+**Examples:**
+
+✅ **CORRECT - Generic optimization:**
+```python
+def optimize_ported_box(driver: ThieleSmallParameters, alignment: str):
+    """
+    Optimize ported box parameters for a given alignment.
+
+    Args:
+        driver: Any driver with Thiele-Small parameters
+        alignment: 'B4', 'QB3', 'BB4', etc.
+
+    Returns:
+        Optimized Vb, Fb, port dimensions
+    """
+    if alignment == 'B4':
+        Vb = driver.V_as
+        Fb = driver.F_s
+    # ... generic optimization logic
+```
+
+❌ **WRONG - Driver-specific hardcoding:**
+```python
+def optimize_for_bc_15ps100():
+    """
+    Optimize for BC 15PS100 only.
+    """
+    Vb = 105.5  # Hardcoded for 15PS100
+    Fb = 37.3   # Hardcoded for 15PS100
+    # ... will not work with any other driver
+```
+
+**Where driver-specific code belongs:**
+- Driver parameter definitions → `src/viberesp/driver/bc_drivers.py` or similar
+- Test cases and examples → `tests/` or `examples/` (can show usage with specific drivers)
+- User's local workspace (not committed to repo)
+
+**Rationale:**
+The viberesp tool is a general-purpose enclosure design calculator, not a collection of one-off designs for specific drivers. Generic optimization code:
+- Is reusable across all drivers
+- Makes the codebase more maintainable
+- Allows users to optimize for their own drivers
+- Keeps the project focused on enclosure design methodology, not specific products
+
 ### Future Features (Roadmap Phases 6-7)
 
 When implementing optimization and parameter exploration:
