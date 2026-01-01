@@ -214,7 +214,14 @@ class PlotFactory:
         y = self._extract_objective_values(self.config.y_objective, designs)
 
         # Filter out NaN values
-        valid_mask = ~(np.isnan(x) | np.isnan(y))
+        if self.config.z_objective:
+            # If using z_objective for coloring, include it in the mask
+            z = self._extract_objective_values(self.config.z_objective, designs)
+            valid_mask = ~(np.isnan(x) | np.isnan(y) | np.isnan(z))
+        else:
+            # Only filter x and y
+            valid_mask = ~(np.isnan(x) | np.isnan(y))
+
         n_filtered = len(x) - valid_mask.sum()
         x = x[valid_mask]
         y = y[valid_mask]
@@ -239,10 +246,10 @@ class PlotFactory:
 
         # Color by third objective if available
         if self.config.z_objective:
-            z = self._extract_objective_values(self.config.z_objective, valid_designs)
-            z = z[~np.isnan(z)]  # Filter NaN from z too
+            # z was already filtered together with x and y using valid_mask
+            z = z[valid_mask]
             scatter = ax.scatter(
-                x[:len(z)], y[:len(z)],
+                x, y,
                 c=z,
                 cmap='viridis',
                 s=60,
